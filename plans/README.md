@@ -20,7 +20,7 @@ honor its STOP conditions, and update your row when done.
 | 005  | Features v1.1: CI/CD gate `--threshold`, `--dry-run`, `--backup` | P2 | M | 001 | DONE |
 | 006  | Consolidar implementaciones JS y Python | P2 | L | 003 | DONE |
 | 007  | Modularizar `src/optimizer.js` (split god module) | P3 | M | 003 | DONE |
-| 008  | CLI modernization + batch audit + enhanced statistics detection | P3 | M | 005, 007 | TODO |
+| 008  | CLI modernization + batch audit + enhanced statistics detection | P3 | M | 005, 007 | DONE |
 
 ## Dependency notes
 

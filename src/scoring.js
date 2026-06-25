@@ -128,12 +128,37 @@ export function auditFile(filepath, config, outputFormat = "text") {
   const statCount = filteredStats.length;
   let statsBreakdown = "";
 
-  if (statCount >= 3) {
+  // Enhanced: detect verbal/non-numeric statistics
+  const verbalStats = [
+    // Fractions
+    /\b(?:one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:-|—)\s*(?:third|quarter|fifth|sixth|seventh|eighth|ninth|tenth)s?\b/gi,
+    /\b(?:one|two|three|four|five)\s*-?\s*(?:third|quarter|fifth)s?\b/gi,
+    // Proportional phrases
+    /\b\d+\s*(?:out\s*of|in)\s*\d+\b/gi,
+    // Multiplier words
+    /\b(?:double|triple|quadruple|half|twice)\b/gi,
+    // Percentage words
+    /\b(?:majority|minority|plurality)\b/gi,
+  ];
+
+  let verbalCount = 0;
+  const verbalMatches = [];
+  for (const pattern of verbalStats) {
+    const matches = textContent.match(pattern) || [];
+    verbalCount += matches.length;
+    if (matches.length > 0) {
+      verbalMatches.push(...matches.slice(0, 3));
+    }
+  }
+
+  const totalStatCount = statCount + verbalCount;
+
+  if (totalStatCount >= 3) {
     statsScore = 20;
-    statsBreakdown = `High density (${statCount} stats found): ${filteredStats.slice(0, 5).join(", ")}... (+20 pts)`;
-  } else if (statCount > 0) {
+    statsBreakdown = `High density (${totalStatCount} stats found: ${filteredStats.slice(0, 3).join(", ")}${verbalMatches.length > 0 ? (filteredStats.length > 0 ? ", " : "") + verbalMatches.slice(0, 3).join(", ") : ""}...) (+20 pts)`;
+  } else if (totalStatCount > 0) {
     statsScore = 10;
-    statsBreakdown = `Moderate density (${statCount} stats found): ${filteredStats.join(", ")} (+10 pts)`;
+    statsBreakdown = `Moderate density (${totalStatCount} stats found: ${filteredStats.concat(verbalMatches).join(", ")}) (+10 pts)`;
   } else {
     statsBreakdown = "No statistics or numerical evidence found (+0 pts)";
   }

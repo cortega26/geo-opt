@@ -359,3 +359,30 @@ test("injectSchema injects JSON-LD script tag into HTML file", () => {
     }
   }
 });
+
+test("auditFile detects verbal statistics as data points", () => {
+  const tempFile = path.join(__dirname, "temp_verbal.md");
+  fs.writeFileSync(
+    tempFile,
+    `# Report
+
+Hybrid cloud adoption is an enterprise IT strategy. It delivers significant benefits.
+
+One third of enterprises report cost reductions. Double the efficiency of legacy setups.
+Three out of four IT managers recommend the approach.
+  `,
+    { encoding: "utf8" }
+  );
+
+  try {
+    const score = auditFile(tempFile, config, "json");
+    // Con "one third", "double", "three out of four" debería tener score > 0
+    // en la categoría de estadísticas
+    assert.ok(typeof score === "number");
+    assert.ok(score > 0);
+  } finally {
+    if (fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile);
+    }
+  }
+});
