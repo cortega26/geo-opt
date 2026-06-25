@@ -1,0 +1,36 @@
+{
+  "author": {
+    "name": "Carlos Ortega González",
+    "jobTitle": "Sr. Software Automation and Data Analyst",
+    "sameAs": "https://www.linkedin.com/in/cortega26/"
+  },
+  "publisher": {
+    "name": "Tooltician",
+    "url": "https://www.tooltician.com",
+    "logo": "https://www.tooltician.com/logo.png"
+  },
+  "signature": "Optimized by [Tooltician](https://www.tooltician.com)",
+  "acronyms": {
+    "AWS": "Amazon Web Services",
+    "GCP": "Google Cloud Platform",
+    "API": "Application Programming Interface",
+    "REST": "Representational State Transfer",
+    "SQL": "Structured Query Language",
+    "GDPR": "General Data Protection Regulation",
+    "HIPAA": "Health Insurance Portability and Accountability Act",
+    "ROI": "Return on Investment",
+    "IT": "Information Technology",
+    "SaaS": "Software as a Service",
+    "PaaS": "Platform as a Service",
+    "IaaS": "Infrastructure as a Service",
+    "ML": "Machine Learning",
+    "AI": "Artificial Intelligence",
+    "RAG": "Retrieval-Augmented Generation",
+    "LLM": "Large Language Model",
+    "SEO": "Search Engine Optimization",
+    "GEO": "Generative Engine Optimization",
+    "CapEx": "Capital Expenditures",
+    "OpEx": "Operational Expenditures",
+    "IDC": "International Data Corporation"
+  }
+}

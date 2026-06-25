@@ -1,0 +1,22 @@
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "[Insert Question 1]",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "[Insert concise, answer-first, fact-filled answer 1]"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "[Insert Question 2]",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "[Insert concise, answer-first, fact-filled answer 2]"
+      }
+    }
+  ]
+}
