@@ -725,6 +725,16 @@ export function injectSchema(filepath, schemaType, config) {
     process.exit(1);
   }
 
+  // SEC-01: Validate path is within working directory
+  const resolvedPath = path.resolve(filepath);
+  const cwd = path.resolve(process.cwd());
+  if (!resolvedPath.startsWith(cwd + path.sep) && resolvedPath !== cwd) {
+    console.error(
+      `Error: Security restriction — target file ${filepath} is outside the current working directory.`
+    );
+    process.exit(1);
+  }
+
   const schema = generateSchemaData(filepath, schemaType, config);
   const schemaJson = JSON.stringify(schema, null, 2);
 
@@ -745,11 +755,27 @@ export function injectSchema(filepath, schemaType, config) {
   let sigHtml = "";
 
   if (signature) {
+    // SEC-02: Validate signature format — only allow markdown link syntax [text](https://url) with optional text
+    const sigPattern = /^[^<>\n]*\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)[^<>\n]*$/;
+    if (!sigPattern.test(signature)) {
+      console.error(
+        `Error: Security restriction — signature must contain a markdown link and no HTML tags. Got: ${signature}`
+      );
+      process.exit(1);
+    }
+
     // Check if signature is already present by stripping markdown link markers
     const sigRaw = signature.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
     if (!content.includes(sigRaw)) {
+      const escapedText = signature
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
       sigMd = `\n\n${signature}\n`;
-      sigHtml = `\n<div class="geo-signature"><p>${signature}</p></div>\n`;
+      // For HTML, use the escaped version to prevent XSS
+      sigHtml = `\n<div class="geo-signature"><p>${escapedText}</p></div>\n`;
     }
   }
 
