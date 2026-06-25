@@ -15,7 +15,7 @@ export function loadConfig(configPath = null) {
       console.error(`Error: Specified config file ${configPath} not found.`);
       process.exit(1);
     }
-    searchPaths.append(configPath);
+    searchPaths.push(configPath);
   } else {
     searchPaths.push(path.join(process.cwd(), "geo_config.json"));
     searchPaths.push(
@@ -313,8 +313,7 @@ export function auditFile(filepath, config, outputFormat = "text") {
     const pronounCount = words.filter((w) => pronouns.includes(w)).length;
     const pronounDensity = pronounCount / totalWordCount;
 
-    const pronounLimit =
-      (config.limits && config.limits.max_pronoun_density) || MAX_PRONOUN_DENSITY;
+    const pronounLimit = config.limits?.max_pronoun_density ?? MAX_PRONOUN_DENSITY;
     if (pronounDensity > pronounLimit) {
       const deduction = Math.min(15, Math.floor((pronounDensity - pronounLimit) * 100));
       clarityScore -= deduction;
@@ -633,7 +632,7 @@ export function generateSchemaData(filepath, schemaType, config) {
       "@id": `${pubUrl}/#article`,
       headline: title,
       description: description,
-      datePublished: "2026-06-25T12:00:00+00:00",
+      datePublished: new Date().toISOString(),
       author: { "@id": authorId },
       publisher: { "@id": orgId },
     };
@@ -674,6 +673,14 @@ export function generateSchemaData(filepath, schemaType, config) {
     const sections = extractSections(content);
     const qaList = [];
     for (const section of sections.slice(0, 5)) {
+      if (
+        section.body.length < 15 ||
+        ["sources", "references", "citations", "bibliography"].includes(
+          section.header.toLowerCase()
+        )
+      ) {
+        continue;
+      }
       qaList.push({
         "@type": "Question",
         name: section.header,
