@@ -1,5 +1,11 @@
 #!/usr/bin/env node
-import { auditFile, checkRobots, generateSchemaData, injectSchema, loadConfig } from '../src/optimizer.js';
+import {
+  auditFile,
+  checkRobots,
+  generateSchemaData,
+  injectSchema,
+  loadConfig,
+} from "../src/optimizer.js";
 
 function printHelp() {
   console.log(`
@@ -25,47 +31,47 @@ Commands:
 
 async function main() {
   const args = process.argv.slice(2);
-  
-  if (args.length === 0 || args.includes('-h') || args.includes('--help')) {
+
+  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
     printHelp();
     process.exit(0);
   }
-  
+
   let configPath = null;
-  const configIndex = args.indexOf('--config');
+  const configIndex = args.indexOf("--config");
   if (configIndex !== -1 && configIndex < args.length - 1) {
     configPath = args[configIndex + 1];
     args.splice(configIndex, 2);
   }
-  
+
   const command = args[0];
   const cmdArgs = args.slice(1);
-  
+
   const { config } = loadConfig(configPath);
-  
-  if (command === 'audit') {
+
+  if (command === "audit") {
     const filepath = cmdArgs[0];
     if (!filepath) {
       console.error("Error: Missing file path for audit command.");
       process.exit(1);
     }
-    const formatIndex = cmdArgs.indexOf('--format');
-    const fIndex = cmdArgs.indexOf('-f');
-    let format = 'text';
+    const formatIndex = cmdArgs.indexOf("--format");
+    const fIndex = cmdArgs.indexOf("-f");
+    let format = "text";
     if (formatIndex !== -1 && formatIndex < cmdArgs.length - 1) {
       format = cmdArgs[formatIndex + 1];
     } else if (fIndex !== -1 && fIndex < cmdArgs.length - 1) {
       format = cmdArgs[fIndex + 1];
     }
     auditFile(filepath, config, format);
-  } else if (command === 'robots') {
+  } else if (command === "robots") {
     const filepath = cmdArgs[0];
     if (!filepath) {
       console.error("Error: Missing file path for robots command.");
       process.exit(1);
     }
     checkRobots(filepath);
-  } else if (command === 'schema') {
+  } else if (command === "schema") {
     const filepath = cmdArgs[0];
     const type = cmdArgs[1];
     if (!filepath || !type) {
@@ -74,7 +80,7 @@ async function main() {
     }
     const schema = generateSchemaData(filepath, type, config);
     console.log(JSON.stringify(schema, null, 2));
-  } else if (command === 'inject') {
+  } else if (command === "inject") {
     const filepath = cmdArgs[0];
     const type = cmdArgs[1];
     if (!filepath || !type) {

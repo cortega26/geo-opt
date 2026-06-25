@@ -13,7 +13,7 @@ honor its STOP conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001  | Inicializar git y establecer tooling base (lint, format, CLAUDE.md, hygiene) | P1 | M | — | TODO |
+| 001  | Inicializar git y establecer tooling base (lint, format, CLAUDE.md, hygiene) | P1 | M | — | DONE |
 | 002  | Corregir 4 bugs críticos (`--config`, `max_pronoun_density`, FAQ filters, fecha hardcodeada) | P1 | S | 001 | TODO |
 | 003  | Expandir cobertura de tests para funciones no testeadas | P2 | M | 002 | TODO |
 | 004  | Hardening de seguridad para `inject` (path validation + signature sanitization) | P1 | S | 001 | TODO |
