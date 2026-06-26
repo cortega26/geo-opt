@@ -1217,6 +1217,248 @@ test("batchInject injects schema and branding into markdown files", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// CLI error-path coverage (plan 016)
+// ═══════════════════════════════════════════════════════════════════
+
+test("CLI audit without files and without --recursive exits with error", () => {
+  const result = spawnSync(process.execPath, [cliPath, "audit"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, /Missing file path/);
+});
+
+test("CLI audit with invalid --format exits with error", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  const testFile = path.join(tmpDir, "test.md");
+  fs.writeFileSync(testFile, "# Test\n\nContent.\n");
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "audit", testFile, "--format", "xml"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /--format must be/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI audit with invalid --threshold exits with error", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  const testFile = path.join(tmpDir, "test.md");
+  fs.writeFileSync(testFile, "# Test\n\nContent.\n");
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "audit", testFile, "--threshold", "abc"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /--threshold must be an integer/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI audit --summary without --format json shows text output", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  try {
+    fs.writeFileSync(
+      path.join(tmpDir, "a.md"),
+      "# A\n\nIntro paragraph with over forty words of content to score properly here.\n"
+    );
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "audit", tmpDir, "--recursive", "--summary"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.ok(
+      result.stdout.includes("SITE SUMMARY") || result.stdout.includes("GEO OPTIMIZATION"),
+      "Should output text report"
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI inject --backup creates .bak file", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  const testFile = path.join(tmpDir, "original.md");
+  const backupFile = testFile + ".bak";
+  fs.writeFileSync(testFile, "# Original\n\nContent here.\n");
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "inject", testFile, "article", "--backup"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(backupFile), "Backup file should exist");
+    assert.strictEqual(fs.readFileSync(backupFile, "utf8"), "# Original\n\nContent here.\n");
+    assert.ok(
+      fs.readFileSync(testFile, "utf8").includes("```json"),
+      "Original should contain injected schema"
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI inject --recursive without --dry-run writes files", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  try {
+    fs.writeFileSync(path.join(tmpDir, "page1.md"), "# Page 1\n\nContent here.\n");
+    fs.writeFileSync(path.join(tmpDir, "page2.md"), "# Page 2\n\nContent here.\n");
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "inject", tmpDir, "article", "--recursive"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.ok(
+      result.stdout.includes("Injected 2 file"),
+      `Expected success message, got: ${result.stdout}`
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI llmstxt audit with missing file exits with error", () => {
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, "llmstxt", "audit", "/nonexistent/llms.txt"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, /not found/);
+});
+
+test("CLI llmstxt audit --recursive reports coverage", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  try {
+    const llmsContent = `# Test Site
+
+> A test.
+
+## Pages
+
+- [Home](https://example.com/): The homepage.
+`;
+    fs.writeFileSync(path.join(tmpDir, "llms.txt"), llmsContent);
+    fs.writeFileSync(
+      path.join(tmpDir, "index.md"),
+      "# Home\n\nWelcome to the test site with enough words for description.\n"
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "about.md"),
+      "# About\n\nAbout page with enough words here for description text.\n"
+    );
+
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "llmstxt", "audit", path.join(tmpDir, "llms.txt"), "--recursive"],
+      { cwd: tmpDir, encoding: "utf8" }
+    );
+    assert.ok(
+      result.stdout.includes("Missing") || result.stdout.includes("not listed"),
+      "Should report missing files from coverage"
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI config with invalid action exits with error", () => {
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, "config", "delete", "reminders"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, /Usage:|Error:/);
+});
+
+test("CLI config set with invalid value exits with error", () => {
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, "config", "set", "reminders", "maybe"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.strictEqual(result.status, 1);
+  assert.match(result.stderr, /true or false/);
+});
+
+test("CLI init creates geo_config.json", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "init"],
+      { cwd: tmpDir, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 0, result.stderr);
+    assert.ok(fs.existsSync(path.join(tmpDir, "geo_config.json")), "Config file should exist");
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, "geo_config.json"), "utf8"));
+    assert.ok(config.author, "Should have author section");
+    assert.ok(config.publisher, "Should have publisher section");
+    assert.ok(config.acronyms, "Should have acronyms section");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI init without --force when file exists exits with error", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  try {
+    fs.writeFileSync(path.join(tmpDir, "geo_config.json"), "{}");
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "init"],
+      { cwd: tmpDir, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /already exists/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI init --force overwrites existing file", () => {
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
+  try {
+    fs.writeFileSync(path.join(tmpDir, "geo_config.json"), "{}");
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "init", "--force"],
+      { cwd: tmpDir, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 0, result.stderr);
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, "geo_config.json"), "utf8"));
+    assert.ok(config.author, "Should have overwritten with template");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI with no arguments shows help and exits 0", () => {
+  const result = spawnSync(
+    process.execPath,
+    [cliPath],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.strictEqual(result.status, 0);
+  assert.ok(
+    result.stdout.includes("Usage:") || result.stdout.includes("Commands:"),
+    "Should show help"
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // llms.txt generation, audit, and robots.txt generation
 // ═══════════════════════════════════════════════════════════════════
 
