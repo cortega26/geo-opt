@@ -1,3 +1,16 @@
+import { marked } from "marked";
+import * as cheerio from "cheerio";
+
+export function cleanHtmlText(value) {
+  const $ = cheerio.load(value);
+  return $.text().replace(/\s+/g, " ").trim();
+}
+
+export function truncateDescription(description, maxLen = 150) {
+  if (!description) return "";
+  return description.length > maxLen ? `${description.slice(0, maxLen - 3)}...` : description;
+}
+
 export function calculateReadability(text) {
   const sentences = text
     .split(/[.!?]+/)
@@ -27,62 +40,101 @@ export function preprocessContent(content) {
 }
 
 export function cleanMarkdownToPlainText(mdText) {
-  // Remove markdown links, keeping text: [text](url) -> text
-  let text = mdText.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-  // Unwrap inline code spans before stripping formatting, so that
-  // * and _ inside `backticks` are preserved as literal characters.
-  text = text.replace(/`([^`]+)`/g, "$1");
-  // Remove bold/italic markup
-  text = text.replace(/[\*_]{1,3}/g, "");
+  const tokens = marked.lexer(mdText);
 
-  const lines = [];
-  for (let line of text.split("\n")) {
-    line = line.trim();
-    if (line.startsWith("|") && line.endsWith("|")) {
-      // Skip divider rows e.g. |---|
-      if (/^\|[\s\-\:\+\|]+$/.test(line)) {
-        continue;
+  // Extract plain text from a token or token array into a separate buffer.
+  function extractText(tok, into) {
+    if (typeof tok === "string") {
+      into.push(tok);
+    } else if (Array.isArray(tok)) {
+      for (const t of tok) extractText(t, into);
+    } else if (tok && typeof tok === "object") {
+      if (tok.type === "text") {
+        into.push(tok.text);
+      } else if (tok.type === "link") {
+        if (tok.tokens) extractText(tok.tokens, into);
+        else if (tok.text) into.push(tok.text);
+      } else if (tok.type === "image") {
+        if (tok.text) into.push(tok.text);
+      } else if (tok.type === "codespan") {
+        into.push(tok.text);
+      } else if (tok.type === "strong" || tok.type === "em" || tok.type === "del") {
+        if (tok.tokens) extractText(tok.tokens, into);
+        else if (tok.text) into.push(tok.text);
+      } else if (tok.type === "html") {
+        into.push(tok.text.replace(/<[^>]+>/g, ""));
+      } else if (tok.type === "br") {
+        into.push("\n");
+      } else if (tok.type === "paragraph") {
+        if (tok.tokens) extractText(tok.tokens, into);
+        else if (tok.text) into.push(tok.text);
+        into.push("\n");
+      } else if (tok.type === "list") {
+        for (const item of tok.items) {
+          if (item.tokens) extractText(item.tokens, into);
+          into.push("\n");
+        }
+      } else if (tok.type === "table") {
+        for (const row of [tok.header, ...tok.rows]) {
+          const cellTexts = row.map((cell) => {
+            const cellParts = [];
+            if (cell.tokens) extractText(cell.tokens, cellParts);
+            return cellParts.join("").trim() || cell.text;
+          });
+          into.push(cellTexts.join(" - "));
+          into.push("\n");
+        }
+      } else if (tok.type === "space") {
+        into.push("\n");
+      } else if (tok.tokens) {
+        extractText(tok.tokens, into);
       }
-      const cells = line
-        .split("|")
-        .slice(1, -1)
-        .map((c) => c.trim());
-      lines.push(cells.filter(Boolean).join(" - "));
-    } else {
-      lines.push(line);
     }
   }
 
-  // Join lines and strip any remaining HTML tags for clean schema output
-  return lines
-    .join("\n")
+  const parts = [];
+  extractText(tokens, parts);
+  // Strip any remaining HTML tags, normalize horizontal whitespace, and trim
+  return parts
+    .join("")
     .replace(/<[^>]+>/g, "")
+    .replace(/[ \t]+/g, " ")
     .trim();
 }
 
 export function extractSections(content) {
   const cleanContent = preprocessContent(content);
+  const tokens = marked.lexer(cleanContent);
   const sections = [];
   let currentHeader = null;
   let currentText = [];
 
-  for (const line of cleanContent.split("\n")) {
-    // Markdown headings: ## Title, ### Subtitle
-    let headerMatch = line.match(/^(##+)\s+(.+)$/);
-    if (!headerMatch) {
-      // HTML headings: <h2>Title</h2>, <h3>Subtitle</h3>
-      headerMatch = line.match(/^<h([234])[^>]*>(.+)<\/h\1>$/i);
-    }
-    if (headerMatch) {
+  for (const token of tokens) {
+    if (token.type === "heading" && token.depth >= 2) {
       if (currentHeader) {
         sections.push({ header: currentHeader, body: currentText.join("\n").trim() });
       }
-      currentHeader = headerMatch[2].trim();
+      currentHeader = token.text;
       currentText = [];
-    } else {
-      if (currentHeader !== null) {
-        currentText.push(line);
+    } else if (currentHeader !== null) {
+      if (token.type === "paragraph" || token.type === "text") {
+        currentText.push(token.text);
+      } else if (token.type === "list") {
+        for (const item of token.items) {
+          currentText.push(item.text);
+        }
+      } else if (token.type === "blockquote") {
+        currentText.push(token.text);
+      } else if (token.type === "code") {
+        currentText.push(token.text);
+      } else if (token.type === "table") {
+        const rows = [];
+        for (const row of [token.header, ...token.rows]) {
+          rows.push(row.map((cell) => cell.text).join(" | "));
+        }
+        currentText.push(rows.join("\n"));
       }
+      // space tokens are ignored (whitespace between blocks)
     }
   }
 

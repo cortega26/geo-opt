@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import * as cheerio from "cheerio";
-import { preprocessContent, cleanMarkdownToPlainText, extractSections } from "./text.js";
+import { preprocessContent, cleanMarkdownToPlainText, extractSections, cleanHtmlText, truncateDescription } from "./text.js";
 import { getNoBrandingError } from "./licensing.js";
 
 export const TOOLTICIAN_BRANDING_MARKDOWN = "Optimized with [Tooltician](https://www.tooltician.com)";
@@ -78,15 +78,6 @@ export function assertNewFileParentInsideCwd(filepath) {
   }
 
   return { parentRealPath, cwdRealPath };
-}
-
-function cleanHtmlText(value) {
-  const $ = cheerio.load(value);
-  return $.text().replace(/\s+/g, " ").trim();
-}
-
-function truncateDescription(description) {
-  return description.length > 150 ? `${description.slice(0, 147)}...` : description;
 }
 
 // _content is an optional pre-read file body. When provided, the file

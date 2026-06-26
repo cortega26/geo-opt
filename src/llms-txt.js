@@ -1,19 +1,7 @@
 import path from "path";
 import * as cheerio from "cheerio";
-import { cleanMarkdownToPlainText, extractSections, preprocessContent } from "./text.js";
+import { cleanMarkdownToPlainText, extractSections, preprocessContent, cleanHtmlText, truncateDescription } from "./text.js";
 import { AI_CRAWLER_AGENTS } from "./robots.js";
-
-// ---- HTML helpers (mirrored from schema.js) ----
-
-function cleanHtmlText(value) {
-  const $ = cheerio.load(value);
-  return $.text().replace(/\s+/g, " ").trim();
-}
-
-function truncateDescription(description, maxLen = 150) {
-  if (!description) return "";
-  return description.length > maxLen ? `${description.slice(0, maxLen - 3)}...` : description;
-}
 
 // ---- Page metadata extraction ----
 
