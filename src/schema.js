@@ -1,10 +1,17 @@
 import fs from "fs";
 import path from "path";
 import * as cheerio from "cheerio";
-import { preprocessContent, cleanMarkdownToPlainText, extractSections, cleanHtmlText, truncateDescription } from "./text.js";
+import {
+  preprocessContent,
+  cleanMarkdownToPlainText,
+  extractSections,
+  cleanHtmlText,
+  truncateDescription,
+} from "./text.js";
 import { getNoBrandingError } from "./licensing.js";
 
-export const TOOLTICIAN_BRANDING_MARKDOWN = "Optimized with [Tooltician](https://www.tooltician.com)";
+export const TOOLTICIAN_BRANDING_MARKDOWN =
+  "Optimized with [Tooltician](https://www.tooltician.com)";
 export const TOOLTICIAN_BRANDING_HTML =
   '<div class="geo-signature"><p>Optimized with <a href="https://www.tooltician.com">Tooltician</a></p></div>';
 const SUPPORTED_SCHEMA_TYPES = new Set(["article", "faq", "product"]);

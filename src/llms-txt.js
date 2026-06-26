@@ -1,6 +1,12 @@
 import path from "path";
 import * as cheerio from "cheerio";
-import { cleanMarkdownToPlainText, extractSections, preprocessContent, cleanHtmlText, truncateDescription } from "./text.js";
+import {
+  cleanMarkdownToPlainText,
+  extractSections,
+  preprocessContent,
+  cleanHtmlText,
+  truncateDescription,
+} from "./text.js";
 import { AI_CRAWLER_AGENTS } from "./robots.js";
 
 // ---- Page metadata extraction ----
