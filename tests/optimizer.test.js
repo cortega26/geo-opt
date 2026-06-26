@@ -1234,11 +1234,10 @@ test("CLI audit with invalid --format exits with error", () => {
   const testFile = path.join(tmpDir, "test.md");
   fs.writeFileSync(testFile, "# Test\n\nContent.\n");
   try {
-    const result = spawnSync(
-      process.execPath,
-      [cliPath, "audit", testFile, "--format", "xml"],
-      { cwd: repoRoot, encoding: "utf8" }
-    );
+    const result = spawnSync(process.execPath, [cliPath, "audit", testFile, "--format", "xml"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
     assert.strictEqual(result.status, 1);
     assert.match(result.stderr, /--format must be/);
   } finally {
@@ -1251,11 +1250,10 @@ test("CLI audit with invalid --threshold exits with error", () => {
   const testFile = path.join(tmpDir, "test.md");
   fs.writeFileSync(testFile, "# Test\n\nContent.\n");
   try {
-    const result = spawnSync(
-      process.execPath,
-      [cliPath, "audit", testFile, "--threshold", "abc"],
-      { cwd: repoRoot, encoding: "utf8" }
-    );
+    const result = spawnSync(process.execPath, [cliPath, "audit", testFile, "--threshold", "abc"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
     assert.strictEqual(result.status, 1);
     assert.match(result.stderr, /--threshold must be an integer/);
   } finally {
@@ -1374,21 +1372,19 @@ test("CLI llmstxt audit --recursive reports coverage", () => {
 });
 
 test("CLI config with invalid action exits with error", () => {
-  const result = spawnSync(
-    process.execPath,
-    [cliPath, "config", "delete", "reminders"],
-    { cwd: repoRoot, encoding: "utf8" }
-  );
+  const result = spawnSync(process.execPath, [cliPath, "config", "delete", "reminders"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
   assert.strictEqual(result.status, 1);
   assert.match(result.stderr, /Usage:|Error:/);
 });
 
 test("CLI config set with invalid value exits with error", () => {
-  const result = spawnSync(
-    process.execPath,
-    [cliPath, "config", "set", "reminders", "maybe"],
-    { cwd: repoRoot, encoding: "utf8" }
-  );
+  const result = spawnSync(process.execPath, [cliPath, "config", "set", "reminders", "maybe"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
   assert.strictEqual(result.status, 1);
   assert.match(result.stderr, /true or false/);
 });
@@ -1396,11 +1392,10 @@ test("CLI config set with invalid value exits with error", () => {
 test("CLI init creates geo_config.json", () => {
   const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
   try {
-    const result = spawnSync(
-      process.execPath,
-      [cliPath, "init"],
-      { cwd: tmpDir, encoding: "utf8" }
-    );
+    const result = spawnSync(process.execPath, [cliPath, "init"], {
+      cwd: tmpDir,
+      encoding: "utf8",
+    });
     assert.strictEqual(result.status, 0, result.stderr);
     assert.ok(fs.existsSync(path.join(tmpDir, "geo_config.json")), "Config file should exist");
     const config = JSON.parse(fs.readFileSync(path.join(tmpDir, "geo_config.json"), "utf8"));
@@ -1416,11 +1411,10 @@ test("CLI init without --force when file exists exits with error", () => {
   const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
   try {
     fs.writeFileSync(path.join(tmpDir, "geo_config.json"), "{}");
-    const result = spawnSync(
-      process.execPath,
-      [cliPath, "init"],
-      { cwd: tmpDir, encoding: "utf8" }
-    );
+    const result = spawnSync(process.execPath, [cliPath, "init"], {
+      cwd: tmpDir,
+      encoding: "utf8",
+    });
     assert.strictEqual(result.status, 1);
     assert.match(result.stderr, /already exists/);
   } finally {
@@ -1432,11 +1426,10 @@ test("CLI init --force overwrites existing file", () => {
   const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
   try {
     fs.writeFileSync(path.join(tmpDir, "geo_config.json"), "{}");
-    const result = spawnSync(
-      process.execPath,
-      [cliPath, "init", "--force"],
-      { cwd: tmpDir, encoding: "utf8" }
-    );
+    const result = spawnSync(process.execPath, [cliPath, "init", "--force"], {
+      cwd: tmpDir,
+      encoding: "utf8",
+    });
     assert.strictEqual(result.status, 0, result.stderr);
     const config = JSON.parse(fs.readFileSync(path.join(tmpDir, "geo_config.json"), "utf8"));
     assert.ok(config.author, "Should have overwritten with template");
@@ -1446,11 +1439,7 @@ test("CLI init --force overwrites existing file", () => {
 });
 
 test("CLI with no arguments shows help and exits 0", () => {
-  const result = spawnSync(
-    process.execPath,
-    [cliPath],
-    { cwd: repoRoot, encoding: "utf8" }
-  );
+  const result = spawnSync(process.execPath, [cliPath], { cwd: repoRoot, encoding: "utf8" });
   assert.strictEqual(result.status, 0);
   assert.ok(
     result.stdout.includes("Usage:") || result.stdout.includes("Commands:"),
