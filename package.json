@@ -28,7 +28,10 @@
     "format": "prettier --write src/ bin/ scripts/ tests/",
     "format:check": "prettier --check src/ bin/ scripts/ tests/",
     "changelog:check": "node scripts/check-changelog.js",
-    "check": "npm run lint && npm run format:check && npm test && npm run test:python && npm run changelog:check"
+    "build": "node scripts/build.js",
+    "check": "npm run lint && npm run format:check && npm test && npm run test:python && npm run changelog:check",
+    "prepublishOnly": "node scripts/build.js",
+    "postpublish": "git checkout -- src/licensing.js src/integrity.js"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -59,6 +62,7 @@
     "@eslint/js": "^10.0.1",
     "c8": "^11.0.0",
     "eslint": "^10.5.0",
+    "javascript-obfuscator": "^5.4.3",
     "prettier": "^3.8.4"
   },
   "dependencies": {

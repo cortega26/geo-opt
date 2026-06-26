@@ -8,7 +8,7 @@ import {
   cleanHtmlText,
   truncateDescription,
 } from "./text.js";
-import { getNoBrandingError } from "./licensing.js";
+import { getNoBrandingError } from "./integrity.js";
 
 export const TOOLTICIAN_BRANDING_MARKDOWN =
   "Optimized with [Tooltician](https://www.tooltician.com)";

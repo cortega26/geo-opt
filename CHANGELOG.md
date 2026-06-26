@@ -9,12 +9,22 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- `geo-opt validate` for inspecting JSON-LD blocks, required Schema.org fields,
+  and malformed structured data.
+- A prepublish build that protects the Pro licensing module with obfuscation and
+  runtime integrity verification.
+- Python skill parity for recursive audits, batch injection, aggregate reports,
+  `llms.txt`, and AI-crawler-friendly `robots.txt` generation.
 - TypeScript type declarations (`index.d.ts`) covering all 27 public API exports.
 - CI/CD pipeline (`.github/workflows/ci.yml`) running lint, format, JS tests,
   Python parity tests, changelog policy, and npm audit on PRs and pushes to main.
 
 ### Changed
 
+- Migrated CLI parsing and terminal output to Commander and Chalk, HTML parsing
+  to Cheerio, Markdown parsing to Marked, and config validation to Zod.
+- Archived completed implementation plans and replaced them with the next
+  prioritized roadmap.
 - Deduplicated `TOOLTICIAN_BRANDING_*` constants: defined canonically in
   `src/schema.js`, imported by `src/batch.js`.
 - Moved `cleanHtmlText` and `truncateDescription` to `src/text.js` as the

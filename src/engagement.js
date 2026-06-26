@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { hasProEntitlement } from "./licensing.js";
+import { hasProEntitlement } from "./integrity.js";
 
 export const REMINDER_INJECTION_INTERVAL = 10;
 export const REMINDER_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;

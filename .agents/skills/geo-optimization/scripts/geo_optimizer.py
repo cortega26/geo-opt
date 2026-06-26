@@ -8,6 +8,9 @@ import contextlib
 import io
 from datetime import datetime, timezone
 
+import mistune
+from bs4 import BeautifulSoup
+
 # Default thresholds
 MAX_PRONOUN_DENSITY = 0.02
 LICENSE_ENV_VAR = "TOOLTICIAN_LICENSE_KEY"
@@ -279,24 +282,257 @@ def assert_new_file_parent_inside_cwd(filepath):
 
 
 def clean_html_text(value):
-    text = re.sub(r"<script\b[^>]*>.*?</script>", " ", value, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"<style\b[^>]*>.*?</style>", " ", text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"<[^>]+>", " ", text)
-    replacements = {
-        "&nbsp;": " ",
-        "&amp;": "&",
-        "&lt;": "<",
-        "&gt;": ">",
-        "&quot;": '"',
-        "&#39;": "'",
-    }
-    for source, replacement in replacements.items():
-        text = re.sub(re.escape(source), replacement, text, flags=re.IGNORECASE)
-    return re.sub(r"\s+", " ", text).strip()
+    soup = BeautifulSoup(value, "html.parser")
+    return re.sub(r"\s+", " ", soup.get_text()).strip()
 
 
 def truncate_description(description):
     return f"{description[:147]}..." if len(description) > 150 else description
+
+
+# ---- Page metadata extraction (llms.txt) ----
+
+def extract_page_metadata(content, filepath):
+    """Extract title, description, and sections from Markdown or HTML content."""
+    clean_text = preprocess_content(content)
+
+    title = ""
+    title_match = re.search(r'^#\s+(.+)$', clean_text, re.MULTILINE)
+    if title_match:
+        title = title_match.group(1).strip()
+    if not title:
+        h1_match = re.search(r'<h1\b[^>]*>([\s\S]*?)</h1>', clean_text, re.DOTALL | re.IGNORECASE)
+        if h1_match:
+            title = clean_html_text(h1_match.group(1))
+    if not title:
+        title = os.path.splitext(os.path.basename(filepath))[0] or "Untitled"
+
+    description = ""
+    intro_match = re.search(r'^#\s+.+?\n\n([^#\n]+)', clean_text, re.DOTALL)
+    if intro_match:
+        description = clean_markdown_to_plain_text(intro_match.group(1).strip())
+    if not description and (filepath.endswith(".html") or re.search(r'<html', clean_text, re.IGNORECASE)):
+        soup = BeautifulSoup(content, "html.parser")
+        meta_desc = soup.find("meta", attrs={"name": "description"})
+        if meta_desc and meta_desc.get("content"):
+            description = clean_html_text(meta_desc["content"])
+        if not description:
+            first_p = soup.find("p")
+            if first_p:
+                description = clean_html_text(first_p.get_text())
+    description = truncate_description(description)
+
+    sections = extract_sections(content)
+    return {"title": title, "description": description, "sections": sections}
+
+
+# ---- llms.txt generation ----
+
+def generate_llms_txt(entries, site_title="Site Documentation", site_description="",
+                      optional_threshold=50):
+    """Generate llms.txt content following the llmstxt.org specification."""
+    lines = []
+
+    lines.append(f"# {site_title}")
+    lines.append("")
+    if site_description:
+        lines.append(f"> {site_description}")
+        lines.append("")
+
+    sections = {}
+    optional_entries = []
+    for entry in entries:
+        score = entry.get("score")
+        if score is not None and score < optional_threshold:
+            optional_entries.append(entry)
+        else:
+            section = entry.get("section", "Pages")
+            sections.setdefault(section, []).append(entry)
+
+    for section_name, section_entries in sections.items():
+        lines.append(f"## {section_name}")
+        lines.append("")
+        for entry in section_entries:
+            desc = f": {clean_markdown_to_plain_text(entry['description'])}" if entry.get("description") else ""
+            lines.append(f"- [{entry['title']}]({entry['url']}){desc}")
+        lines.append("")
+
+    if optional_entries:
+        lines.append("## Optional")
+        lines.append("")
+        for entry in optional_entries:
+            desc = f": {clean_markdown_to_plain_text(entry['description'])}" if entry.get("description") else ""
+            lines.append(f"- [{entry['title']}]({entry['url']}){desc}")
+        lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def generate_llms_full_txt(entries, site_title="Site Documentation"):
+    """Generate llms-full.txt with complete page content."""
+    lines = []
+    lines.append(f"# {site_title} — Full Content")
+    lines.append("")
+    lines.append("> This file contains the complete content of all pages listed in llms.txt.")
+    lines.append("")
+
+    for entry in entries:
+        lines.append("---")
+        lines.append("")
+        lines.append(f"## [{entry['title']}]({entry['url']})")
+        lines.append("")
+        content = entry.get("content", "")
+        clean = preprocess_content(content)
+        plain = clean_markdown_to_plain_text(clean)
+        paragraphs = re.split(r"\n{2,}", plain)
+        for para in paragraphs:
+            trimmed = para.strip()
+            if trimmed:
+                lines.append(trimmed)
+            lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
+
+
+# ---- llms.txt audit ----
+
+def _parse_llms_entries(llms_content):
+    """Parse section entries (URLs and titles) from an llms.txt file."""
+    entries = []
+    current_section = ""
+    current_optional = False
+
+    for line in llms_content.split("\n"):
+        h2_match = re.match(r'^##\s+(.+)$', line)
+        if h2_match:
+            current_section = h2_match.group(1).strip()
+            current_optional = current_section.lower() == "optional"
+            continue
+        link_match = re.match(r'^\s*-\s+\[([^\]]+)\]\(([^)]+)\)', line)
+        if link_match:
+            entries.append({
+                "title": link_match.group(1).strip(),
+                "url": link_match.group(2).strip(),
+                "section": current_section or "Pages",
+                "optional": current_optional,
+            })
+
+    return entries
+
+
+def audit_llms_txt(llms_content, discovered_files=None, base_dir=""):
+    """Audit an existing llms.txt for spec compliance and coverage."""
+    if discovered_files is None:
+        discovered_files = []
+    issues = []
+
+    if not re.search(r'^#\s+\S', llms_content, re.MULTILINE):
+        issues.append("Missing required H1 title (e.g. '# Site Name').")
+    if not re.search(r'^>\s+\S', llms_content, re.MULTILINE):
+        issues.append("Missing recommended blockquote description (e.g. '> Brief summary...').")
+    if not re.search(r'^##\s+\S', llms_content, re.MULTILINE):
+        issues.append("No H2 sections found. Add at least one section with page links.")
+
+    entries = _parse_llms_entries(llms_content)
+
+    without_desc = 0
+    for e in entries:
+        pattern = re.compile(re.escape(f"[{e['title']}]({e['url']})") + r":")
+        if not pattern.search(llms_content):
+            without_desc += 1
+    if without_desc > 0:
+        issues.append(f"{without_desc} page(s) have no description (add ': description' after the URL).")
+
+    h2_matches = list(re.finditer(r'^##\s+(.+)$', llms_content, re.MULTILINE))
+    optional_idx = next(
+        (i for i, m in enumerate(h2_matches) if m.group(1).strip().lower() == "optional"),
+        -1
+    )
+    if optional_idx >= 0 and optional_idx < len(h2_matches) - 1:
+        issues.append("The '## Optional' section should be the last section in the file.")
+
+    coverage = None
+    if discovered_files:
+        listed_paths = set()
+        for e in entries:
+            try:
+                listed_paths.add(e["url"])
+            except Exception:
+                listed_paths.add(e["url"])
+        missing_files = []
+        for fp in discovered_files:
+            rel = os.path.relpath(fp, base_dir) if base_dir else fp
+            ext = os.path.splitext(rel)[1]
+            without_ext = rel[: -len(ext)]
+            rel_url = "/" + without_ext.replace(os.sep, "/").replace("/index", "")
+            if rel_url in ("/", ""):
+                continue
+            if rel_url not in listed_paths and (rel_url + "/") not in listed_paths:
+                found = any(rel_url in p or os.path.basename(without_ext) in p for p in listed_paths)
+                if not found:
+                    missing_files.append(fp)
+        coverage = {
+            "listed": len(entries),
+            "missing": len(missing_files),
+            "total": len(discovered_files),
+            "missingFiles": missing_files[:10],
+        }
+        if missing_files:
+            issues.append(f"{len(missing_files)} file(s) on the site are not listed in llms.txt.")
+
+    return {
+        "valid": len(issues) == 0,
+        "issues": issues,
+        **({"coverage": coverage} if coverage else {}),
+    }
+
+
+# ---- robots.txt generation ----
+
+AI_CRAWLER_AGENTS_LIST = [
+    "GPTBot", "ChatGPT-User", "OAI-SearchBot",
+    "ClaudeBot", "Claude-SearchBot", "Claude-User",
+    "PerplexityBot", "Google-Extended", "Applebot-Extended",
+    "Meta-ExternalAgent", "Bytespider", "CCBot",
+    "Amazonbot", "anthropic-ai",
+]
+
+
+def generate_robots_txt(disallow_paths=None, sitemap_url=""):
+    """Generate an optimized robots.txt for AI crawler access."""
+    if disallow_paths is None:
+        disallow_paths = []
+    lines = []
+    lines.append("# ── AI Crawlers ──")
+    lines.append("# Allow major AI crawler user-agents full access so your content")
+    lines.append("# is available for AI-powered search and Retrieval-Augmented Generation (RAG).")
+    lines.append("")
+
+    for agent in AI_CRAWLER_AGENTS_LIST:
+        lines.append(f"User-agent: {agent}")
+        lines.append("Allow: /")
+        lines.append("")
+
+    lines.append("# ── Default Rules ──")
+    lines.append("# All other crawlers (traditional search engines, etc.) follow these rules.")
+    lines.append("")
+    lines.append("User-agent: *")
+
+    if disallow_paths:
+        for path in disallow_paths:
+            normalized = path if path.startswith("/") else "/" + path
+            lines.append(f"Disallow: {normalized}")
+    else:
+        lines.append("Disallow: /admin")
+        lines.append("Disallow: /api")
+        lines.append("Disallow: /private")
+
+    lines.append("")
+    if sitemap_url:
+        lines.append(f"Sitemap: {sitemap_url}")
+        lines.append("")
+
+    return "\n".join(lines).strip() + "\n"
 
 
 def load_config(config_path=None):
@@ -342,81 +578,442 @@ def calculate_readability(text):
 
 def preprocess_content(content):
     """Strips markdown code blocks and HTML comments to clean text for analysis."""
-    # Strip markdown code blocks
-    text = re.sub(r'```.*?```', '', content, flags=re.DOTALL)
-    # Strip HTML script and style blocks
-    text = re.sub(r'<script.*?>.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r'<style.*?>.*?</style>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    # Strip HTML comments
-    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
-    return text
+    # Strip markdown code blocks first (BeautifulSoup does not parse markdown)
+    text = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
+    # Strip HTML comments before BeautifulSoup parsing
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    # Use BeautifulSoup to strip <script> and <style> elements reliably
+    soup = BeautifulSoup(text, "html.parser")
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+    return str(soup)
 
 def clean_markdown_to_plain_text(md_text):
     """Converts markdown (links, bold, tables) to clean, search-compliant plain text for schema nodes."""
-    # Remove links keeping text: [text](url) -> text
-    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', md_text)
-    # Unwrap inline code spans before stripping formatting, so that
-    # * and _ inside `backticks` are preserved as literal characters.
-    text = re.sub(r'`([^`]+)`', r'\1', text)
-    # Remove bold/italic tags
-    text = re.sub(r'[\*_]{1,3}', '', text)
-    
-    lines = []
-    for line in text.split('\n'):
-        line = line.strip()
-        if line.startswith('|') and line.endswith('|'):
-            # Skip divider rows
-            if re.match(r'^\|[\s\-\:\+\|]+$', line):
-                continue
-            cells = [c.strip() for c in line.split('|')[1:-1]]
-            lines.append(' - '.join(c for c in cells if c))
-        else:
-            lines.append(line)
-            
-    # Join lines and strip any remaining HTML tags for clean schema output
-    return re.sub(r'<[^>]+>', '', '\n'.join(lines)).strip()
+    md = mistune.create_markdown(renderer=None, plugins=["table", "strikethrough", "task_lists"])
+    tokens, _state = md.parse(md_text)
+
+    def walk(tok, into):
+        if isinstance(tok, list):
+            for t in tok:
+                walk(t, into)
+        elif isinstance(tok, dict):
+            ttype = tok.get("type")
+            if ttype == "text":
+                into.append(tok.get("text", tok.get("raw", "")))
+            elif ttype == "link":
+                walk(tok.get("children", []), into)
+            elif ttype == "image":
+                alt = tok.get("attrs", {}).get("alt") or tok.get("text")
+                if alt:
+                    into.append(alt)
+            elif ttype in ("codespan", "strong", "emphasis", "delete"):
+                walk(tok.get("children", []), into)
+            elif ttype == "html_inline":
+                into.append(re.sub(r"<[^>]+>", "", tok.get("text", "")))
+            elif ttype == "linebreak":
+                into.append("\n")
+            elif ttype == "paragraph":
+                walk(tok.get("children", []), into)
+                into.append("\n")
+            elif ttype == "list":
+                for item in tok.get("children", []):
+                    walk(item.get("children", []), into)
+                    into.append("\n")
+            elif ttype == "table":
+                for row in tok.get("children", []):
+                    cells = []
+                    for cell in row.get("children", []):
+                        cell_parts = []
+                        walk(cell.get("children", []), cell_parts)
+                        cells.append("".join(cell_parts).strip() or cell.get("text", ""))
+                    into.append(" - ".join(cells))
+                    into.append("\n")
+            elif ttype in ("block_quote", "block_code"):
+                into.append(tok.get("text", ""))
+            elif "children" in tok:
+                walk(tok["children"], into)
+
+    parts = []
+    walk(tokens, parts)
+    return re.sub(r"<[^>]+>", "", re.sub(r"[ \t]+", " ", "".join(parts))).strip()
+
+def _extract_text_from_children(token):
+    """Recursively extract plain text from mistune AST token children."""
+    if isinstance(token, dict):
+        if "children" in token:
+            return "".join(_extract_text_from_children(c) for c in token["children"])
+        return token.get("text", token.get("raw", ""))
+    return str(token) if token else ""
+
 
 def extract_sections(content):
-    """Robustly extracts headings and their clean body text from markdown, stripping code blocks."""
+    """Extracts headings (H2+) and their body text from markdown using mistune AST."""
     clean_content = preprocess_content(content)
+    md = mistune.create_markdown(renderer=None, plugins=["table", "strikethrough", "task_lists"])
+    tokens, _state = md.parse(clean_content)
     sections = []
     current_header = None
     current_text = []
-    
-    for line in clean_content.split('\n'):
-        # Markdown headings: ## Title, ### Subtitle
-        header_match = re.match(r'^(##+)\s+(.+)$', line)
-        if not header_match:
-            # HTML headings: <h2>Title</h2>, <h3>Subtitle</h3>
-            header_match = re.match(r'^<h([234])[^>]*>(.+)</h\1>$', line, re.IGNORECASE)
-        if header_match:
+
+    for token in tokens:
+        if token.get("type") == "heading" and token.get("attrs", {}).get("level", 1) >= 2:
             if current_header:
-                sections.append((current_header, '\n'.join(current_text).strip()))
-            current_header = header_match.group(2).strip()
+                sections.append((current_header, "\n".join(current_text).strip()))
+            current_header = _extract_text_from_children(token)
             current_text = []
-        else:
-            if current_header is not None:
-                current_text.append(line)
-                
+        elif current_header is not None:
+            ttype = token.get("type")
+            if ttype in ("paragraph", "text"):
+                current_text.append(_extract_text_from_children(token))
+            elif ttype == "list":
+                for item in token.get("children", []):
+                    current_text.append(_extract_text_from_children(item))
+            elif ttype == "block_quote":
+                current_text.append(_extract_text_from_children(token))
+            elif ttype == "block_code":
+                current_text.append(token.get("raw", ""))
+            elif ttype == "table":
+                rows = []
+                for row in token.get("children", []):
+                    cells = [_extract_text_from_children(c) for c in row.get("children", [])]
+                    rows.append(" | ".join(cells))
+                current_text.append("\n".join(rows))
+            # blank_line tokens are ignored
+
     if current_header:
-        sections.append((current_header, '\n'.join(current_text).strip()))
-        
+        sections.append((current_header, "\n".join(current_text).strip()))
+
     return sections
 
-def audit_file(filepath, config, output_format="text"):
-    if not os.path.exists(filepath):
-        print(f"Error: File {filepath} not found.", file=sys.stderr)
-        sys.exit(1)
-        
+# ---- File discovery (batch/recursive) ----
+
+DEFAULT_EXTENSIONS = {".md", ".html", ".htm"}
+
+
+def _compile_gitignore_patterns(raw_patterns):
+    """Compile .gitignore-style patterns into a list of {pattern, regex, negated} rules."""
+    rules = []
+    for raw in raw_patterns:
+        trimmed = raw.strip()
+        if not trimmed or trimmed.startswith("#"):
+            continue
+        negated = trimmed.startswith("!")
+        pattern = negated and trimmed[1:] or trimmed
+        regex = _pattern_to_regex(pattern)
+        rules.append({"pattern": pattern, "regex": regex, "negated": negated})
+    return rules
+
+
+def _pattern_to_regex(pattern):
+    """Convert a single .gitignore pattern to a compiled regex."""
+    anchored = False
+    p = pattern
+    if p.startswith("/"):
+        anchored = True
+        p = p[1:]
+    dir_only = p.endswith("/")
+    if dir_only:
+        p = p[:-1]
+
+    r = re.escape(p)
+    r = r.replace(r"\\*\\*", ".__DOUBLESTAR__.")
+    r = r.replace(r"\\*", "[^/]*")
+    r = r.replace(r"\\?", "[^/]")
+    r = r.replace(".__DOUBLESTAR__.", ".*")
+
+    if dir_only:
+        r = f"(?:{r}/.*|{r}$)"
+    if anchored:
+        r = "^" + r
+    else:
+        r = "(?:^|.*/)" + r
+    if not dir_only and not r.endswith(".*"):
+        r = r + "(?:/.*)?$"
+    else:
+        r = r + "$"
+    return re.compile(r)
+
+
+def _matches_ignore(relative_path, rules):
+    """Check if a relative path matches compiled ignore rules (last match wins)."""
+    ignored = False
+    for rule in rules:
+        if rule["regex"].search(relative_path):
+            ignored = not rule["negated"]
+    return ignored
+
+
+def _walk_directory(dir_path, collected, rules, allowed_extensions, relative_root):
+    """Recursively walk a directory, collecting files matching allowed extensions."""
     try:
-        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
-            content = f.read()
-    except Exception as e:
-        print(f"Error: Failed to read file {filepath}: {e}", file=sys.stderr)
-        sys.exit(1)
+        entries = os.listdir(dir_path)
+    except OSError:
+        return
+    for name in sorted(entries):
+        full_path = os.path.join(dir_path, name)
+        entry_rel = os.path.relpath(full_path, relative_root)
+        if rules and _matches_ignore(entry_rel, rules):
+            continue
+        if os.path.isdir(full_path):
+            _walk_directory(full_path, collected, rules, allowed_extensions, relative_root)
+        elif os.path.isfile(full_path):
+            ext = os.path.splitext(name)[1].lower()
+            if ext in allowed_extensions:
+                collected.append(full_path)
+
+
+def discover_files(input_paths, recursive=False, ignore_patterns=None,
+                   allowed_extensions=None, cwd=None, config=None):
+    """Discover content files from user-supplied paths (files or directories).
+
+    Returns a sorted list of absolute file paths.
+    Raises RuntimeError if a path is a directory and recursive is False.
+    """
+    if allowed_extensions is None:
+        allowed_extensions = DEFAULT_EXTENSIONS
+    if ignore_patterns is None:
+        ignore_patterns = []
+    if cwd is None:
+        cwd = os.getcwd()
+    if config is None:
+        config = {}
+
+    # Compile ignore rules from .gitignore + config + CLI
+    rules = []
+    gitignore_path = os.path.join(cwd, ".gitignore")
+    try:
+        with open(gitignore_path, "r", encoding="utf-8") as fh:
+            raw = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+        rules.extend(_compile_gitignore_patterns(raw))
+    except OSError:
+        pass
+
+    config_ignore = config.get("ignore")
+    if isinstance(config_ignore, list):
+        rules.extend(_compile_gitignore_patterns(config_ignore))
+    if ignore_patterns:
+        rules.extend(_compile_gitignore_patterns(ignore_patterns))
+
+    collected = []
+    relative_root = os.path.abspath(cwd)
+
+    for input_path in input_paths:
+        resolved = os.path.abspath(os.path.join(cwd, input_path))
+        try:
+            st = os.stat(resolved)
+        except OSError:
+            continue
+
+        if os.path.isdir(resolved) if hasattr(os.path, "isdir") else (lambda x: os.path.isdir(x))(resolved):
+            # Use os.path.isdir
+            if os.path.isdir(resolved):
+                if not recursive:
+                    raise RuntimeError(
+                        f'Path "{input_path}" is a directory. Use --recursive to scan directories.'
+                    )
+                _walk_directory(
+                    resolved, collected,
+                    rules if rules else None,
+                    allowed_extensions,
+                    relative_root,
+                )
+        elif os.path.isfile(resolved):
+            ext = os.path.splitext(resolved)[1].lower()
+            if ext in allowed_extensions:
+                collected.append(resolved)
+
+    collected.sort()
+    return collected
+
+
+# ---- Batch audit (safe — no sys.exit per file) ----
+
+def audit_files(filepaths, config):
+    """Audit multiple files, collecting results without sys.exit.
+
+    Returns list of dicts: {file, status, score?, report?, error?}
+    """
+    results = []
+    for filepath in filepaths:
+        try:
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="replace") as fh:
+                    content = fh.read()
+            except OSError as read_err:
+                results.append({
+                    "file": filepath,
+                    "status": "error",
+                    "error": f"Read failed: {read_err}",
+                })
+                continue
+            score, report = _score_content(content, filepath, config)
+            results.append({"file": filepath, "status": "success", "score": score, "report": report})
+        except Exception as err:
+            results.append({"file": filepath, "status": "error", "error": str(err)})
+    return results
+
+
+def compute_summary(results):
+    """Aggregate per-file audit results into a site-level summary report."""
+    successes = [r for r in results if r.get("status") == "success"]
+    scores = [r["score"] for r in successes]
+    total = len(results)
+    succeeded = len(successes)
+    failed = total - succeeded
+
+    if succeeded == 0:
+        return {
+            "totalFiles": total,
+            "succeeded": 0,
+            "failed": failed,
+            "message": "No files could be audited.",
+            "perFile": results,
+        }
+
+    sorted_scores = sorted(scores)
+    avg = sum(scores) / len(scores)
+    variance = sum((v - avg) ** 2 for v in scores) / len(scores)
+    median = (
+        (sorted_scores[len(sorted_scores) // 2 - 1] + sorted_scores[len(sorted_scores) // 2]) / 2
+        if len(sorted_scores) % 2 == 0
+        else sorted_scores[len(sorted_scores) // 2]
+    )
+
+    rec_counts = {}
+    for r in successes:
+        for rec in r["report"].get("recommendations", []):
+            rec_counts[rec] = rec_counts.get(rec, 0) + 1
+    top_recs = sorted(rec_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_recommendations = [{"recommendation": rec, "fileCount": count} for rec, count in top_recs]
+
+    worst = sorted(successes, key=lambda r: r["score"])[:5]
+
+    return {
+        "totalFiles": total,
+        "succeeded": succeeded,
+        "failed": failed,
+        "averageScore": round(avg, 2),
+        "medianScore": round(median, 2),
+        "minScore": sorted_scores[0],
+        "maxScore": sorted_scores[-1],
+        "stdDev": round(variance ** 0.5, 2),
+        "distribution": {
+            "excellent": sum(1 for s in scores if s >= 80),
+            "good": sum(1 for s in scores if s >= 50 and s < 80),
+            "needsWork": sum(1 for s in scores if s < 50),
+        },
+        "topRecommendations": top_recommendations,
+        "worstFiles": [{"file": r["file"], "score": r["score"]} for r in worst],
+        "perFile": results,
+    }
+
+
+# ---- Pure scoring (without I/O — for batch use) ----
+
+def _score_content(content, filepath, config):
+    """Score content without I/O side effects. Returns (score, report_dict)."""
+    # This delegates to the existing audit_file but captures its JSON output.
+    # We reuse audit_file's scoring logic by temporarily redirecting stdout.
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        score = audit_file(filepath, config, "json", _content=content)
+    report = json.loads(buf.getvalue())
+    return score, report
+
+
+# --- Mistune-based scoring helpers ---
+def _parse_md_tokens(content):
+    md = mistune.create_markdown(renderer=None, plugins=["table", "strikethrough", "task_lists"])
+    tokens, _state = md.parse(content)
+    return tokens
+
+
+def _count_md_links(tokens):
+    count = 0
+
+    def walk(tok):
+        nonlocal count
+        if isinstance(tok, list):
+            for t in tok:
+                walk(t)
+        elif isinstance(tok, dict):
+            if tok.get("type") == "link" and tok.get("attrs", {}).get("url", "").startswith("http"):
+                count += 1
+            elif tok.get("type") == "image" and tok.get("attrs", {}).get("url", "").startswith("http"):
+                count += 1
+            if "children" in tok:
+                walk(tok["children"])
+
+    walk(tokens)
+    return count
+
+
+def _count_blockquotes(tokens):
+    count = 0
+
+    def walk(tok):
+        nonlocal count
+        if isinstance(tok, list):
+            for t in tok:
+                walk(t)
+        elif isinstance(tok, dict):
+            if tok.get("type") == "block_quote":
+                count += 1
+            if "children" in tok:
+                walk(tok["children"])
+
+    walk(tokens)
+    return count
+
+
+def _has_md_table(tokens):
+    def walk(tok):
+        if isinstance(tok, list):
+            return any(walk(t) for t in tok)
+        if isinstance(tok, dict):
+            if tok.get("type") == "table":
+                return True
+            if "children" in tok and walk(tok["children"]):
+                return True
+        return False
+
+    return walk(tokens)
+
+
+def _has_md_list(tokens):
+    def walk(tok):
+        if isinstance(tok, list):
+            return any(walk(t) for t in tok)
+        if isinstance(tok, dict):
+            if tok.get("type") == "list":
+                return True
+            if "children" in tok and walk(tok["children"]):
+                return True
+        return False
+
+    return walk(tokens)
+
+
+def audit_file(filepath, config, output_format="text", _content=None):
+    # _content is an optional pre-read body. When provided, file I/O is skipped.
+    if _content is not None:
+        content = _content
+    else:
+        if not os.path.exists(filepath):
+            print(f"Error: File {filepath} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+        except Exception as e:
+            print(f"Error: Failed to read file {filepath}: {e}", file=sys.stderr)
+            sys.exit(1)
 
     text_content = preprocess_content(content)
-    
+    md_tokens = _parse_md_tokens(text_content)
+
     # 1. Answer-First & Structure (Max 20 pts)
     struct_score = 0
     struct_breakdown = []
@@ -445,13 +1042,13 @@ def audit_file(filepath, config, output_format="text"):
     else:
         struct_breakdown.append("Answer-First: No intro paragraph found (+0 pts)")
         
-    if ("|" in text_content and re.search(r'\|\s*:?-+:?\s*\|', text_content)) or "<table>" in text_content.lower():
+    if _has_md_table(md_tokens) or "<table>" in text_content.lower():
         struct_score += 4
         struct_breakdown.append("Tables: Structured data tables present (+4 pts)")
     else:
         struct_breakdown.append("Tables: No tables found (+0 pts)")
         
-    if re.search(r'^\s*[\-\*\+\d\.]+\s+', text_content, re.MULTILINE):
+    if _has_md_list(md_tokens):
         struct_score += 3
         struct_breakdown.append("Lists: Bulleted or numbered lists present (+3 pts)")
     else:
@@ -464,24 +1061,34 @@ def audit_file(filepath, config, output_format="text"):
         struct_breakdown.append("Headers: No H2/H3 headers found (+0 pts)")
 
     # Check for HTML semantic layout if it's an HTML file (Technical AI Readiness)
-    # Use text_content (code blocks stripped) to avoid false positives
-    # when markdown files contain HTML code examples inside code fences.
+    # Use BeautifulSoup to query the actual DOM tree, avoiding false positives
+    # from tag names that appear in text, comments, or code samples.
     if filepath.endswith('.html') or "<html" in text_content.lower():
         html_lowered = text_content.lower()
-        semantic_tags = ["<article", "<main", "<header", "<footer", "<nav", "<section"]
-        found_tags = [t for t in semantic_tags if t in html_lowered]
+        soup = BeautifulSoup(content, "html.parser")
+        semantic_tags = ["article", "main", "header", "footer", "nav", "section"]
+        found_tags = [t for t in semantic_tags if soup.find(t) is not None]
         if len(found_tags) >= 3:
-            struct_breakdown.append(f"Semantic HTML: Good HTML5 layout tags used ({', '.join(found_tags)}) (+0 pts)")
+            struct_breakdown.append(
+                f"Semantic HTML: Good HTML5 layout tags used (<{'}>, <{'.join(found_tags)}>) (+0 pts)"
+            )
         else:
             deduction = 4
             struct_score = max(0, struct_score - deduction)
-            struct_breakdown.append(f"Semantic HTML: Lacks HTML5 structural tags (e.g. <main>, <article>). Found only: {', '.join(found_tags)} (-{deduction} pts)")
-            
-        # Check for dynamic client-side JS rendering setups
-        dynamic_indicators = ["id=\"app\"", "id=\"root\"", "createapp(", "reactdom.render("]
-        found_dynamic = [ind for ind in dynamic_indicators if ind in html_lowered]
-        if found_dynamic:
-            struct_breakdown.append("Dynamic Rendering Warning: Detects client-side JS references. Ensure content is pre-rendered / SSR for AI crawler searchability.")
+            tag_display = f"<{'}>, <{'.join(found_tags)}>" if found_tags else "none"
+            struct_breakdown.append(
+                f"Semantic HTML: Lacks HTML5 structural tags (e.g. <main>, <article>). "
+                f"Found only: {tag_display} (-{deduction} pts)"
+            )
+
+        # SPA / client-side rendering detection.
+        has_app_container = soup.select_one('[id="app"], [id="root"]') is not None
+        has_framework_code = bool(re.search(r'createapp\(|reactdom\.render\(', html_lowered))
+        if has_app_container or has_framework_code:
+            struct_breakdown.append(
+                "Dynamic Rendering Warning: Detects client-side JS references. "
+                "Ensure content is pre-rendered / SSR for AI crawler searchability."
+            )
 
     # 2. Statistics Density (Max 20 pts)
     stats_score = 0
@@ -535,9 +1142,9 @@ def audit_file(filepath, config, output_format="text"):
 
     # 3. Quotation Density (Max 20 pts)
     quotes_score = 0
-    quote_blocks = re.findall(r'^\s*>\s+.+', text_content, re.MULTILINE)
+    blockquote_count = _count_blockquotes(md_tokens)
     inline_quotes = re.findall(r'"([^"]{15,})"', text_content)
-    quote_count = len(quote_blocks) + len(inline_quotes)
+    quote_count = blockquote_count + len(inline_quotes)
     
     if quote_count >= 2:
         quotes_score = 20
@@ -550,9 +1157,9 @@ def audit_file(filepath, config, output_format="text"):
 
     # 4. Citation & Authority (Max 20 pts)
     citation_score = 0
-    links = re.findall(r'\[([^\]]+)\]\((https?://[^\)]+)\)', text_content)
+    md_link_count = _count_md_links(md_tokens)
     html_links = re.findall(r'href=["\'](https?://[^"\']+)["\']', text_content)
-    link_count = len(links) + len(html_links)
+    link_count = md_link_count + len(html_links)
     
     has_sources_header = any(keyword in text_content.lower() for keyword in ["sources", "references", "citations", "bibliography"])
     
@@ -866,15 +1473,16 @@ def generate_schema_data(filepath, schema_type, config, _content=None):
     intro_match = re.search(r'^#\s+.+?\n\n([^#\n]+)', clean_text, re.DOTALL)
     description = clean_markdown_to_plain_text(intro_match.group(1).strip()) if intro_match else ""
     if not description and (filepath.endswith(".html") or "<html" in clean_text.lower()):
-        meta_match = re.search(
-            r'<meta\b(?=[^>]*\bname=["\']description["\'])(?=[^>]*\bcontent=(["\'])(.*?)\1)[^>]*>',
-            clean_text,
-            re.DOTALL | re.IGNORECASE,
-        )
-        paragraph_match = re.search(r"<p\b[^>]*>(.*?)</p>", clean_text, re.DOTALL | re.IGNORECASE)
-        description = clean_html_text(meta_match.group(2)) if meta_match else ""
-        if not description and paragraph_match:
-            description = clean_html_text(paragraph_match.group(1))
+        # Use BeautifulSoup for reliable <meta name="description"> extraction
+        # regardless of attribute order.
+        soup_desc = BeautifulSoup(content, "html.parser")
+        meta_desc = soup_desc.find("meta", attrs={"name": "description"})
+        if meta_desc and meta_desc.get("content"):
+            description = clean_html_text(meta_desc["content"])
+        if not description:
+            first_p = soup_desc.find("p")
+            if first_p:
+                description = clean_html_text(first_p.get_text())
     description = truncate_description(description)
         
     author_info = config.get("author", {})
@@ -1112,20 +1720,48 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="Subcommand to run")
 
-    # Audit Command
+    # Audit Command (with recursive/batch support)
     audit_parser = subparsers.add_parser("audit", help="Audit content for GEO optimization score")
-    audit_parser.add_argument("filepaths", nargs="+", help="Path(s) to the markdown or HTML file(s) to audit")
+    audit_parser.add_argument("filepaths", nargs="*", default=None,
+                              help="Path(s) to the markdown or HTML file(s) to audit")
     audit_parser.add_argument("-f", "--format", choices=["text", "json"], default="text", help="Output format")
     audit_parser.add_argument("-t", "--threshold", type=int, default=None, help="Exit with code 1 if score is below threshold")
+    audit_parser.add_argument("-r", "--recursive", action="store_true", help="Recursively scan directories")
+    audit_parser.add_argument("--ignore", nargs="*", default=[], help="Additional ignore patterns (gitignore syntax)")
+    audit_parser.add_argument("-s", "--summary", action="store_true", help="Show aggregate site report (JSON only)")
 
-    # Robots Command
-    robots_parser = subparsers.add_parser("robots", help="Audit robots.txt for AI bot block rules")
-    robots_parser.add_argument("filepath", help="Path to robots.txt")
+    # Robots Command (audit + generate)
+    robots_parser = subparsers.add_parser("robots", help="Audit or generate robots.txt")
+    robots_sub = robots_parser.add_subparsers(dest="robots_action", help="Action")
+    robots_audit = robots_sub.add_parser("audit", help="Audit robots.txt for AI crawler blocking rules")
+    robots_audit.add_argument("filepath", help="Path to robots.txt")
+    robots_gen = robots_sub.add_parser("generate", help="Generate an optimized robots.txt for AI crawler access")
+    robots_gen.add_argument("--disallow", nargs="*", default=[], help="Paths to disallow for non-AI crawlers")
+    robots_gen.add_argument("--sitemap", default="", help="URL of the sitemap")
+    robots_gen.add_argument("--output", default="robots.txt", help="Output file path")
+    robots_gen.add_argument("--dry-run", action="store_true", help="Preview without writing")
 
     # Schema Command
     schema_parser = subparsers.add_parser("schema", help="Generate JSON-LD schema markup from file content")
     schema_parser.add_argument("filepath", help="Path to markdown or HTML file")
     schema_parser.add_argument("type", choices=["article", "faq", "product"], help="Type of schema to generate")
+
+    # LlmsTxt Command
+    llmstxt_parser = subparsers.add_parser("llmstxt", help="Generate or audit llms.txt for LLM-friendly site documentation")
+    llmstxt_sub = llmstxt_parser.add_subparsers(dest="llmstxt_action", help="Action")
+    llmstxt_gen = llmstxt_sub.add_parser("generate", help="Generate llms.txt (and llms-full.txt) from content files")
+    llmstxt_gen.add_argument("files", nargs="*", default=None, help="Files or directories to include")
+    llmstxt_gen.add_argument("-r", "--recursive", action="store_true", help="Recursively scan directories")
+    llmstxt_gen.add_argument("--ignore", nargs="*", default=[], help="Additional ignore patterns")
+    llmstxt_gen.add_argument("--output", default=".", help="Output directory")
+    llmstxt_gen.add_argument("--site-url", default="", help="Base URL of the site")
+    llmstxt_gen.add_argument("--title", default="", help="Site name")
+    llmstxt_gen.add_argument("--description", default="", help="Site description")
+    llmstxt_gen.add_argument("--full", action="store_true", help="Also generate llms-full.txt")
+    llmstxt_gen.add_argument("--dry-run", action="store_true", help="Preview without writing files")
+    llmstxt_audit = llmstxt_sub.add_parser("audit", help="Audit an existing llms.txt for spec compliance and coverage")
+    llmstxt_audit.add_argument("filepath", help="Path to llms.txt")
+    llmstxt_audit.add_argument("-r", "--recursive", action="store_true", help="Check coverage against all site files")
 
     # Inject Command
     inject_parser = subparsers.add_parser("inject", help="Generate and inject JSON-LD schema block directly into file")
@@ -1133,6 +1769,8 @@ def main():
     inject_parser.add_argument("type", choices=["article", "faq", "product"], help="Type of schema to generate")
     inject_parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing")
     inject_parser.add_argument("--backup", action="store_true", help="Create .bak file before modifying")
+    inject_parser.add_argument("-r", "--recursive", action="store_true", help="Treat path as directory and inject all files within")
+    inject_parser.add_argument("--ignore", nargs="*", default=[], help="Additional ignore patterns")
     inject_parser.add_argument(
         "--no-branding",
         action="store_true",
@@ -1151,35 +1789,221 @@ def main():
     config, config_path = load_config(args.config)
 
     if args.command == "audit":
-        results = []
-        json_reports = []
-        for fp in args.filepaths:
-            if args.format == "json":
-                score, report = audit_file_json(fp, config)
-                json_reports.append(report)
+        filepaths = args.filepaths
+        if not filepaths:
+            if args.recursive:
+                filepaths = ["."]
             else:
-                score = audit_file(fp, config, args.format)
-            results.append((fp, score))
+                print("Error: Missing file path for audit command.", file=sys.stderr)
+                sys.exit(1)
 
-        if args.format == "json":
-            payload = json_reports[0] if len(json_reports) == 1 else json_reports
+        # File discovery
+        try:
+            discovered = discover_files(
+                filepaths,
+                recursive=args.recursive or False,
+                ignore_patterns=args.ignore or [],
+                cwd=os.getcwd(),
+                config=config,
+            )
+        except RuntimeError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if not discovered:
+            print("No matching files found.", file=sys.stderr)
+            sys.exit(1)
+
+        batch_results = audit_files(discovered, config)
+
+        if args.summary and args.format == "json":
+            summary = compute_summary(batch_results)
+            print(json.dumps(summary, indent=2, ensure_ascii=False))
+        elif args.format == "json":
+            reports = [r["report"] for r in batch_results if r["status"] == "success"]
+            payload = reports[0] if len(reports) == 1 else reports
             print(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            successes = [r for r in batch_results if r["status"] == "success"]
+            for r in successes:
+                audit_file(r["file"], config, "text")
+            errors = [r for r in batch_results if r["status"] == "error"]
+            for e in errors:
+                print(f"\nError auditing {e['file']}: {e['error']}", file=sys.stderr)
+            if len(batch_results) > 1:
+                summary = compute_summary(batch_results)
+                print(f"\n{'='*50}")
+                print(f"                 SITE SUMMARY                    ")
+                print(f"{'='*50}")
+                print(f"Files:  {summary['succeeded']}/{summary['totalFiles']} succeeded")
+                if summary['failed'] > 0:
+                    print(f"        {summary['failed']} failed")
+                print(f"Average: {summary['averageScore']}/100")
+                print(f"Median:  {summary['medianScore']}/100")
+                print(f"Range:   {summary['minScore']} – {summary['maxScore']}")
+                print(f"{'='*50}")
 
         if args.threshold is not None:
-            failures = [(fp, s) for fp, s in results if s < args.threshold]
-            if failures:
-                print(f"\nThreshold not met for {len(failures)} file(s):", file=sys.stderr)
-                for fp, s in failures:
-                    print(f"  {fp}: {s}/100 (threshold: {args.threshold})", file=sys.stderr)
+            failures = [r for r in batch_results if r["status"] == "success" and r["score"] < args.threshold]
+            errs = [r for r in batch_results if r["status"] == "error"]
+            if failures or errs:
+                if failures:
+                    print(f"\nThreshold not met for {len(failures)} file(s):", file=sys.stderr)
+                    for f in failures:
+                        print(f"  {f['file']}: {f['score']}/100 (threshold: {args.threshold})", file=sys.stderr)
+                if errs:
+                    print(f"\n{len(errs)} file(s) could not be audited.", file=sys.stderr)
                 sys.exit(1)
             if args.format != "json":
-                print(f"\nAll {len(results)} file(s) meet threshold {args.threshold}/100.")
+                suc = len([r for r in batch_results if r["status"] == "success"])
+                print(f"\nAll {suc} file(s) meet threshold {args.threshold}/100.")
 
     elif args.command == "robots":
-        check_robots(args.filepath)
+        if getattr(args, "robots_action", "audit") == "generate":
+            content = generate_robots_txt(
+                disallow_paths=args.disallow or [],
+                sitemap_url=args.sitemap or "",
+            )
+            if getattr(args, "dry_run", False):
+                print(content)
+                print(f"[dry-run] Would write to: {args.output}")
+            else:
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(content)
+                print(f"robots.txt written to {args.output}")
+        else:
+            check_robots(args.filepath)
+
     elif args.command == "schema":
         schema = generate_schema_data(args.filepath, args.type, config)
         print(json.dumps(schema, indent=2, ensure_ascii=False))
+
+    elif args.command == "llmstxt":
+        if getattr(args, "llmstxt_action", "audit") == "generate":
+            files = args.files
+            if not files:
+                files = ["."]
+            try:
+                discovered = discover_files(
+                    files,
+                    recursive=args.recursive or False,
+                    ignore_patterns=args.ignore or [],
+                    cwd=os.getcwd(),
+                    config=config,
+                )
+            except RuntimeError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                sys.exit(1)
+
+            if not discovered:
+                print("No matching files found.", file=sys.stderr)
+                sys.exit(1)
+
+            site_url = args.site_url or config.get("siteUrl", "")
+            site_title = args.title or (config.get("publisher") or {}).get("name") or os.path.basename(os.getcwd())
+            site_description = args.description or config.get("siteDescription", "")
+
+            entries = []
+            errors_list = []
+            for fp in discovered:
+                try:
+                    with open(fp, "r", encoding="utf-8", errors="replace") as fh:
+                        content = fh.read()
+                    meta = extract_page_metadata(content, fp)
+                    rel_dir = os.path.relpath(os.path.dirname(fp), os.getcwd())
+                    section = "Pages"
+                    if rel_dir and rel_dir != ".":
+                        section = rel_dir[0].upper() + rel_dir[1:].replace("_", " ").replace("-", " ")
+                    url = ""
+                    if site_url:
+                        rel = os.path.relpath(fp, os.getcwd()).replace(os.sep, "/")
+                        ext = os.path.splitext(rel)[1]
+                        without_ext = rel[: -len(ext)]
+                        if os.path.basename(without_ext) == "index":
+                            without_ext = os.path.dirname(without_ext)
+                        if without_ext in (".", ""):
+                            url = site_url.rstrip("/") + "/"
+                        else:
+                            url = site_url.rstrip("/") + "/" + without_ext
+                    else:
+                        url = rel_dir + "/" + os.path.basename(fp)
+
+                    entry = {"path": fp, "url": url, "title": meta["title"],
+                             "description": meta["description"], "section": section}
+                    if args.full:
+                        entry["content"] = content
+                    entries.append(entry)
+                except Exception as err:
+                    errors_list.append({"file": fp, "error": str(err)})
+
+            llms_content = generate_llms_txt(entries, site_title, site_description)
+
+            if getattr(args, "dry_run", False):
+                print("=== llms.txt preview ===")
+                print(llms_content)
+                if args.full:
+                    full_content = generate_llms_full_txt([e for e in entries if e.get("content")], site_title)
+                    print("\n=== llms-full.txt preview ===")
+                    print(full_content[:2000])
+                    if len(full_content) > 2000:
+                        print(f"\n... ({len(full_content) - 2000} more chars)")
+                print(f"\n[dry-run] Would write {len(entries)} page(s) to {os.path.abspath(args.output)}/llms.txt")
+            else:
+                out_dir = os.path.abspath(args.output)
+                os.makedirs(out_dir, exist_ok=True)
+                with open(os.path.join(out_dir, "llms.txt"), "w", encoding="utf-8") as f:
+                    f.write(llms_content)
+                sections_n = len(set(e["section"] for e in entries))
+                print(f"✓ llms.txt written ({len(entries)} pages, {sections_n} sections) → {os.path.join(out_dir, 'llms.txt')}")
+                if args.full:
+                    full_content = generate_llms_full_txt([e for e in entries if e.get("content")], site_title)
+                    with open(os.path.join(out_dir, "llms-full.txt"), "w", encoding="utf-8") as f:
+                        f.write(full_content)
+                    print(f"✓ llms-full.txt written → {os.path.join(out_dir, 'llms-full.txt')}")
+
+            if errors_list:
+                print(f"\n{len(errors_list)} file(s) could not be processed:", file=sys.stderr)
+                for e in errors_list[:5]:
+                    print(f"  {e['file']}: {e['error']}", file=sys.stderr)
+                if errors_list:
+                    sys.exit(1)
+        else:
+            fp = args.filepath
+            if not os.path.exists(fp):
+                print(f"Error: File {fp} not found.", file=sys.stderr)
+                sys.exit(1)
+            with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            discovered = []
+            if getattr(args, "recursive", False):
+                try:
+                    discovered = discover_files(["."], recursive=True, cwd=os.getcwd(), config=config)
+                except Exception:
+                    pass
+            report = audit_llms_txt(content, discovered, os.getcwd())
+            print(f"{'='*50}")
+            print(f"              LLMS.TXT AUDIT REPORT               ")
+            print(f"{'='*50}")
+            if report["valid"]:
+                print("✓ llms.txt is valid and complete.")
+            else:
+                print(f"{len(report['issues'])} issue(s) found:")
+                for issue in report["issues"]:
+                    print(f"  - {issue}")
+            if "coverage" in report:
+                cov = report["coverage"]
+                print(f"\nCoverage:")
+                print(f"  Listed: {cov['listed']} | Missing: {cov['missing']} | Total: {cov['total']}")
+                if cov["missingFiles"]:
+                    print("\nMissing from llms.txt:")
+                    for mf in cov["missingFiles"]:
+                        print(f"  {mf}")
+                    if cov["missing"] > 10:
+                        print(f"  ... and {cov['missing'] - 10} more")
+            print(f"{'='*50}")
+            if not report["valid"]:
+                sys.exit(1)
+
     elif args.command == "inject":
         dry_run = args.dry_run or False
         backup = args.backup or False
@@ -1191,27 +2015,58 @@ def main():
                 print(f"Error: {entitlement_error}", file=sys.stderr)
                 sys.exit(1)
 
-        if backup and not dry_run:
-            backup_path = args.filepath + ".bak"
-            assert_writable_target_inside_cwd(args.filepath)
-            assert_new_file_parent_inside_cwd(backup_path)
+        # File discovery for inject
+        file_list = []
+        if getattr(args, "recursive", False):
             try:
-                import shutil
-                shutil.copy2(args.filepath, backup_path)
-                print(f"Backup created: {backup_path}")
-            except Exception as e:
-                print(f"Error: Failed to create backup {backup_path}: {e}", file=sys.stderr)
+                file_list = discover_files(
+                    [args.filepath],
+                    recursive=True,
+                    ignore_patterns=args.ignore or [],
+                    cwd=os.getcwd(),
+                    config=config,
+                )
+            except RuntimeError as e:
+                print(f"Error: {e}", file=sys.stderr)
                 sys.exit(1)
+            if not file_list:
+                print("No matching files found.", file=sys.stderr)
+                sys.exit(1)
+        else:
+            file_list = [args.filepath]
+            if backup and not dry_run:
+                backup_path = args.filepath + ".bak"
+                assert_writable_target_inside_cwd(args.filepath)
+                assert_new_file_parent_inside_cwd(backup_path)
+                try:
+                    import shutil
+                    shutil.copy2(args.filepath, backup_path)
+                    print(f"Backup created: {backup_path}")
+                except Exception as e:
+                    print(f"Error: Failed to create backup {backup_path}: {e}", file=sys.stderr)
+                    sys.exit(1)
 
-        inject_schema(
-            args.filepath,
-            args.type,
-            config,
-            dry_run=dry_run,
-            no_branding=no_branding,
-        )
+        success_count = 0
+        fail_count = 0
+        for fp in file_list:
+            try:
+                inject_schema(fp, args.type, config, dry_run=dry_run, no_branding=no_branding)
+                success_count += 1
+            except SystemExit:
+                fail_count += 1
+            except Exception as e:
+                print(f"Error injecting {fp}: {e}", file=sys.stderr)
+                fail_count += 1
+        if dry_run:
+            print(f"[dry-run] Would inject {args.type} schema into {success_count} file(s)" +
+                  (f" ({fail_count} skipped)" if fail_count else ""))
+        elif args.recursive:
+            print(f"Injected {success_count} file(s)" + (f", {fail_count} failed" if fail_count else ""))
         if not dry_run:
             record_successful_free_injection(config)
+        if fail_count > 0:
+            sys.exit(1)
+
     elif args.command == "config":
         if args.action == "get":
             print("true" if reminders_are_enabled() else "false")

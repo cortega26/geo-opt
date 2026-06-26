@@ -136,3 +136,96 @@ Check that AI bot crawlers are not blocked from indexing your optimized pages:
     python3 scripts/geo_optimizer.py robots <path-to-robots.txt>
     ```
 3.  Ensure user-agents like `GPTBot`, `Google-Extended`, `ClaudeBot`, and `PerplexityBot` are not blocked from accessing content directories.
+
+---
+
+### Phase 6: llms.txt Generation & Management
+
+The `llms.txt` standard (llmstxt.org) lets you provide a structured, LLM-friendly
+map of your site — the most impactful single file for Generative Engine
+Optimization.
+
+Generate `llms.txt` and `llms-full.txt` from your content files:
+
+```bash
+# Generate llms.txt from all pages in a directory
+geo-opt llmstxt generate ./content --recursive --site-url https://example.com
+
+# Include full page content (llms-full.txt)
+geo-opt llmstxt generate ./content --recursive --site-url https://example.com --full
+
+# Preview before writing
+geo-opt llmstxt generate ./content --recursive --site-url https://example.com --dry-run
+
+# Custom site title and description
+geo-opt llmstxt generate ./content --recursive \
+  --site-url https://example.com \
+  --title "My Project" \
+  --description "Technical documentation and guides."
+```
+
+Audit an existing `llms.txt` for spec compliance and coverage:
+
+```bash
+# Basic structure check
+geo-opt llmstxt audit llms.txt
+
+# Check that all site pages are covered
+geo-opt llmstxt audit llms.txt --recursive
+```
+
+Generate an optimized `robots.txt` that explicitly allows all major AI crawlers:
+
+```bash
+# Generate with defaults
+geo-opt robots generate
+
+# Custom disallow paths and sitemap
+geo-opt robots generate \
+  --disallow /admin /api /internal \
+  --sitemap https://example.com/sitemap.xml
+
+# Preview
+geo-opt robots generate --dry-run
+```
+
+### Phase 7: Whole-Site Audit & Batch Operations
+
+For projects with multiple pages, use batch commands to audit an entire directory
+tree at once. The `--recursive` flag walks subdirectories, `--ignore` excludes
+patterns (`.gitignore` syntax), and `--summary` adds aggregate statistics.
+
+```bash
+# Recursive audit of all markdown/HTML files in a directory
+python3 scripts/geo_optimizer.py audit ./content --recursive --format json
+
+# With aggregate site-level summary report
+python3 scripts/geo_optimizer.py audit ./content --recursive --summary --format json
+
+# Exclude draft and private content
+python3 scripts/geo_optimizer.py audit ./content --recursive --ignore "draft-*,private/**" --format json
+
+# Batch inject schema across all discovered files (preview first)
+python3 scripts/geo_optimizer.py inject ./content article --recursive --dry-run
+
+# Apply injection to all files
+python3 scripts/geo_optimizer.py inject ./content article --recursive
+
+# Set a site-wide quality gate (fails CI if any page scores below 60)
+python3 scripts/geo_optimizer.py audit ./content --recursive --threshold 60
+```
+
+The `--summary` flag adds aggregate statistics to the JSON output:
+average and median score, standard deviation, score distribution
+(excellent/good/needs-work), top 5 lowest-scoring pages, and the most
+common recommendations across all files.
+
+Ignore patterns are loaded automatically from `.gitignore` in the current
+directory. Additional patterns can be added via `geo_config.json`:
+
+```json
+{
+  "ignore": ["draft-*", "private/**", "vendor/**"],
+  "allowedExtensions": [".md", ".html", ".htm"]
+}
+```

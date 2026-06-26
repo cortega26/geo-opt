@@ -4,7 +4,7 @@ export {
   resolveLicenseKey,
   hasProEntitlement,
   getNoBrandingError,
-} from "./licensing.js";
+} from "./integrity.js";
 export {
   REMINDER_INJECTION_INTERVAL,
   REMINDER_COOLDOWN_MS,
@@ -21,11 +21,22 @@ export {
   cleanMarkdownToPlainText,
   extractSections,
 } from "./text.js";
-export { auditFile } from "./scoring.js";
+export { scoreContent, auditFile } from "./scoring.js";
+export { discoverFiles } from "./discovery.js";
+export { auditFiles, aggregateReport, batchInject } from "./batch.js";
 export {
   assertNewFileParentInsideCwd,
   assertWritableTargetInsideCwd,
   generateSchemaData,
   injectSchema,
 } from "./schema.js";
-export { checkRobots } from "./robots.js";
+export { checkRobots, AI_CRAWLER_AGENTS } from "./robots.js";
+export { validateSchemaFile } from "./validate.js";
+export {
+  extractPageMetadata,
+  resolvePageUrl,
+  generateLlmsTxt,
+  generateLlmsFullTxt,
+  auditLlmsTxt,
+  generateRobotsTxt,
+} from "./llms-txt.js";

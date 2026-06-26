@@ -1,6 +1,7 @@
 import fs from "fs";
+import chalk from "chalk";
 
-const AI_CRAWLER_AGENTS = [
+export const AI_CRAWLER_AGENTS = [
   "GPTBot",
   "ChatGPT-User",
   "OAI-SearchBot",
@@ -115,9 +116,10 @@ export function checkRobots(robotsPath) {
     return;
   }
 
-  console.log("==================================================");
-  console.log("            ROBOTS.TXT CRAWLER AUDIT             ");
-  console.log("==================================================");
+  const banner = chalk.bold.blue("═".repeat(50));
+  console.log(banner);
+  console.log(chalk.bold.blue("            ROBOTS.TXT CRAWLER AUDIT             "));
+  console.log(banner);
 
   const groups = parseRobotsGroups(content);
   const blockedAgents = [];
@@ -133,19 +135,35 @@ export function checkRobots(robotsPath) {
   const wildcardBlocksRoot = blocksRoot(wildcardGroup);
 
   if (blockedAgents.length > 0 || wildcardBlocksRoot) {
-    console.log("WARNING: The following AI agents are blocked from crawling your root directory:");
+    console.log(
+      chalk.yellow.bold(
+        "WARNING: The following AI agents are blocked from crawling your root directory:"
+      )
+    );
     if (wildcardBlocksRoot) {
-      console.log("  - User-agent: * (root access blocked for crawlers without a specific allow)");
+      console.log(
+        chalk.yellow(
+          "  - User-agent: * (root access blocked for crawlers without a specific allow)"
+        )
+      );
     }
     for (const b of blockedAgents) {
-      console.log(`  - User-agent: ${b.agent} (root access blocked)`);
+      console.log(chalk.yellow(`  - User-agent: ${b.agent} (root access blocked)`));
     }
     console.log(
-      "\nNote: Blocking these crawlers prevents AI engines from indexing your content and citing your pages."
+      chalk.dim(
+        "\nNote: Blocking these crawlers prevents AI engines from indexing your content and citing your pages."
+      )
     );
   } else {
-    console.log("SUCCESS: No major AI agents or wildcard directives are blocking root access.");
-    console.log("Your content is crawler-friendly for generative search engine indexing.");
+    console.log(
+      chalk.green.bold(
+        "SUCCESS: No major AI agents or wildcard directives are blocking root access."
+      )
+    );
+    console.log(
+      chalk.green("Your content is crawler-friendly for generative search engine indexing.")
+    );
   }
-  console.log("==================================================");
+  console.log(banner);
 }
