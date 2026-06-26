@@ -34,4 +34,5 @@ npm-debug.log*
 .claude/
 .continue/
 .codegraph/
+plans/
 daemon.pid

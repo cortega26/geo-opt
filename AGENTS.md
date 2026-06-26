@@ -142,9 +142,3 @@ Use concise bullets grouped under Keep a Changelog-style sections such as
 - Paid/Pro positioning should focus on professional value: branding-free output,
   stronger validation, reporting, workflow integrations, and support.
 
-## Roadmap and implementation plans
-
-See `plans/README.md` for the current improvement roadmap. Execute plans in
-order unless the user explicitly reprioritizes. Plans are written for executor
-models with zero context, so read each selected plan fully before starting.
-
