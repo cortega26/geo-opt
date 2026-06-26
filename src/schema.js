@@ -41,27 +41,41 @@ function isInsideDirectory(candidatePath, directoryPath) {
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
-export function assertWritableTargetInsideCwd(filepath) {
+/**
+ * Validate that a target path resolves inside the current working directory.
+ * Batch-safe: returns a result object instead of calling process.exit.
+ *
+ * @param {string} filepath
+ * @returns {{ valid: true, targetRealPath: string, cwdRealPath: string } | { valid: false, error: string }}
+ */
+export function validateWritableTargetInsideCwd(filepath) {
   let targetRealPath;
   let cwdRealPath;
   try {
     targetRealPath = fs.realpathSync(filepath);
     cwdRealPath = fs.realpathSync(process.cwd());
   } catch (e) {
-    console.error(`Error: Failed to resolve real path for ${filepath}: ${e.message}`);
-    process.exit(1);
-    return;
+    return { valid: false, error: `Failed to resolve real path for ${filepath}: ${e.message}` };
   }
 
   if (!isInsideDirectory(targetRealPath, cwdRealPath)) {
-    console.error(
-      `Error: Security restriction — target file ${filepath} resolves outside the current working directory.`
-    );
+    return {
+      valid: false,
+      error: `Security restriction — target file ${filepath} resolves outside the current working directory.`,
+    };
+  }
+
+  return { valid: true, targetRealPath, cwdRealPath };
+}
+
+export function assertWritableTargetInsideCwd(filepath) {
+  const result = validateWritableTargetInsideCwd(filepath);
+  if (!result.valid) {
+    console.error(`Error: ${result.error}`);
     process.exit(1);
     return;
   }
-
-  return { targetRealPath, cwdRealPath };
+  return { targetRealPath: result.targetRealPath, cwdRealPath: result.cwdRealPath };
 }
 
 export function assertNewFileParentInsideCwd(filepath) {

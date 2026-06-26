@@ -4,6 +4,7 @@ import {
   generateSchemaData,
   TOOLTICIAN_BRANDING_MARKDOWN,
   TOOLTICIAN_BRANDING_HTML,
+  validateWritableTargetInsideCwd,
 } from "./schema.js";
 
 /**
@@ -131,6 +132,16 @@ export function batchInject(files, schemaType, config, options = {}) {
         continue;
       }
 
+      // Validate path confinement (batch-safe, no process.exit)
+      const pathCheck = validateWritableTargetInsideCwd(filepath);
+      if (!pathCheck.valid) {
+        errors.push({ file: filepath, error: pathCheck.error });
+        failCount++;
+        continue;
+      }
+
+      // Use generateSchemaData + fs.writeFileSync with explicit path validation
+      // instead of injectSchema to keep error handling batch-safe (no process.exit).
       let content;
       try {
         content = fs.readFileSync(filepath, { encoding: "utf8" });

@@ -1181,7 +1181,7 @@ test("CLI audit --summary produces aggregate report", () => {
 });
 
 test("CLI inject --recursive processes multiple files", () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-test-"));
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
   try {
     fs.writeFileSync(path.join(tmpDir, "page1.md"), "# Page 1\n\nContent.\n");
     fs.writeFileSync(path.join(tmpDir, "page2.md"), "# Page 2\n\nContent.\n");
@@ -1201,7 +1201,7 @@ test("CLI inject --recursive processes multiple files", () => {
 });
 
 test("batchInject injects schema and branding into markdown files", () => {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-test-"));
+  const tmpDir = fs.mkdtempSync(path.join(__dirname, "geo-test-"));
   try {
     const goodFile = path.join(tmpDir, "test.md");
     fs.writeFileSync(goodFile, "# Test\n\nBody content here.\n");
