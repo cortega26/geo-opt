@@ -312,8 +312,8 @@ program
         }
       }
 
-      // Engagement reminder
-      recordSuccessfulFreeInjection(config);
+      // An audit is not an injection: it must not advance engagement state.
+      // The injection reminder is recorded only after a real schema injection.
       return;
     }
 

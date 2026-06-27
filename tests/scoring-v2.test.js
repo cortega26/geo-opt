@@ -11,10 +11,39 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { readFileSync } from "fs";
-import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+import { execSync, spawnSync } from "child_process";
 
 import { scoreContentV2 } from "../src/scoring-v2.js";
+import { scoreContent } from "../src/scoring.js";
+import { aggregateReport } from "../src/batch.js";
+import {
+  createFinding,
+  REPORT_VERSION,
+  MODEL_VERSION_V1,
+  MODEL_VERSION_V2,
+} from "../src/findings.js";
+import { VALID_EVIDENCE_LABELS } from "../src/evidence.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(__dirname, "..");
+const cliPath = path.join(repoRoot, "bin", "cli.js");
+const VALID_STATUSES = ["pass", "warn", "fail", "not_applicable"];
+
+/** Recursively collect every markdown fixture under a directory. */
+function collectFixtures(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...collectFixtures(full));
+    else if (entry.name.endsWith(".md")) out.push(full);
+  }
+  return out.sort();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Profile-aware scoring
@@ -370,5 +399,150 @@ describe("report structure", () => {
     assert.ok(Array.isArray(report.notApplicableDimensions));
     assert.ok(report.notApplicableDimensions.includes("quotations"));
     assert.ok(report.notApplicableDimensions.includes("statistics"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Finding contract (plan 029)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("v2 finding contract", () => {
+  const fixtures = collectFixtures(path.join(repoRoot, "tests", "fixtures", "audit-v2"));
+
+  it("scores every characterization fixture without contract errors", () => {
+    assert.ok(fixtures.length >= 30, `expected the full corpus, found ${fixtures.length}`);
+  });
+
+  for (const fixture of fixtures) {
+    const name = path.relative(repoRoot, fixture);
+    it(`every finding satisfies the complete contract: ${name}`, () => {
+      const content = readFileSync(fixture, "utf8");
+      const { report } = scoreContentV2(content, fixture, {});
+      assert.ok(Array.isArray(report.findings));
+      for (const f of report.findings) {
+        assert.ok(typeof f.ruleId === "string" && f.ruleId.length > 0, `ruleId in ${name}`);
+        assert.ok(typeof f.category === "string" && f.category.length > 0, `category in ${name}`);
+        assert.ok(VALID_STATUSES.includes(f.severity), `severity ${f.severity} in ${name}`);
+        assert.strictEqual(f.status, f.severity, `status mirrors severity in ${name}`);
+        assert.ok(typeof f.message === "string" && f.message.length > 0, `message in ${name}`);
+        assert.ok(
+          VALID_EVIDENCE_LABELS.includes(f.evidenceLabel),
+          `evidenceLabel ${f.evidenceLabel} in ${name}`
+        );
+        assert.ok(
+          typeof f.applicability === "string" || Array.isArray(f.applicability),
+          `applicability in ${name}`
+        );
+        assert.ok(Array.isArray(f.sourceRefs), `sourceRefs in ${name}`);
+        assert.ok(
+          f.observedFacts && typeof f.observedFacts === "object",
+          `observedFacts in ${name}`
+        );
+        assert.ok(
+          typeof f.remediation === "string" || f.remediation === null,
+          `remediation in ${name}`
+        );
+      }
+    });
+  }
+});
+
+describe("createFinding boundary", () => {
+  const base = {
+    ruleId: "v2.test.rule",
+    category: "structure",
+    severity: "warn",
+    message: "test",
+    evidenceLabel: "heuristic",
+  };
+
+  it("rejects an invalid severity", () => {
+    assert.throws(() => createFinding({ ...base, severity: "broken" }), /Invalid severity/);
+  });
+
+  it("rejects a missing category", () => {
+    assert.throws(() => createFinding({ ...base, category: "" }), /invalid category/);
+  });
+
+  it("rejects an invalid evidence label", () => {
+    assert.throws(
+      () => createFinding({ ...base, evidenceLabel: "made-up" }),
+      /Invalid evidenceLabel/
+    );
+  });
+
+  it("accepts a complete finding and mirrors status from severity", () => {
+    const f = createFinding(base);
+    assert.strictEqual(f.status, "warn");
+    assert.strictEqual(f.severity, "warn");
+  });
+});
+
+describe("model identity", () => {
+  it("v1 and v2 reports carry distinct model identities, sharing the report contract version", () => {
+    const content = readFileSync(
+      path.join(repoRoot, "tests", "fixtures", "audit-v2", "editorial", "tech-blog.md"),
+      "utf8"
+    );
+    const v1 = scoreContent(content, "tech-blog.md", {}).report;
+    const v2 = scoreContentV2(content, "tech-blog.md", {}).report;
+
+    assert.strictEqual(v1.modelVersion, MODEL_VERSION_V1);
+    assert.strictEqual(v2.modelVersion, MODEL_VERSION_V2);
+    assert.notStrictEqual(v1.modelVersion, v2.modelVersion);
+    assert.strictEqual(v1.reportVersion, REPORT_VERSION);
+    assert.strictEqual(v2.reportVersion, REPORT_VERSION);
+  });
+});
+
+describe("v2 summary aggregation", () => {
+  it("topFindings never omit category or evidenceLabel", () => {
+    const files = [
+      "adversarial/link-farm.md",
+      "adversarial/fake-stats.md",
+      "adversarial/unattributed-quotes.md",
+    ];
+    const results = files.map((rel) => {
+      const abs = path.join(repoRoot, "tests", "fixtures", "audit-v2", rel);
+      const { score, report } = scoreContentV2(readFileSync(abs, "utf8"), abs, {});
+      return { file: abs, status: "success", score, report };
+    });
+    const summary = aggregateReport(results);
+    assert.ok(summary.topFindings.length >= 1);
+    for (const entry of summary.topFindings) {
+      assert.ok(typeof entry.category === "string" && entry.category.length > 0);
+      assert.ok(VALID_EVIDENCE_LABELS.includes(entry.evidenceLabel));
+      assert.ok(typeof entry.ruleId === "string");
+    }
+  });
+});
+
+describe("audit is not an injection", () => {
+  it("a v2 audit does not advance engagement injection state", () => {
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-audit-state-"));
+    const statePath = path.join(stateDir, "geo-opt", "state.json");
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    // Seed engagement state as if injections had already occurred.
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({ remindersEnabled: true, successfulFreeInjections: 4, lastReminderAt: null })
+    );
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [cliPath, "audit", "tests/fixtures/sample.md", "--model", "v2", "-f", "json"],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+          env: { ...process.env, GEO_OPT_STATE_DIR: stateDir },
+        }
+      );
+      assert.strictEqual(result.status, 0, result.stderr);
+      const persisted = JSON.parse(fs.readFileSync(statePath, "utf8"));
+      // The audit must not have counted as an injection.
+      assert.strictEqual(persisted.successfulFreeInjections, 4);
+    } finally {
+      fs.rmSync(stateDir, { recursive: true, force: true });
+    }
   });
 });

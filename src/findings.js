@@ -10,15 +10,39 @@
 
 import { VALID_EVIDENCE_LABELS, validateSourceRefs } from "./evidence.js";
 
-/** Current report contract version. */
+/**
+ * Report contract version — the shape of the report/findings payload.
+ * Shared by every scoring model and independent from the package version.
+ */
 export const REPORT_VERSION = "1.0.0";
 
-/** Scoring model version (matches package.json). */
-export const MODEL_VERSION = "2.0.0";
+/**
+ * Legacy heuristic scoring model identity (the default model). Preserved at
+ * its established value so existing v1 reports and the Python compatibility
+ * port stay byte-compatible.
+ */
+export const MODEL_VERSION_V1 = "2.0.0";
+
+/**
+ * Profile-aware scoring model identity (opt-in behind `--model v2`). Distinct
+ * from the v1 model so persisted reports can identify the algorithm that
+ * produced them; both models previously reported `2.0.0`.
+ */
+export const MODEL_VERSION_V2 = "2.1.0";
+
+/**
+ * Default scoring model version. v1 remains the default until the migration
+ * gate completes. This is the scoring algorithm identity, NOT the package
+ * version (`package.json`) nor the report contract version (`REPORT_VERSION`).
+ */
+export const MODEL_VERSION = MODEL_VERSION_V1;
 
 /**
  * @typedef {"pass"|"warn"|"fail"|"not_applicable"} FindingStatus
  */
+
+/** Valid finding severities/statuses. */
+export const VALID_FINDING_STATUSES = Object.freeze(["pass", "warn", "fail", "not_applicable"]);
 
 /**
  * @typedef {Object} Finding
@@ -67,6 +91,18 @@ export function createFinding({
   observedFacts = {},
   remediation = null,
 }) {
+  // Validate category
+  if (typeof category !== "string" || category.length === 0) {
+    throw new Error(`Missing or invalid category for rule ${ruleId}.`);
+  }
+
+  // Validate severity/status
+  if (!VALID_FINDING_STATUSES.includes(severity)) {
+    throw new Error(
+      `Invalid severity "${severity}" for rule ${ruleId}. Must be one of: ${VALID_FINDING_STATUSES.join(", ")}`
+    );
+  }
+
   // Validate evidence label
   if (!VALID_EVIDENCE_LABELS.includes(evidenceLabel)) {
     throw new Error(
@@ -97,14 +133,16 @@ export function createFinding({
 }
 
 /**
- * Build report metadata for the current model version.
+ * Build report metadata for an explicit scoring model.
  *
+ * @param {string} [modelVersion=MODEL_VERSION] - the scoring model identity
+ *   that produced the report (defaults to the v1 model).
  * @returns {ReportMeta}
  */
-export function buildReportMeta() {
+export function buildReportMeta(modelVersion = MODEL_VERSION) {
   return {
     reportVersion: REPORT_VERSION,
-    modelVersion: MODEL_VERSION,
+    modelVersion,
     generatedAt: new Date().toISOString(),
   };
 }
@@ -478,13 +516,16 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.heading_hierarchy",
-        status: observations.headingHierarchy.status,
+        category: "structure",
+        severity: observations.headingHierarchy.status,
         message: observations.headingHierarchy.message,
         evidenceLabel: "heuristic",
         applicability: profile,
         observedFacts: {
           issues: observations.headingHierarchy.issues,
         },
+        remediation:
+          "Use a single H1 and avoid skipping heading levels so parsers can map the document outline.",
       })
     );
   }
@@ -499,7 +540,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.section_containment",
-        status: observations.sectionSelfContainment.status,
+        category: "structure",
+        severity: observations.sectionSelfContainment.status,
         message: observations.sectionSelfContainment.message,
         evidenceLabel: "heuristic",
         applicability: profile,
@@ -507,6 +549,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           totalSections: observations.sectionSelfContainment.details?.length ?? 0,
           emptySections: emptyCount,
         },
+        remediation:
+          "Give every heading enough body content to stand on its own when retrieved out of context.",
       })
     );
   }
@@ -516,7 +560,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.answer_first",
-        status: observations.answerFirst.status,
+        category: "structure",
+        severity: observations.answerFirst.status,
         message: observations.answerFirst.message,
         evidenceLabel: "experimental",
         applicability: profile,
@@ -524,6 +569,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           wordCount: observations.answerFirst.wordCount,
           hasDefinition: observations.answerFirst.hasDefinition,
         },
+        remediation:
+          "Open with a direct, self-contained definition of the topic before adding supporting detail.",
       })
     );
   }
@@ -533,7 +580,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.attribution",
-        status: observations.attributionProximity.status,
+        category: "statistics",
+        severity: observations.attributionProximity.status,
         message: observations.attributionProximity.message,
         evidenceLabel: "strong",
         applicability: profile,
@@ -543,6 +591,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           quotesWithAttribution: observations.attributionProximity.quotesWithAttribution,
           quotesWithoutAttribution: observations.attributionProximity.quotesWithoutAttribution,
         },
+        remediation:
+          "Place a named source next to each statistic and quotation so claims are verifiable.",
       })
     );
   }
@@ -552,7 +602,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.freshness",
-        status: observations.contentFreshness.status,
+        category: "citations",
+        severity: observations.contentFreshness.status,
         message: observations.contentFreshness.message,
         evidenceLabel: "heuristic",
         applicability: profile,
@@ -560,6 +611,7 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           publishedDate: observations.contentFreshness.publishedDate,
           reviewedDate: observations.contentFreshness.reviewedDate,
         },
+        remediation: "Add explicit published and reviewed dates so freshness can be assessed.",
       })
     );
   }
@@ -569,7 +621,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.link_quality",
-        status: observations.linkQuality.status,
+        category: "citations",
+        severity: observations.linkQuality.status,
         message: observations.linkQuality.message,
         evidenceLabel: "strong",
         applicability: profile,
@@ -578,6 +631,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           hasSourcesSection: observations.linkQuality.hasSourcesSection,
           hasExcessiveLinks: observations.linkQuality.hasExcessiveLinks,
         },
+        remediation:
+          "Link key claims to authoritative external sources and avoid excessive low-value links.",
       })
     );
   }
@@ -588,6 +643,8 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
 export default {
   REPORT_VERSION,
   MODEL_VERSION,
+  MODEL_VERSION_V1,
+  MODEL_VERSION_V2,
   createFinding,
   buildReportMeta,
   mapLegacyToFindings,

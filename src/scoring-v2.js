@@ -17,7 +17,12 @@ import { marked } from "marked";
 import { preprocessContent } from "./text.js";
 import { PROFILES, isApplicable, notApplicableDimensions, resolveProfile } from "./profiles.js";
 import { observeContent } from "./observations.js";
-import { buildReportMeta, mapObservationsToFindings } from "./findings.js";
+import {
+  buildReportMeta,
+  createFinding,
+  mapObservationsToFindings,
+  MODEL_VERSION_V2,
+} from "./findings.js";
 import { EVIDENCE_REGISTRY } from "./evidence.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -27,9 +32,10 @@ import { EVIDENCE_REGISTRY } from "./evidence.js";
 /**
  * Score the structure dimension from observations.
  * @param {import("./observations.js").ContentObservations} obs
- * @returns {{ score: number, max: number, details: string[], findings: Array<{ruleId: string, status: string, message: string}> }}
+ * @param {string} profile — current content profile id (finding applicability)
+ * @returns {{ score: number, max: number, details: string[], findings: import("./findings.js").Finding[] }}
  */
-function scoreStructure(obs) {
+function scoreStructure(obs, profile) {
   let score = 0;
   const max = 20;
   const details = [];
@@ -42,18 +48,34 @@ function scoreStructure(obs) {
   } else if (obs.headingHierarchy.status === "warn") {
     score += 4;
     details.push(`Headings: Minor issues — ${obs.headingHierarchy.message} (+4 pts)`);
-    findings.push({
-      ruleId: "v2.structure.headings",
-      status: "warn",
-      message: obs.headingHierarchy.message,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.structure.headings",
+        category: "structure",
+        severity: "warn",
+        message: obs.headingHierarchy.message,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: { issues: obs.headingHierarchy.issues },
+        remediation:
+          "Use a single H1 and avoid skipping heading levels so parsers can map the document outline.",
+      })
+    );
   } else {
     details.push(`Headings: ${obs.headingHierarchy.message} (+0 pts)`);
-    findings.push({
-      ruleId: "v2.structure.headings",
-      status: "fail",
-      message: obs.headingHierarchy.message,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.structure.headings",
+        category: "structure",
+        severity: "fail",
+        message: obs.headingHierarchy.message,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: { issues: obs.headingHierarchy.issues },
+        remediation:
+          "Add a clear H2/H3 heading hierarchy without skipped levels so each section is addressable.",
+      })
+    );
   }
 
   // Section self-containment (0–5 pts)
@@ -63,18 +85,40 @@ function scoreStructure(obs) {
   } else if (obs.sectionSelfContainment.status === "warn") {
     score += 2;
     details.push(`Sections: ${obs.sectionSelfContainment.message} (+2 pts)`);
-    findings.push({
-      ruleId: "v2.structure.empty_sections",
-      status: "warn",
-      message: obs.sectionSelfContainment.message,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.structure.empty_sections",
+        category: "structure",
+        severity: "warn",
+        message: obs.sectionSelfContainment.message,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: {
+          totalSections: obs.sectionSelfContainment.details?.length ?? 0,
+          emptySections: obs.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0,
+        },
+        remediation:
+          "Give every heading enough body content to stand on its own when retrieved out of context.",
+      })
+    );
   } else {
     details.push(`Sections: ${obs.sectionSelfContainment.message} (+0 pts)`);
-    findings.push({
-      ruleId: "v2.structure.empty_sections",
-      status: "fail",
-      message: obs.sectionSelfContainment.message,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.structure.empty_sections",
+        category: "structure",
+        severity: "fail",
+        message: obs.sectionSelfContainment.message,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: {
+          totalSections: obs.sectionSelfContainment.details?.length ?? 0,
+          emptySections: obs.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0,
+        },
+        remediation:
+          "Add substantive content under each heading; remove or merge empty placeholder sections.",
+      })
+    );
   }
 
   // Answer-first (0–5 pts)
@@ -86,11 +130,22 @@ function scoreStructure(obs) {
     details.push(`Answer-First: ${obs.answerFirst.message} (+2 pts)`);
   } else {
     details.push(`Answer-First: ${obs.answerFirst.message} (+0 pts)`);
-    findings.push({
-      ruleId: "v2.structure.answer_first",
-      status: "fail",
-      message: obs.answerFirst.message,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.structure.answer_first",
+        category: "structure",
+        severity: "fail",
+        message: obs.answerFirst.message,
+        evidenceLabel: "experimental",
+        applicability: profile,
+        observedFacts: {
+          wordCount: obs.answerFirst.wordCount,
+          hasDefinition: obs.answerFirst.hasDefinition,
+        },
+        remediation:
+          "Open with a direct, self-contained definition of the topic before adding supporting detail.",
+      })
+    );
   }
 
   // Tables, lists, code blocks (0–3 pts) — structural richness
@@ -117,9 +172,10 @@ function scoreStructure(obs) {
 /**
  * Score the statistics dimension from observations.
  * @param {import("./observations.js").ContentObservations} obs
- * @returns {{ score: number, max: number, details: string[], findings: Array<{ruleId: string, status: string, message: string}> }}
+ * @param {string} profile — current content profile id (finding applicability)
+ * @returns {{ score: number, max: number, details: string[], findings: import("./findings.js").Finding[] }}
  */
-function scoreStatistics(obs) {
+function scoreStatistics(obs, profile) {
   let score = 0;
   const max = 20;
   const details = [];
@@ -151,22 +207,45 @@ function scoreStatistics(obs) {
     details.push(
       `Statistics: ${totalStats} stats but only ${Math.round(attributionRatio * 100)}% have nearby source attribution (+6 pts)`
     );
-    findings.push({
-      ruleId: "v2.statistics.attribution",
-      status: "warn",
-      message: `${attr.statsWithoutNearbySource} of ${totalStats} statistics lack nearby source attribution.`,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.statistics.attribution",
+        category: "statistics",
+        severity: "warn",
+        message: `${attr.statsWithoutNearbySource} of ${totalStats} statistics lack nearby source attribution.`,
+        evidenceLabel: "strong",
+        applicability: profile,
+        observedFacts: {
+          totalStats,
+          statsWithNearbySource: attr.statsWithNearbySource,
+          statsWithoutNearbySource: attr.statsWithoutNearbySource,
+        },
+        remediation: "Cite a named source next to each statistic that currently lacks one.",
+      })
+    );
   } else if (totalStats >= 3) {
     // Zero attribution — strongly penalized
     score += 2;
     details.push(
       `Statistics: ${totalStats} stats with NO source attribution (+2 pts — attribution required for full credit)`
     );
-    findings.push({
-      ruleId: "v2.statistics.attribution",
-      status: "fail",
-      message: `All ${totalStats} statistics lack nearby source attribution. Add sources and methodology.`,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.statistics.attribution",
+        category: "statistics",
+        severity: "fail",
+        message: `All ${totalStats} statistics lack nearby source attribution. Add sources and methodology.`,
+        evidenceLabel: "strong",
+        applicability: profile,
+        observedFacts: {
+          totalStats,
+          statsWithNearbySource: attr.statsWithNearbySource,
+          statsWithoutNearbySource: attr.statsWithoutNearbySource,
+        },
+        remediation:
+          "Attribute every statistic to a named, verifiable source and state methodology.",
+      })
+    );
   } else {
     score += 2;
     details.push(`Statistics: ${totalStats} stat(s) found (+2 pts)`);
@@ -187,11 +266,21 @@ function scoreStatistics(obs) {
 
   // Flag unattributed stats as adversarial signal
   if (attr.statsWithoutNearbySource >= 5 && attributionRatio < 0.3) {
-    findings.push({
-      ruleId: "v2.statistics.implausible",
-      status: "fail",
-      message: `${attr.statsWithoutNearbySource} statistics without attribution — possible fabricated or unverified claims.`,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.statistics.implausible",
+        category: "statistics",
+        severity: "fail",
+        message: `${attr.statsWithoutNearbySource} statistics without attribution — possible fabricated or unverified claims.`,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: {
+          statsWithoutNearbySource: attr.statsWithoutNearbySource,
+          attributionRatio: Math.round(attributionRatio * 100) / 100,
+        },
+        remediation: "Verify each figure and attribute it, or remove unverifiable statistics.",
+      })
+    );
   }
 
   return { score: Math.min(score, max), max, details, findings };
@@ -200,9 +289,10 @@ function scoreStatistics(obs) {
 /**
  * Score the quotations dimension from observations.
  * @param {import("./observations.js").ContentObservations} obs
- * @returns {{ score: number, max: number, details: string[], findings: Array<{ruleId: string, status: string, message: string}> }}
+ * @param {string} profile — current content profile id (finding applicability)
+ * @returns {{ score: number, max: number, details: string[], findings: import("./findings.js").Finding[] }}
  */
-function scoreQuotations(obs) {
+function scoreQuotations(obs, profile) {
   let score = 0;
   const max = 20;
   const details = [];
@@ -232,18 +322,40 @@ function scoreQuotations(obs) {
     details.push(
       `Quotations: Some quotes attributed but ${attr.quotesWithoutAttribution} lack sources (+4 pts)`
     );
-    findings.push({
-      ruleId: "v2.quotations.attribution",
-      status: "warn",
-      message: `${attr.quotesWithoutAttribution} of ${totalQuotes} quotes lack identifiable attribution.`,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.quotations.attribution",
+        category: "quotations",
+        severity: "warn",
+        message: `${attr.quotesWithoutAttribution} of ${totalQuotes} quotes lack identifiable attribution.`,
+        evidenceLabel: "strong",
+        applicability: profile,
+        observedFacts: {
+          totalQuotes,
+          quotesWithAttribution: attr.quotesWithAttribution,
+          quotesWithoutAttribution: attr.quotesWithoutAttribution,
+        },
+        remediation: "Attribute each quote to a named person with their title and context.",
+      })
+    );
   } else {
     details.push(`Quotations: ${totalQuotes} quotes with no attribution (+0 pts)`);
-    findings.push({
-      ruleId: "v2.quotations.attribution",
-      status: "fail",
-      message: `All ${totalQuotes} quotes lack attribution. Add speaker name, title, and context.`,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.quotations.attribution",
+        category: "quotations",
+        severity: "fail",
+        message: `All ${totalQuotes} quotes lack attribution. Add speaker name, title, and context.`,
+        evidenceLabel: "strong",
+        applicability: profile,
+        observedFacts: {
+          totalQuotes,
+          quotesWithAttribution: attr.quotesWithAttribution,
+          quotesWithoutAttribution: attr.quotesWithoutAttribution,
+        },
+        remediation: "Add a named speaker, title, and context to every quotation.",
+      })
+    );
   }
 
   // Density bonus (0–8 pts)
@@ -260,11 +372,21 @@ function scoreQuotations(obs) {
 
   // Flag unattributed quotes as adversarial
   if (attr.quotesWithoutAttribution >= 3 && attributionRatio < 0.3) {
-    findings.push({
-      ruleId: "v2.quotations.unattributed",
-      status: "fail",
-      message: `${attr.quotesWithoutAttribution} unattributed quotes — possible fabricated quotations.`,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.quotations.unattributed",
+        category: "quotations",
+        severity: "fail",
+        message: `${attr.quotesWithoutAttribution} unattributed quotes — possible fabricated quotations.`,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: {
+          quotesWithoutAttribution: attr.quotesWithoutAttribution,
+          attributionRatio: Math.round(attributionRatio * 100) / 100,
+        },
+        remediation: "Attribute or remove quotes that cannot be traced to a named source.",
+      })
+    );
   }
 
   return { score: Math.min(score, max), max, details, findings };
@@ -273,9 +395,10 @@ function scoreQuotations(obs) {
 /**
  * Score the citations dimension from observations.
  * @param {import("./observations.js").ContentObservations} obs
- * @returns {{ score: number, max: number, details: string[], findings: Array<{ruleId: string, status: string, message: string}> }}
+ * @param {string} profile — current content profile id (finding applicability)
+ * @returns {{ score: number, max: number, details: string[], findings: import("./findings.js").Finding[] }}
  */
-function scoreCitations(obs) {
+function scoreCitations(obs, profile) {
   let score = 0;
   const max = 20;
   const details = [];
@@ -286,11 +409,19 @@ function scoreCitations(obs) {
   // Link-farm detection (automatic fail for this dimension)
   if (link.hasExcessiveLinks) {
     details.push(`Citations: ${link.message} (+0 pts)`);
-    findings.push({
-      ruleId: "v2.citations.link_farm",
-      status: "fail",
-      message: link.message,
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.citations.link_farm",
+        category: "citations",
+        severity: "fail",
+        message: link.message,
+        evidenceLabel: "heuristic",
+        applicability: profile,
+        observedFacts: { externalLinkCount: link.externalLinkCount, hasExcessiveLinks: true },
+        remediation:
+          "Reduce excessive outbound links; keep only relevant, authoritative citations.",
+      })
+    );
     return { score: 0, max, details, findings };
   }
 
@@ -308,11 +439,19 @@ function scoreCitations(obs) {
     details.push(`Citations: ${link.externalLinkCount} external link(s) (+5 pts)`);
   } else {
     details.push("Citations: No external links (+0 pts)");
-    findings.push({
-      ruleId: "v2.citations.no_links",
-      status: "warn",
-      message: "No external hyperlinks found. Citations improve authority signals.",
-    });
+    findings.push(
+      createFinding({
+        ruleId: "v2.citations.no_links",
+        category: "citations",
+        severity: "warn",
+        message: "No external hyperlinks found. Citations improve authority signals.",
+        evidenceLabel: "strong",
+        applicability: profile,
+        observedFacts: { externalLinkCount: 0 },
+        remediation:
+          "Link key claims to authoritative external sources and add a references section.",
+      })
+    );
   }
 
   // Sources section (0–5 pts)
@@ -341,9 +480,10 @@ function scoreCitations(obs) {
  * @param {import("./observations.js").ContentObservations} obs
  * @param {string} textContent
  * @param {Object} config
- * @returns {{ score: number, max: number, details: string[], findings: Array<{ruleId: string, status: string, message: string}> }}
+ * @param {string} profile — current content profile id (finding applicability)
+ * @returns {{ score: number, max: number, details: string[], findings: import("./findings.js").Finding[] }}
  */
-function scoreClarity(obs, textContent, config) {
+function scoreClarity(obs, textContent, config, profile) {
   let score = 20; // Start full, deduct for issues
   const max = 20;
   const details = [];
@@ -386,11 +526,22 @@ function scoreClarity(obs, textContent, config) {
       details.push(
         `Pronouns: High ambiguous pronoun density (${(pronounDensity * 100).toFixed(1)}%) (-${deduct} pts)`
       );
-      findings.push({
-        ruleId: "v2.clarity.pronouns",
-        status: "warn",
-        message: `Ambiguous pronoun density of ${(pronounDensity * 100).toFixed(1)}% exceeds limit of ${(pronounLimit * 100).toFixed(0)}%.`,
-      });
+      findings.push(
+        createFinding({
+          ruleId: "v2.clarity.pronouns",
+          category: "clarity",
+          severity: "warn",
+          message: `Ambiguous pronoun density of ${(pronounDensity * 100).toFixed(1)}% exceeds limit of ${(pronounLimit * 100).toFixed(0)}%.`,
+          evidenceLabel: "heuristic",
+          applicability: profile,
+          observedFacts: {
+            pronounDensity: Math.round(pronounDensity * 1000) / 1000,
+            pronounLimit,
+          },
+          remediation:
+            "Replace ambiguous pronouns ('it', 'they', 'this') with specific entity names where clarity is at risk.",
+        })
+      );
     } else {
       details.push(
         `Pronouns: Low ambiguous pronoun density (${(pronounDensity * 100).toFixed(1)}%) (+0 pts)`
@@ -497,6 +648,25 @@ function readinessBand(pct) {
   };
 }
 
+/**
+ * Remove findings that express the same rule and the same observed facts.
+ * Distinct ruleIds (or the same rule reporting different facts) are kept —
+ * only exact rule+fact duplicates are collapsed.
+ * @param {import("./findings.js").Finding[]} findings
+ * @returns {import("./findings.js").Finding[]}
+ */
+function dedupeFindings(findings) {
+  const seen = new Set();
+  const result = [];
+  for (const finding of findings) {
+    const key = `${finding.ruleId}::${JSON.stringify(finding.observedFacts ?? {})}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(finding);
+  }
+  return result;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Main v2 scoring entry point
 // ═══════════════════════════════════════════════════════════════════════════
@@ -523,13 +693,14 @@ export function scoreContentV2(rawContent, filepath, config = {}) {
   // 3. Score each applicable dimension
   const dimensions = {};
   const allFindings = [];
+  const profile = profileInfo.profile;
 
   const dimScorers = {
-    structure: () => scoreStructure(observations),
-    statistics: () => scoreStatistics(observations),
-    quotations: () => scoreQuotations(observations),
-    citations: () => scoreCitations(observations),
-    clarity: () => scoreClarity(observations, textContent, config),
+    structure: () => scoreStructure(observations, profile),
+    statistics: () => scoreStatistics(observations, profile),
+    quotations: () => scoreQuotations(observations, profile),
+    citations: () => scoreCitations(observations, profile),
+    clarity: () => scoreClarity(observations, textContent, config, profile),
   };
 
   let applicableCount = 0;
@@ -564,16 +735,14 @@ export function scoreContentV2(rawContent, filepath, config = {}) {
   const band = readinessBand(pct);
 
   // 5. Build report
-  const meta = buildReportMeta("v2");
+  const meta = buildReportMeta(MODEL_VERSION_V2);
 
   // Map observations to findings using the v2 bridge
-  const observationFindings = mapObservationsToFindings
-    ? mapObservationsToFindings(observations, profileInfo.profile)
-    : [];
+  const observationFindings = mapObservationsToFindings(observations, profile);
 
   const report = {
     file: filepath,
-    modelVersion: "2.0.0",
+    modelVersion: meta.modelVersion,
     reportVersion: meta.reportVersion,
     generatedAt: meta.generatedAt,
     profile: {
@@ -609,7 +778,7 @@ export function scoreContentV2(rawContent, filepath, config = {}) {
       publishedDate: observations.contentFreshness.publishedDate,
       reviewedDate: observations.contentFreshness.reviewedDate,
     },
-    findings: [...allFindings, ...observationFindings],
+    findings: dedupeFindings([...allFindings, ...observationFindings]),
     notApplicableDimensions: notApplicableDimensions(profileInfo.profile),
     recommendations: generateRecommendationsV2(dimensions, profileInfo.profile, observations),
   };

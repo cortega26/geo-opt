@@ -39,6 +39,24 @@ export function auditFiles(files, config) {
 }
 
 /**
+ * A finding is eligible for summary aggregation only when it carries the
+ * complete contract (a ruleId, category and evidence label) and reports an
+ * actual issue (non-"pass" severity).
+ *
+ * @param {object} finding
+ * @returns {boolean}
+ */
+function isValidatedFinding(finding) {
+  return Boolean(
+    finding &&
+    typeof finding.ruleId === "string" &&
+    typeof finding.category === "string" &&
+    typeof finding.evidenceLabel === "string" &&
+    finding.severity !== "pass"
+  );
+}
+
+/**
  * Aggregate per-file audit results into a site-level summary report.
  *
  * @param {Array} results - output from auditFiles()
@@ -81,26 +99,26 @@ export function aggregateReport(results) {
     .slice(0, 10)
     .map(([recommendation, fileCount]) => ({ recommendation, fileCount }));
 
-  // Collect finding frequency by ruleId (plan 021, additive)
+  // Collect finding frequency by ruleId (plan 021, additive).
+  // Only validated findings (complete contract, non-pass) are aggregated so a
+  // summary entry can never omit category or evidenceLabel.
   const findingCounts = new Map();
   for (const r of successes) {
-    if (r.report.findings) {
-      for (const f of r.report.findings) {
-        if (f.severity !== "pass") {
-          const key = f.ruleId;
-          const entry = findingCounts.get(key);
-          if (entry) {
-            entry.fileCount++;
-          } else {
-            findingCounts.set(key, {
-              ruleId: f.ruleId,
-              category: f.category,
-              evidenceLabel: f.evidenceLabel,
-              message: f.message,
-              fileCount: 1,
-            });
-          }
-        }
+    if (!Array.isArray(r.report.findings)) continue;
+    for (const f of r.report.findings) {
+      if (!isValidatedFinding(f)) continue;
+      const key = f.ruleId;
+      const entry = findingCounts.get(key);
+      if (entry) {
+        entry.fileCount++;
+      } else {
+        findingCounts.set(key, {
+          ruleId: f.ruleId,
+          category: f.category,
+          evidenceLabel: f.evidenceLabel,
+          message: f.message,
+          fileCount: 1,
+        });
       }
     }
   }

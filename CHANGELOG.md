@@ -89,6 +89,22 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Normalized every model v2 finding through the `createFinding` factory so all
+  published findings carry the complete contract (`category`, `severity`,
+  `evidenceLabel`, `applicability`, `sourceRefs`, `observedFacts`,
+  `remediation`). Dimension scorers and the observation bridge no longer emit
+  reduced or `status`-only shapes, and the factory now rejects an invalid
+  `severity` or missing `category` at its boundary.
+- Gave the v1 and v2 scoring models distinct, unambiguous model identities
+  while keeping a single shared report-contract version (`REPORT_VERSION`). The
+  default v1 model keeps its established `modelVersion` `2.0.0`; the profile-aware
+  v2 model now reports a distinct `2.1.0`. Both models previously reported
+  `2.0.0`, so persisted reports could not identify which algorithm produced them.
+- Site summaries aggregate only validated findings, so no `topFindings` entry
+  can omit `category` or `evidenceLabel`.
+- A model v2 audit no longer records a successful free injection, so audits can
+  no longer advance the support-reminder engagement state; only a real schema
+  injection does.
 - Completed Python compatibility for the legacy versioned, evidence-labeled
   audit report on a shared cross-runtime fixture, with aligned Markdown
   blockquote counting.
