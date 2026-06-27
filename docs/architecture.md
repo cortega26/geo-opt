@@ -15,6 +15,7 @@ constraint requires a difference.
 | Content discovery and ignore rules     | `src/discovery.js`                        |
 | Text extraction and normalization      | `src/text.js`                             |
 | Heuristic scoring                      | `src/scoring.js`                          |
+| Finding contract and evidence registry  | `src/findings.js` and `src/evidence.js`   |
 | Batch audits and injection             | `src/batch.js`                            |
 | Schema generation and injection        | `src/schema.js`                           |
 | JSON-LD validation                     | `src/validate.js`                         |

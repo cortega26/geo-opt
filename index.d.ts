@@ -109,6 +109,85 @@ declare module "geo-opt" {
 
   export function extractSections(content: string): Section[];
 
+  // ═══ Evidence ═══
+  export type SourceType = "paper" | "official-doc" | "community-proposal" | "project-convention";
+
+  export interface EvidenceEntry {
+    id: string;
+    title: string;
+    url: string;
+    sourceType: SourceType;
+    lastVerified: string;
+  }
+
+  export const EVIDENCE_REGISTRY: Readonly<Record<string, EvidenceEntry>>;
+  export const EVIDENCE_LABELS: Readonly<Record<string, string>>;
+  export const VALID_EVIDENCE_LABELS: readonly string[];
+
+  export function validateSourceRefs(sourceRefs: string[]): {
+    valid: boolean;
+    missing: string[];
+  };
+
+  export function staleEvidenceWarnings(staleDays?: number): string[];
+
+  // ═══ Findings ═══
+  export const REPORT_VERSION: string;
+  export const MODEL_VERSION: string;
+
+  export type FindingStatus = "pass" | "warn" | "fail" | "not_applicable";
+  export type EvidenceLabel = "strong" | "probable" | "experimental" | "heuristic";
+
+  export interface Finding {
+    ruleId: string;
+    category: string;
+    severity: FindingStatus;
+    status: FindingStatus;
+    message: string;
+    evidenceLabel: EvidenceLabel;
+    applicability: string | string[];
+    sourceRefs: string[];
+    observedFacts: Record<string, unknown>;
+    remediation: string | null;
+  }
+
+  export interface ReportMeta {
+    reportVersion: string;
+    modelVersion: string;
+    generatedAt: string;
+  }
+
+  export function createFinding(params: {
+    ruleId: string;
+    category: string;
+    severity: FindingStatus;
+    message: string;
+    evidenceLabel: EvidenceLabel;
+    applicability?: string | string[];
+    sourceRefs?: string[];
+    observedFacts?: Record<string, unknown>;
+    remediation?: string | null;
+  }): Finding;
+
+  export function buildReportMeta(): ReportMeta;
+
+  export function mapLegacyToFindings(params: {
+    introWordCount: number;
+    introHasDefinition: boolean;
+    hasTable: boolean;
+    hasList: boolean;
+    hasHeaders: boolean;
+    hasSemanticHtml?: boolean;
+    hasDynamicRendering: boolean;
+    totalStatCount: number;
+    quoteCount: number;
+    linkCount: number;
+    hasSourcesSection: boolean;
+    pronounDensity: number;
+    pronounLimit: number;
+    unexplainedAcronyms: string[];
+  }): Finding[];
+
   // ═══ Scoring ═══
   export interface ScoreBreakdownItem {
     score: number;
@@ -127,6 +206,10 @@ declare module "geo-opt" {
       clarity: ScoreBreakdownItem;
     };
     recommendations: string[];
+    findings: Finding[];
+    reportVersion: string;
+    modelVersion: string;
+    generatedAt: string;
   }
 
   export function scoreContent(
@@ -177,6 +260,13 @@ declare module "geo-opt" {
       needsWork: number;
     };
     topRecommendations?: Array<{ recommendation: string; fileCount: number }>;
+    topFindings?: Array<{
+      ruleId: string;
+      category: string;
+      evidenceLabel: string;
+      message: string;
+      fileCount: number;
+    }>;
     worstFiles?: Array<{ file: string; score: number }>;
     perFile?: AuditResult[];
   }

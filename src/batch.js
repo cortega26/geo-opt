@@ -69,7 +69,7 @@ export function aggregateReport(results) {
       ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
       : sorted[Math.floor(sorted.length / 2)];
 
-  // Collect recommendation frequency across all files
+  // Collect recommendation frequency across all files (legacy, prose-based)
   const recCounts = new Map();
   for (const r of successes) {
     for (const rec of r.report.recommendations) {
@@ -80,6 +80,33 @@ export function aggregateReport(results) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([recommendation, fileCount]) => ({ recommendation, fileCount }));
+
+  // Collect finding frequency by ruleId (plan 021, additive)
+  const findingCounts = new Map();
+  for (const r of successes) {
+    if (r.report.findings) {
+      for (const f of r.report.findings) {
+        if (f.severity !== "pass") {
+          const key = f.ruleId;
+          const entry = findingCounts.get(key);
+          if (entry) {
+            entry.fileCount++;
+          } else {
+            findingCounts.set(key, {
+              ruleId: f.ruleId,
+              category: f.category,
+              evidenceLabel: f.evidenceLabel,
+              message: f.message,
+              fileCount: 1,
+            });
+          }
+        }
+      }
+    }
+  }
+  const topFindings = [...findingCounts.values()]
+    .sort((a, b) => b.fileCount - a.fileCount)
+    .slice(0, 10);
 
   return {
     totalFiles: total,
@@ -96,6 +123,7 @@ export function aggregateReport(results) {
       needsWork: scores.filter((s) => s < 50).length,
     },
     topRecommendations,
+    topFindings,
     worstFiles: [...successes]
       .sort((a, b) => a.score - b.score)
       .slice(0, 5)

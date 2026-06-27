@@ -9,6 +9,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- A versioned finding contract (`src/findings.js`) with stable namespaced
+  `ruleId`s, severity levels, evidence labels, source references, observed
+  facts, and remediation hints. Every audit report now includes machine-readable
+  `findings` alongside legacy scores and recommendations.
+- An evidence registry (`src/evidence.js`) that links scoring rules to their
+  supporting sources (papers, official docs, community proposals) with
+  verification dates and staleness warnings.
+- `topFindings` aggregation by `ruleId` in site-level summary reports,
+  complementing the existing prose-based `topRecommendations`.
+- `--explain` flag for `geo-opt audit` that displays evidence labels and
+  primary source references alongside findings in text output.
 - A versioned, purpose-aware crawler registry and structured `robots.txt`
   audits with JSON CLI output.
 - Explicit `search-visible` and `open` crawler-policy presets with JavaScript
@@ -25,6 +36,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- Audit reports now include `reportVersion`, `modelVersion`, and `generatedAt`
+  metadata fields alongside the existing breakdown and recommendations.
 - Migrated CLI parsing and terminal output to Commander and Chalk, HTML parsing
   to Cheerio, Markdown parsing to Marked, and config validation to Zod.
 - Refined the public documentation around local-first operation, current

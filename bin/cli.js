@@ -49,6 +49,7 @@ program
   .option("-r, --recursive", "Recursively scan directories")
   .option("--ignore <patterns...>", "Additional ignore patterns (gitignore syntax)")
   .option("-s, --summary", "Show aggregate site report (JSON only)")
+  .option("--explain", "Show evidence labels and sources alongside findings")
   .action((files, options, cmd) => {
     const config = resolveConfig(cmd);
 
@@ -116,7 +117,7 @@ program
       const successes = batchResults.filter((r) => r.status === "success");
       for (const r of successes) {
         // Reuse auditFile's text output by calling it directly
-        auditFile(r.file, config, "text");
+        auditFile(r.file, config, "text", options.explain || false);
       }
       // Report errors
       const errors = batchResults.filter((r) => r.status === "error");

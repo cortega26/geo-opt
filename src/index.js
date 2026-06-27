@@ -22,6 +22,20 @@ export {
   extractSections,
 } from "./text.js";
 export { scoreContent, auditFile } from "./scoring.js";
+export {
+  REPORT_VERSION,
+  MODEL_VERSION,
+  createFinding,
+  buildReportMeta,
+  mapLegacyToFindings,
+} from "./findings.js";
+export {
+  EVIDENCE_REGISTRY,
+  EVIDENCE_LABELS,
+  VALID_EVIDENCE_LABELS,
+  validateSourceRefs,
+  staleEvidenceWarnings,
+} from "./evidence.js";
 export { discoverFiles } from "./discovery.js";
 export { auditFiles, aggregateReport, batchInject } from "./batch.js";
 export {

@@ -4,6 +4,8 @@ import { marked } from "marked";
 import chalk from "chalk";
 import { preprocessContent } from "./text.js";
 import { MAX_PRONOUN_DENSITY } from "./config.js";
+import { mapLegacyToFindings, buildReportMeta } from "./findings.js";
+import { EVIDENCE_REGISTRY } from "./evidence.js";
 
 const VERBAL_STATS_PATTERNS = [
   /\b(?:one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:-|—)\s*(?:third|quarter|fifth|sixth|seventh|eighth|ninth|tenth)s?\b/gi,
@@ -85,6 +87,15 @@ export function scoreContent(content, filepath, config) {
   const textContent = preprocessContent(content);
   const tokens = marked.lexer(textContent); // AST for reliable structural queries
 
+  // Hoisted variables for structured findings (plan 021)
+  let introWordCount = 0;
+  let introHasDefinition = false;
+  let foundSemanticHtml = undefined; // undefined = not HTML; true/false = HTML
+  let hasDynamicRendering = false;
+  let observedPronounDensity = 0;
+  let observedPronounLimit = config.limits?.max_pronoun_density ?? MAX_PRONOUN_DENSITY;
+  let observedUnexplainedAcronyms = [];
+
   // 1. Answer-First & Structure (Max 20 pts)
   let structScore = 0;
   const structBreakdown = [];
@@ -102,8 +113,8 @@ export function scoreContent(content, filepath, config) {
   }
 
   if (introPara) {
-    const wordCount = introPara.split(/\s+/).length;
-    const isDefinition = [
+    introWordCount = introPara.split(/\s+/).length;
+    introHasDefinition = [
       " is a ",
       " is an ",
       " refers to ",
@@ -111,8 +122,8 @@ export function scoreContent(content, filepath, config) {
       " is the strategic ",
     ].some((verb) => introPara.toLowerCase().includes(verb));
 
-    if (wordCount >= 40 && wordCount <= 90) {
-      if (isDefinition) {
+    if (introWordCount >= 40 && introWordCount <= 90) {
+      if (introHasDefinition) {
         structScore += 10;
         structBreakdown.push(
           "Answer-First: Optimal length (40-90 words) and contains definition markers (+10 pts)"
@@ -125,7 +136,7 @@ export function scoreContent(content, filepath, config) {
       }
     } else {
       structBreakdown.push(
-        `Answer-First: Intro paragraph has ${wordCount} words (optimal is 40-90) (+0 pts)`
+        `Answer-First: Intro paragraph has ${introWordCount} words (optimal is 40-90) (+0 pts)`
       );
     }
   } else {
@@ -160,10 +171,12 @@ export function scoreContent(content, filepath, config) {
     const semanticTags = ["article", "main", "header", "footer", "nav", "section"];
     const foundTags = semanticTags.filter((tag) => $html(tag).length > 0);
     if (foundTags.length >= 3) {
+      foundSemanticHtml = true;
       structBreakdown.push(
         `Semantic HTML: Good HTML5 layout tags used (<${foundTags.join(">, <")}>) (+0 pts)`
       );
     } else {
+      foundSemanticHtml = false;
       const deduction = 4;
       structScore = Math.max(0, structScore - deduction);
       structBreakdown.push(
@@ -174,6 +187,7 @@ export function scoreContent(content, filepath, config) {
     const hasAppContainer = $html('[id="app"], [id="root"]').length > 0;
     const hasFrameworkCode = /createapp\(|reactdom\.render\(/i.test(htmlLower);
     if (hasAppContainer || hasFrameworkCode) {
+      hasDynamicRendering = true;
       structBreakdown.push(
         "Dynamic Rendering Warning: Detects client-side JS references. Ensure content is pre-rendered / SSR for AI crawler searchability."
       );
@@ -269,8 +283,10 @@ export function scoreContent(content, filepath, config) {
     const pronouns = ["it", "they", "them", "this", "these", "those"];
     const pronounCount = words.filter((w) => pronouns.includes(w)).length;
     const pronounDensity = pronounCount / totalWordCount;
+    observedPronounDensity = pronounDensity;
 
     const pronounLimit = config.limits?.max_pronoun_density ?? MAX_PRONOUN_DENSITY;
+    observedPronounLimit = pronounLimit;
     if (pronounDensity > pronounLimit) {
       const deduction = Math.min(15, Math.floor((pronounDensity - pronounLimit) * 100));
       clarityScore -= deduction;
@@ -333,6 +349,8 @@ export function scoreContent(content, filepath, config) {
       }
     }
 
+    observedUnexplainedAcronyms = unexplained;
+
     if (unexplained.length > 0) {
       const deductPts = Math.min(5, unexplained.length);
       clarityScore -= deductPts;
@@ -347,6 +365,25 @@ export function scoreContent(content, filepath, config) {
   }
 
   const totalScore = structScore + statsScore + quotesScore + citationScore + clarityScore;
+
+  // ── Structured findings (plan 021, additive — scores and recs untouched) ──
+  const findings = mapLegacyToFindings({
+    introWordCount,
+    introHasDefinition,
+    hasTable: hasMdTable(tokens) || textContent.toLowerCase().includes("<table>"),
+    hasList: hasMdList(tokens),
+    hasHeaders: /^##+\s+\w+/m.test(textContent) || /<h[234]>/i.test(textContent),
+    hasSemanticHtml: foundSemanticHtml,
+    hasDynamicRendering,
+    totalStatCount,
+    quoteCount,
+    linkCount,
+    hasSourcesSection: hasSourcesHeader,
+    pronounDensity: observedPronounDensity,
+    pronounLimit: observedPronounLimit,
+    unexplainedAcronyms: observedUnexplainedAcronyms,
+  });
+  const meta = buildReportMeta();
 
   const recs = [];
   if (structScore < 15) {
@@ -388,12 +425,17 @@ export function scoreContent(content, filepath, config) {
       clarity: { score: clarityScore, max: 20, details: clarityBreakdown },
     },
     recommendations: recs,
+    // Additive structured contract (plan 021)
+    findings,
+    reportVersion: meta.reportVersion,
+    modelVersion: meta.modelVersion,
+    generatedAt: meta.generatedAt,
   };
 
   return { score: totalScore, report };
 }
 
-export function auditFile(filepath, config, outputFormat = "text") {
+export function auditFile(filepath, config, outputFormat = "text", explain = false) {
   if (!fs.existsSync(filepath)) {
     console.error(`Error: File ${filepath} not found.`);
     process.exit(1);
@@ -488,6 +530,37 @@ export function auditFile(filepath, config, outputFormat = "text") {
     } else {
       for (const r of recs) {
         console.log(chalk.cyan(`- ${r}`));
+      }
+    }
+
+    // Explain mode: show evidence labels and source refs per finding
+    if (explain && report.findings) {
+      console.log(chalk.bold.magenta("\nEvidence & Sources (--explain):"));
+      const warnFailFindings = report.findings.filter(
+        (f) => f.severity === "warn" || f.severity === "fail"
+      );
+      if (warnFailFindings.length === 0) {
+        console.log(chalk.green("  All checks passed — no evidence notes needed."));
+      } else {
+        for (const f of warnFailFindings) {
+          const labelColor =
+            f.evidenceLabel === "strong"
+              ? chalk.green
+              : f.evidenceLabel === "probable"
+                ? chalk.blue
+                : f.evidenceLabel === "experimental"
+                  ? chalk.yellow
+                  : chalk.gray;
+          console.log(`  ${chalk.bold(f.ruleId)} ${labelColor(`[${f.evidenceLabel}]`)}`);
+          if (f.sourceRefs.length > 0) {
+            for (const ref of f.sourceRefs) {
+              const entry = EVIDENCE_REGISTRY[ref];
+              if (entry) {
+                console.log(`    ← ${entry.title} (${entry.url})`);
+              }
+            }
+          }
+        }
       }
     }
     console.log(banner);

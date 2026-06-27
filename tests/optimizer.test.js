@@ -14,10 +14,13 @@ import {
   auditLlmsTxt,
   auditRobots,
   batchInject,
+  buildReportMeta,
   calculateReadability,
   checkRobots,
   cleanMarkdownToPlainText,
+  createFinding,
   discoverFiles,
+  EVIDENCE_REGISTRY,
   extractPageMetadata,
   extractSections,
   generateLlmsTxt,
@@ -28,12 +31,16 @@ import {
   hasProEntitlement,
   injectSchema,
   loadConfig,
+  MODEL_VERSION,
   preprocessContent,
   readEngagementState,
   recordSuccessfulFreeInjection,
   remindersAreEnabled,
+  REPORT_VERSION,
   scoreContent,
   setRemindersEnabled,
+  staleEvidenceWarnings,
+  validateSourceRefs,
 } from "../src/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1717,6 +1724,245 @@ test("CLI llmstxt generate --dry-run outputs expected content", () => {
       "Should include page description"
     );
     assert.ok(result.stdout.includes("[dry-run]"), "Should mark as dry-run");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+// ── Plan 021: Finding contract and evidence registry ──
+
+test("createFinding returns a valid finding with required fields", () => {
+  const f = createFinding({
+    ruleId: "content.answer_first",
+    category: "structure",
+    severity: "warn",
+    message: "Intro paragraph has 26 words.",
+    evidenceLabel: "experimental",
+    sourceRefs: ["geo-kdd-2024"],
+    observedFacts: { wordCount: 26 },
+    remediation: "Consider a longer intro.",
+  });
+  assert.strictEqual(f.ruleId, "content.answer_first");
+  assert.strictEqual(f.category, "structure");
+  assert.strictEqual(f.severity, "warn");
+  assert.strictEqual(f.status, "warn");
+  assert.strictEqual(f.evidenceLabel, "experimental");
+  assert.deepStrictEqual(f.sourceRefs, ["geo-kdd-2024"]);
+  assert.deepStrictEqual(f.observedFacts, { wordCount: 26 });
+  assert.strictEqual(f.remediation, "Consider a longer intro.");
+  assert.strictEqual(f.applicability, "common");
+});
+
+test("createFinding throws on invalid evidence label", () => {
+  assert.throws(
+    () =>
+      createFinding({
+        ruleId: "test.rule",
+        category: "structure",
+        severity: "warn",
+        message: "test",
+        evidenceLabel: "invalid-label",
+      }),
+    /Invalid evidenceLabel/
+  );
+});
+
+test("createFinding throws on unknown source ref", () => {
+  assert.throws(
+    () =>
+      createFinding({
+        ruleId: "test.rule",
+        category: "structure",
+        severity: "warn",
+        message: "test",
+        evidenceLabel: "heuristic",
+        sourceRefs: ["nonexistent-ref"],
+      }),
+    /Unknown source refs/
+  );
+});
+
+test("validateSourceRefs detects missing entries", () => {
+  const { valid, missing } = validateSourceRefs(["geo-kdd-2024", "fake-ref"]);
+  assert.strictEqual(valid, false);
+  assert.deepStrictEqual(missing, ["fake-ref"]);
+});
+
+test("validateSourceRefs returns valid for known entries", () => {
+  const { valid, missing } = validateSourceRefs(["geo-kdd-2024", "what-gets-cited-2025"]);
+  assert.strictEqual(valid, true);
+  assert.deepStrictEqual(missing, []);
+});
+
+test("staleEvidenceWarnings returns warnings for old entries", () => {
+  const warnings = staleEvidenceWarnings(1); // all entries are stale after 1 day
+  assert.ok(warnings.length > 0);
+  assert.ok(warnings.some((w) => w.includes("geo-kdd-2024")));
+});
+
+test("scoreContent report includes findings with stable ruleIds", () => {
+  const content =
+    "# Test\n\nThis is a test document with enough words to form a reasonable intro paragraph for scoring purposes here.\n\n## Section\n\nMore content goes here with additional details.\n\n> A quote from an expert.\n\nSee https://example.com for more.\n\n## Sources\n\n- Source 1";
+  const { report } = scoreContent(content, "test.md", {});
+  assert.ok(Array.isArray(report.findings), "report must include findings array");
+  assert.ok(report.findings.length >= 8, "should have at least 8 findings");
+  // Verify stable ruleIds exist
+  const ruleIds = report.findings.map((f) => f.ruleId);
+  assert.ok(ruleIds.includes("content.intro_definition"));
+  assert.ok(ruleIds.includes("content.tables"));
+  assert.ok(ruleIds.includes("content.lists"));
+  assert.ok(ruleIds.includes("content.headings"));
+  assert.ok(ruleIds.includes("content.statistics_density"));
+  assert.ok(ruleIds.includes("content.quotation_density"));
+  assert.ok(ruleIds.includes("content.citation_links"));
+  assert.ok(ruleIds.includes("content.references_section"));
+  assert.ok(ruleIds.includes("content.pronoun_density"));
+  assert.ok(ruleIds.includes("content.acronym_clarity"));
+  // Every finding has required fields
+  for (const f of report.findings) {
+    assert.ok(typeof f.ruleId === "string", `ruleId must be string, got ${typeof f.ruleId}`);
+    assert.ok(typeof f.category === "string");
+    assert.ok(["pass", "warn", "fail", "not_applicable"].includes(f.severity));
+    assert.ok(typeof f.message === "string");
+    assert.ok(["strong", "probable", "experimental", "heuristic"].includes(f.evidenceLabel));
+    assert.ok(typeof f.remediation === "string" || f.remediation === null);
+  }
+});
+
+test("scoreContent report preserves legacy scores with additive findings", () => {
+  const content = "# Test\n\nShort intro.\n\n## Section\n\nContent here.";
+  const { report } = scoreContent(content, "test.md", {});
+  // Legacy fields untouched
+  assert.ok(typeof report.total_score === "number");
+  assert.ok(typeof report.breakdown === "object");
+  assert.ok(Array.isArray(report.recommendations));
+  assert.ok(typeof report.breakdown.structure.score === "number");
+  // New additive fields
+  assert.ok(report.reportVersion === REPORT_VERSION);
+  assert.ok(report.modelVersion === MODEL_VERSION);
+  assert.ok(typeof report.generatedAt === "string");
+  // ISO 8601 timestamp
+  assert.ok(!isNaN(Date.parse(report.generatedAt)));
+});
+
+test("aggregateReport includes topFindings by ruleId", () => {
+  const results = [
+    {
+      file: "a.md",
+      status: "success",
+      score: 50,
+      report: {
+        findings: [
+          {
+            ruleId: "content.tables",
+            category: "structure",
+            severity: "warn",
+            evidenceLabel: "heuristic",
+            message: "No tables found.",
+          },
+          {
+            ruleId: "content.lists",
+            category: "structure",
+            severity: "pass",
+            evidenceLabel: "heuristic",
+            message: "Lists present.",
+          },
+        ],
+        recommendations: ["Add tables."],
+      },
+    },
+    {
+      file: "b.md",
+      status: "success",
+      score: 70,
+      report: {
+        findings: [
+          {
+            ruleId: "content.tables",
+            category: "structure",
+            severity: "warn",
+            evidenceLabel: "heuristic",
+            message: "No tables found.",
+          },
+          {
+            ruleId: "content.lists",
+            category: "structure",
+            severity: "warn",
+            evidenceLabel: "heuristic",
+            message: "No lists found.",
+          },
+        ],
+        recommendations: ["Add tables.", "Add lists."],
+      },
+    },
+  ];
+  const agg = aggregateReport(results);
+  assert.ok(agg.topRecommendations, "legacy topRecommendations preserved");
+  assert.ok(agg.topFindings, "topFindings must exist");
+  assert.ok(agg.topFindings.length >= 1);
+  // "content.tables" should appear in 2 files (warn in both), "content.lists" in 1 (only b is warn)
+  const tablesFinding = agg.topFindings.find((f) => f.ruleId === "content.tables");
+  assert.ok(tablesFinding);
+  assert.strictEqual(tablesFinding.fileCount, 2);
+  // Pass findings are excluded
+  assert.ok(!agg.topFindings.some((f) => f.ruleId === "content.lists" && f.fileCount === 0));
+});
+
+test("buildReportMeta returns current versions and timestamp", () => {
+  const meta = buildReportMeta();
+  assert.strictEqual(meta.reportVersion, REPORT_VERSION);
+  assert.strictEqual(meta.modelVersion, MODEL_VERSION);
+  assert.ok(!isNaN(Date.parse(meta.generatedAt)));
+});
+
+test("CLI audit JSON output includes findings and report metadata", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-test-"));
+  try {
+    const testFile = path.join(tmpDir, "test.md");
+    fs.writeFileSync(
+      testFile,
+      "# Test\n\nThis is a test document with enough words to form a reasonable intro paragraph for scoring.\n\n## Section\n\nMore content."
+    );
+    const result = spawnSync(process.execPath, [cliPath, "audit", testFile, "--format", "json"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    assert.strictEqual(result.status, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+    assert.ok(Array.isArray(parsed.findings), "JSON output includes findings");
+    assert.ok(parsed.reportVersion, "reportVersion present in JSON output");
+    assert.ok(parsed.modelVersion, "modelVersion present in JSON output");
+    assert.ok(parsed.generatedAt, "generatedAt present in JSON output");
+    // Verify finding structure in CLI output
+    for (const f of parsed.findings) {
+      assert.ok(typeof f.ruleId === "string");
+      assert.ok(typeof f.evidenceLabel === "string");
+      assert.ok(typeof f.severity === "string");
+    }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("CLI audit --explain shows evidence labels in text output", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-test-"));
+  try {
+    const testFile = path.join(tmpDir, "test.md");
+    fs.writeFileSync(testFile, "# Test\n\nShort.\n\n## Section\n\nContent.");
+    const result = spawnSync(process.execPath, [cliPath, "audit", testFile, "--explain"], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    assert.strictEqual(result.status, 0, result.stderr);
+    // --explain output should include the evidence header
+    assert.ok(
+      result.stdout.includes("Evidence & Sources"),
+      "Should show evidence header with --explain"
+    );
+    assert.ok(
+      result.stdout.includes("[experimental]") || result.stdout.includes("[heuristic]"),
+      "Should show evidence labels with --explain"
+    );
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
