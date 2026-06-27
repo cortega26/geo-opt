@@ -9,6 +9,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Pure local technical-discovery audits for supplied HTML, covering titles,
+  visible text, canonical links, meta robots, heading order, language and
+  hreflang declarations, link targets, JSON-LD/text consistency, and cautious
+  empty app-shell signals with versioned evidence-labeled findings.
 - **Profile-aware audit model v2** (opt-in via `--model v2`):
   - Seven content profiles (documentation, open-source, editorial, commercial,
     ecommerce, regulated) with explicit dimension applicability.

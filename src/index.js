@@ -49,6 +49,7 @@ export {
   resolveProfile,
 } from "./profiles.js";
 export { observeContent, observeAndParse } from "./observations.js";
+export { observeTechnicalHtml, buildTechnicalFindings, auditTechnicalHtml } from "./technical.js";
 export { scoreContentV2 } from "./scoring-v2.js";
 export {
   assertNewFileParentInsideCwd,

@@ -40,6 +40,34 @@ export const EVIDENCE_REGISTRY = Object.freeze({
     sourceType: "official-doc",
     lastVerified: "2025-06-01",
   },
+  "google-canonical-2025": {
+    id: "google-canonical-2025",
+    title: "Google Search: Canonical URLs",
+    url: "https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls",
+    sourceType: "official-doc",
+    lastVerified: "2026-06-27",
+  },
+  "google-robots-meta-2025": {
+    id: "google-robots-meta-2025",
+    title: "Google Search: Robots meta tag specifications",
+    url: "https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag",
+    sourceType: "official-doc",
+    lastVerified: "2026-06-27",
+  },
+  "google-hreflang-2025": {
+    id: "google-hreflang-2025",
+    title: "Google Search: Localized versions of pages",
+    url: "https://developers.google.com/search/docs/specialty/international/localized-versions",
+    sourceType: "official-doc",
+    lastVerified: "2026-06-27",
+  },
+  "google-structured-data-2025": {
+    id: "google-structured-data-2025",
+    title: "Google Search: Structured data general guidelines",
+    url: "https://developers.google.com/search/docs/appearance/structured-data/sd-policies",
+    sourceType: "official-doc",
+    lastVerified: "2026-06-27",
+  },
 });
 
 /**

@@ -324,6 +324,92 @@ declare module "geo-opt" {
     unexplainedAcronyms: string[];
   }): Finding[];
 
+  // ═══ Technical discovery ═══
+  export interface TechnicalAuditOptions {
+    sourceUrl?: string;
+    minVisibleWords?: number;
+  }
+
+  export interface TechnicalObservations {
+    title: { values: string[]; count: number; empty: boolean };
+    visibleText: {
+      text: string;
+      wordCount: number;
+      root: string | null;
+      minimumWords: number;
+    };
+    canonical: {
+      values: Array<{ href: string; absolute: boolean; validHttpUrl: boolean }>;
+      count: number;
+      conflicts: boolean;
+    };
+    robots: {
+      declarations: Array<{ agent: string; content: string; directives: string[] }>;
+      directives: string[];
+      unknown: string[];
+      conflicts: string[];
+      noindex: boolean;
+      nofollow: boolean;
+    };
+    headings: {
+      values: Array<{ level: number; text: string }>;
+      issues: string[];
+    };
+    language: {
+      documentLanguage: string;
+      validDocumentLanguage: boolean;
+      hreflang: Array<{
+        language: string;
+        href: string;
+        validLanguage: boolean;
+        absolute: boolean;
+      }>;
+      duplicateHreflang: string[];
+      hasSelfHreflang: boolean | null;
+    };
+    links: {
+      values: Array<{
+        href: string;
+        text: string;
+        resolvedUrl: string | null;
+        internal: boolean | null;
+        nofollow: boolean;
+        invalid: boolean;
+      }>;
+      invalidCount: number;
+      nofollowCount: number;
+      internalCount: number;
+    };
+    structuredData: {
+      blockCount: number;
+      invalidBlocks: Array<{ index: number; error: string }>;
+      claims: Array<{ property: string; value: string }>;
+      mismatches: Array<{ property: string; value: string }>;
+    };
+    appShell: {
+      detected: boolean;
+      appRootCount: number;
+      scriptCount: number;
+      visibleWordCount: number;
+    };
+  }
+
+  export interface TechnicalAuditReport extends ReportMeta {
+    target: string | null;
+    observations: TechnicalObservations;
+    findings: Finding[];
+  }
+
+  export function observeTechnicalHtml(
+    html: string,
+    options?: TechnicalAuditOptions
+  ): TechnicalObservations;
+  export function buildTechnicalFindings(observations: TechnicalObservations): Finding[];
+  export function auditTechnicalHtml(
+    html: string,
+    options?: TechnicalAuditOptions
+  ): TechnicalAuditReport;
+
   // ═══ Scoring ═══
   export interface ScoreBreakdownItem {
     score: number;
