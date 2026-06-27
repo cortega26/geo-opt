@@ -744,10 +744,19 @@ declare module "geo-opt" {
     content?: string;
   }
 
+  export function suggestSection(
+    filepath: string,
+    content?: string,
+    cwd?: string
+  ): string;
   export function generateLlmsFullTxt(
     entries: LlmsFullEntry[],
-    options?: { siteTitle?: string }
+    options?: { siteTitle?: string; maxChars?: number }
   ): string;
+  export function generateLlmsFullTxtFiles(
+    entries: LlmsFullEntry[],
+    options?: { siteTitle?: string; maxChars?: number }
+  ): Array<{ name: string; content: string }>;
 
   export interface LlmsAuditReport {
     valid: boolean;
@@ -771,4 +780,30 @@ declare module "geo-opt" {
     sitemapUrl?: string;
     preset?: "search-visible" | "open";
   }): string;
+
+  // ═══ Sitemap ═══
+  export interface SitemapEntry {
+    url: string;
+    score?: number;
+    lastmod?: string;
+    publishedDate?: string | null;
+    reviewedDate?: string | null;
+    filePath?: string;
+    images?: Array<{ loc: string; caption?: string; title?: string }>;
+  }
+
+  export function scoreToPriority(score: number): number;
+  export function determineChangefreq(entry?: {
+    publishedDate?: string | null;
+    reviewedDate?: string | null;
+    filePath?: string;
+  }): string;
+  export function generateSitemapXml(
+    entries: SitemapEntry[],
+    options?: { baseUrl?: string }
+  ): string;
+  export function generateSitemapFiles(
+    entries: SitemapEntry[],
+    options?: { baseUrl?: string }
+  ): Array<{ name: string; content: string }>;
 }

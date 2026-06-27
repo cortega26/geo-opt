@@ -6,6 +6,7 @@ import path from "path";
 import {
   auditFiles,
   aggregateReport,
+  auditContent,
   auditLlmsTxt,
   batchInject,
   assertNewFileParentInsideCwd,
@@ -15,6 +16,8 @@ import {
   extractPageMetadata,
   generateLlmsTxt,
   generateLlmsFullTxt,
+  generateLlmsFullTxtFiles,
+  suggestSection,
   generateRobotsTxt,
   generateSchemaData,
   loadConfig,
@@ -23,6 +26,9 @@ import {
   remindersAreEnabled,
   setRemindersEnabled,
   validateSchemaFile,
+  generateSitemapXml,
+  scoreToPriority,
+  determineChangefreq,
 } from "../src/index.js";
 import {
   renderV1Report,
@@ -241,6 +247,110 @@ robotsCmd
     }
   });
 
+// --- Sitemap ---
+const sitemapCmd = program
+  .command("sitemap")
+  .description("Generate sitemap.xml from content tree");
+
+sitemapCmd
+  .command("generate [files...]")
+  .description("Generate sitemap.xml with GEO-derived priorities")
+  .option("-r, --recursive", "Recursively scan directories")
+  .option("--ignore <patterns...>", "Additional ignore patterns (gitignore syntax)")
+  .option("--output <dir>", "Output directory", ".")
+  .option("--base-url <url>", "Base URL for site (e.g. https://example.com)")
+  .option("--audit", "Run GEO audit to compute score-based priorities")
+  .option("--dry-run", "Preview without writing files")
+  .action((files, options, cmd) => {
+    const config = resolveConfig(cmd);
+
+    if (!files || files.length === 0) files = ["."];
+
+    const allowedExts = new Set(
+      Array.isArray(config.allowedExtensions) && config.allowedExtensions.length > 0
+        ? config.allowedExtensions
+        : [".md", ".html", ".htm"]
+    );
+
+    let discovered;
+    try {
+      discovered = discoverFiles(files, {
+        recursive: options.recursive || false,
+        ignorePatterns: options.ignore || [],
+        allowedExtensions: allowedExts,
+        cwd: process.cwd(),
+        config,
+      });
+    } catch (e) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+
+    if (discovered.length === 0) {
+      console.error("No matching files found.");
+      process.exit(1);
+    }
+
+    const baseUrl = options.baseUrl || config.siteUrl || "";
+
+    // Build sitemap entries from discovered files
+    const entries = [];
+    for (const fp of discovered) {
+      // Resolve URL relative to site base
+      const rel = path.relative(process.cwd(), fp).split(path.sep).join("/");
+      const ext = path.extname(rel);
+      let urlPath = rel.slice(0, -ext.length);
+      if (path.basename(urlPath) === "index") {
+        urlPath = path.dirname(urlPath);
+      }
+      if (urlPath === "." || urlPath === "") {
+        urlPath = "/";
+      } else if (!urlPath.startsWith("/")) {
+        urlPath = "/" + urlPath;
+      }
+
+      const entry = {
+        url: baseUrl ? baseUrl.replace(/\/+$/, "") + urlPath : urlPath,
+        filePath: fp,
+      };
+
+      // Optionally run GEO audit for score-based priority
+      if (options.audit) {
+        try {
+          const content = fs.readFileSync(fp, { encoding: "utf8" });
+          const { score } = auditContent(content, fp, config, "v2");
+          entry.score = score;
+        } catch {
+          // Skip scoring if audit fails for this file
+        }
+      }
+
+      entries.push(entry);
+    }
+
+    const sitemapXml = generateSitemapXml(entries, { baseUrl });
+
+    if (options.dryRun) {
+      console.log("=== sitemap.xml preview ===");
+      console.log(sitemapXml.substring(0, 3000));
+      if (sitemapXml.length > 3000) {
+        console.log(`\n... (${sitemapXml.length - 3000} more chars)`);
+      }
+      console.log(
+        `\n[dry-run] Would write sitemap.xml with ${entries.length} URL(s) to ${path.resolve(options.output)}`
+      );
+    } else {
+      const outDir = path.resolve(options.output);
+      fs.mkdirSync(outDir, { recursive: true });
+      fs.writeFileSync(path.join(outDir, "sitemap.xml"), sitemapXml, {
+        encoding: "utf8",
+      });
+      console.log(
+        `✓ sitemap.xml written (${entries.length} URL(s)) → ${path.join(outDir, "sitemap.xml")}`
+      );
+    }
+  });
+
 // --- Schema ---
 program
   .command("schema <file> <type>")
@@ -284,6 +394,7 @@ llmstxtCmd
   .option("--title <name>", "Site name (default: from config or directory name)")
   .option("--description <text>", "Site description (default: from config)")
   .option("--full", "Also generate llms-full.txt with complete page content")
+  .option("--max-chars <number>", "Max characters per llms-full file before splitting", "500000")
   .option("--dry-run", "Preview without writing files")
   .action((files, options, cmd) => {
     const config = resolveConfig(cmd);
@@ -327,12 +438,8 @@ llmstxtCmd
         const content = fs.readFileSync(fp, { encoding: "utf8" });
         const { title, description } = extractPageMetadata(content, fp);
 
-        // Determine section from directory context
-        const relDir = path.relative(process.cwd(), path.dirname(fp));
-        const section =
-          relDir && relDir !== "."
-            ? relDir.charAt(0).toUpperCase() + relDir.slice(1).replace(/[_-]/g, " ")
-            : "Pages";
+        // Determine section from content signals or directory context
+        const section = suggestSection(fp, content);
 
         // Resolve URL
         let url = "";
@@ -375,14 +482,21 @@ llmstxtCmd
       console.log("=== llms.txt preview ===");
       console.log(llmsContent);
       if (options.full) {
-        const fullContent = generateLlmsFullTxt(
+        const maxChars = parseInt(options.maxChars) || 500_000;
+        const fullFiles = generateLlmsFullTxtFiles(
           entries.filter((e) => e.content),
-          { siteTitle }
+          { siteTitle, maxChars }
         );
         console.log("\n=== llms-full.txt preview ===");
-        console.log(fullContent.substring(0, 2000));
-        if (fullContent.length > 2000) {
-          console.log(`\n... (${fullContent.length - 2000} more chars)`);
+        for (const file of fullFiles) {
+          console.log(`\n--- ${file.name} ---`);
+          console.log(file.content.substring(0, 2000));
+          if (file.content.length > 2000) {
+            console.log(`\n... (${file.content.length - 2000} more chars in ${file.name})`);
+          }
+        }
+        if (fullFiles.length > 1) {
+          console.log(`\n[dry-run] Full content split into ${fullFiles.length} files.`);
         }
       }
       console.log(
@@ -399,14 +513,26 @@ llmstxtCmd
       );
 
       if (options.full) {
-        const fullContent = generateLlmsFullTxt(
-          entries.filter((e) => e.content),
-          { siteTitle }
-        );
-        fs.writeFileSync(path.join(outDir, "llms-full.txt"), fullContent, {
-          encoding: "utf8",
+        const maxChars = parseInt(options.maxChars) || 500_000;
+        const fullEntries = entries.filter((e) => e.content);
+        const fullFiles = generateLlmsFullTxtFiles(fullEntries, {
+          siteTitle,
+          maxChars,
         });
-        console.log(`✓ llms-full.txt written → ${path.join(outDir, "llms-full.txt")}`);
+        for (const file of fullFiles) {
+          fs.writeFileSync(path.join(outDir, file.name), file.content, {
+            encoding: "utf8",
+          });
+        }
+        if (fullFiles.length === 1) {
+          console.log(
+            `✓ llms-full.txt written (${fullEntries.length} pages) → ${path.join(outDir, "llms-full.txt")}`
+          );
+        } else {
+          console.log(
+            `✓ llms-full.txt written as ${fullFiles.length} files (${fullEntries.length} pages, max ${maxChars.toLocaleString()} chars each) → ${outDir}/`
+          );
+        }
       }
     }
 

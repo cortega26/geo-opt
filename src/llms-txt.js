@@ -155,13 +155,18 @@ export function generateLlmsTxt(entries, options = {}) {
 /**
  * Generate an llms-full.txt file containing the full content of all pages.
  *
+ * Preserves Markdown structure (headings, lists, tables, code blocks, links)
+ * so LLMs receive well-structured content. HTML pages are converted to
+ * plain text with heading structure preserved.
+ *
  * @param {Array<{ title: string, url: string, content: string }>} entries
  * @param {object} options
  * @param {string} [options.siteTitle] - site name for the header
+ * @param {number} [options.maxChars] - max total chars before splitting (default: 500_000)
  * @returns {string} compiled markdown content for llms-full.txt
  */
 export function generateLlmsFullTxt(entries, options = {}) {
-  const { siteTitle = "Site Documentation" } = options;
+  const { siteTitle = "Site Documentation", maxChars = 500_000 } = options;
   const lines = [];
 
   lines.push(`# ${siteTitle} — Full Content`);
@@ -170,24 +175,269 @@ export function generateLlmsFullTxt(entries, options = {}) {
   lines.push("");
 
   for (const entry of entries) {
-    lines.push("---");
-    lines.push("");
-    lines.push(`## [${entry.title}](${entry.url})`);
-    lines.push("");
-
-    const content = entry.content || "";
-    const clean = preprocessContent(content);
-    const plain = cleanMarkdownToPlainText(clean);
-    // Split into paragraphs for readability
-    const paragraphs = plain.split(/\n{2,}/);
-    for (const para of paragraphs) {
-      const trimmed = para.trim();
-      if (trimmed) lines.push(trimmed);
-      lines.push("");
-    }
+    const pageContent = renderPageForFullTxt(entry, maxChars, lines);
+    if (pageContent === null) break; // maxChars reached
   }
 
   return lines.join("\n").trim() + "\n";
+}
+
+/**
+ * Render a single page entry for llms-full.txt, appending to lines.
+ * Returns false if maxChars was reached.
+ *
+ * @param {{ title: string, url: string, content: string }} entry
+ * @param {number} maxChars
+ * @param {string[]} lines
+ * @returns {boolean} true if the page was fully rendered, false if truncated
+ */
+function renderPageForFullTxt(entry, maxChars, lines) {
+  const currentLen = lines.join("\n").length;
+  if (currentLen >= maxChars) return false;
+
+  lines.push("---");
+  lines.push("");
+  lines.push(`## [${entry.title}](${entry.url})`);
+  lines.push("");
+
+  const content = entry.content || "";
+  const cleaned = preserveContentStructure(content);
+  const bodyParagraphs = cleaned.split(/\n{2,}/);
+
+  for (const para of bodyParagraphs) {
+    const trimmed = para.trim();
+    if (!trimmed) continue;
+
+    lines.push(trimmed);
+    lines.push("");
+
+    // Check if we've exceeded maxChars
+    if (lines.join("\n").length >= maxChars) {
+      lines.push("");
+      lines.push(`> ⚠️ Content truncated at ~${maxChars.toLocaleString()} characters.`);
+      lines.push(`> Remaining pages omitted. Increase --max-chars or split into multiple files.`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Clean content for llms-full.txt while preserving Markdown structure.
+ *
+ * Removes: <script>, <style>, HTML comments, navigation/footer boilerplate.
+ * Preserves: headings, lists, code blocks, tables, blockquotes, links.
+ *
+ * @param {string} rawContent
+ * @returns {string}
+ */
+function preserveContentStructure(rawContent) {
+  let text = rawContent;
+
+  // Remove HTML scripts, styles, and comments
+  text = text.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
+  text = text.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
+  text = text.replace(/<!--[\s\S]*?-->/g, "");
+
+  // Remove common navigation/footer boilerplate (non-semantic class patterns)
+  // Only in HTML content
+  if (/<html[\s>]/i.test(text) || /^\s*<!DOCTYPE\s/i.test(text)) {
+    // For HTML, extract body content and convert to readable markdown-like text
+    text = extractHtmlBodyForFullTxt(text);
+  } else {
+    // For Markdown, strip YAML frontmatter only
+    text = text.replace(/^---\n[\s\S]*?\n---\n/, "");
+  }
+
+  // Collapse excessive blank lines
+  text = text.replace(/\n{4,}/g, "\n\n\n");
+
+  return text.trim();
+}
+
+/**
+ * Extract meaningful body content from HTML for llms-full.txt.
+ *
+ * Removes <nav>, <footer>, and hidden elements; keeps semantic content
+ * elements with their heading hierarchy intact.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function extractHtmlBodyForFullTxt(html) {
+  const $ = cheerio.load(html);
+
+  // Remove non-content elements
+  $("script, style, noscript, meta, link, head").remove();
+  $("nav, footer").remove();
+
+  // Remove hidden elements
+  $('[style*="display:none"], [style*="display: none"], [hidden], [aria-hidden="true"]').remove();
+
+  // Try to extract main content area
+  let $content;
+  if ($("main").length) {
+    $content = $("main");
+  } else if ($("article").length) {
+    $content = $("article").first();
+  } else {
+    $content = $("body").length ? $("body") : $.root();
+  }
+
+  if (!$content || !$content.length) return "";
+
+  // Convert to text preserving heading markers
+  const parts = [];
+  $content.find("h1, h2, h3, h4, h5, h6, p, ul, ol, li, table, pre, code, blockquote").each((_, el) => {
+    const tag = el.tagName.toLowerCase();
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    if (!text) return;
+
+    if (tag.startsWith("h")) {
+      const level = parseInt(tag[1]);
+      parts.push("\n" + "#".repeat(level) + " " + text + "\n");
+    } else if (tag === "li") {
+      parts.push("- " + text);
+    } else if (tag === "pre" || tag === "code") {
+      const code = $(el).text();
+      parts.push("\n```\n" + code + "\n```\n");
+    } else if (tag === "blockquote") {
+      parts.push("> " + text);
+    } else {
+      parts.push(text);
+    }
+  });
+
+  return parts.join("\n\n");
+}
+
+/**
+ * Suggest a logical section name based on content signals and file path.
+ *
+ * Uses content profile detection (via profiles.js) when the content is
+ * available, falling back to path-based heuristics for the directory name.
+ *
+ * @param {string} filepath - absolute file path
+ * @param {string} [content] - raw file content (optional, for profile detection)
+ * @param {string} [cwd] - current working directory for relative paths
+ * @returns {string} suggested section name
+ */
+export function suggestSection(filepath, content, cwd = process.cwd()) {
+  // Derive from directory name with a map of common patterns
+  const relDir = path.relative(cwd, path.dirname(filepath));
+  if (!relDir || relDir === ".") return "Pages";
+
+  // Common directory name → readable section
+  const dirMap = {
+    docs: "Documentation",
+    documentation: "Documentation",
+    api: "API Reference",
+    guide: "Guides",
+    guides: "Guides",
+    tutorial: "Tutorials",
+    tutorials: "Tutorials",
+    blog: "Blog",
+    posts: "Articles",
+    articles: "Articles",
+    news: "News",
+    reference: "Reference",
+    legal: "Legal",
+    privacy: "Legal",
+    terms: "Legal",
+    about: "About",
+    products: "Products",
+    pricing: "Pricing",
+    changelog: "Changelog",
+    releases: "Releases",
+  };
+
+  const dirName = path.basename(relDir).toLowerCase();
+  if (dirMap[dirName]) return dirMap[dirName];
+
+  // Use content signals if available (lightweight, no profile dependency)
+  if (content) {
+    const lower = content.substring(0, 2000).toLowerCase();
+    if (/api\s+(reference|endpoint|docs|documentation)/.test(lower)) return "API Reference";
+    if (/changelog|release\s+notes|version\s+history/.test(lower)) return "Changelog";
+    if (/privacy\s+policy|terms\s+of\s+(service|use)|gdpr|ccpa/.test(lower)) return "Legal";
+    if (/tutorial|step.by.step|how.to|guide/.test(lower)) return "Guides";
+    if (/news|press\s+release|announcement/.test(lower)) return "News";
+  }
+
+  // General path transformation
+  return relDir.charAt(0).toUpperCase() + relDir.slice(1).replace(/[_-]/g, " ");
+}
+
+/**
+ * Generate split llms-full.txt files for large sites.
+ *
+ * Returns an array of { name, content } objects suitable for writing
+ * to disk. Files are named llms-full.txt, llms-full-2.txt, etc.
+ *
+ * @param {Array<{ title: string, url: string, content: string }>} entries
+ * @param {object} [options]
+ * @param {string} [options.siteTitle]
+ * @param {number} [options.maxChars=500_000] - max characters per file
+ * @returns {Array<{name: string, content: string}>}
+ */
+export function generateLlmsFullTxtFiles(entries, options = {}) {
+  const { siteTitle = "Site Documentation", maxChars = 500_000 } = options;
+
+  if (!entries || entries.length === 0) {
+    return [{ name: "llms-full.txt", content: generateLlmsFullTxt([], options) }];
+  }
+
+  const files = [];
+  let currentEntries = [];
+  let currentSize = 0;
+  let fileIndex = 0;
+
+  const header = (title) =>
+    `# ${title} — Full Content\n\n> This file contains the complete content of all pages listed in llms.txt.\n`;
+
+  for (const entry of entries) {
+    const pageHeader = `\n---\n\n## [${entry.title}](${entry.url})\n\n`;
+    const content = entry.content || "";
+    const cleaned = preserveContentStructure(content);
+    const pageText = pageHeader + cleaned;
+
+    const fullSize = currentSize + pageText.length;
+
+    if (currentEntries.length > 0 && fullSize > maxChars) {
+      // Finalize current file
+      fileIndex++;
+      const title = fileIndex === 1 ? siteTitle : `${siteTitle} (Part ${fileIndex})`;
+      const fileName =
+        fileIndex === 1 ? "llms-full.txt" : `llms-full-${fileIndex}.txt`;
+      files.push({
+        name: fileName,
+        content: header(title) + currentEntries.join(""),
+      });
+      currentEntries = [];
+      currentSize = 0;
+    }
+
+    currentEntries.push(pageText);
+    currentSize += pageText.length;
+  }
+
+  // Final file
+  if (currentEntries.length > 0) {
+    fileIndex++;
+    const title =
+      fileIndex === 1 && files.length === 0
+        ? siteTitle
+        : `${siteTitle} (Part ${fileIndex})`;
+    const fileName =
+      files.length === 0 ? "llms-full.txt" : `llms-full-${fileIndex}.txt`;
+    files.push({
+      name: fileName,
+      content: header(title) + currentEntries.join(""),
+    });
+  }
+
+  return files;
 }
 
 // ---- llms.txt audit ----
@@ -357,56 +607,212 @@ export function generateRobotsTxt(options = {}) {
   const normalizedDisallowPaths = (
     disallowPaths.length > 0 ? disallowPaths : ["/admin", "/api", "/private"]
   ).map((entry) => (entry.startsWith("/") ? entry : `/${entry}`));
-  const lines = [];
 
-  lines.push("# ── AI Crawler Policy ──");
-  lines.push(`# Registry: ${CRAWLER_REGISTRY_VERSION}; preset: ${preset}`);
-  lines.push("# Draft policy signal only: robots.txt is not an access control.");
-  lines.push("");
+  // ── Group agents by effective policy ──
+  const groups = {
+    search: [],
+    user: [],
+    training: [],
+    control: [],
+    legacy: [],
+  };
 
   for (const entry of AI_CRAWLER_REGISTRY) {
-    if (entry.purpose === "legacy" && preset !== "open") {
-      lines.push(
-        `# ${entry.token}: legacy or undocumented token; verify with ${entry.provider} before adding rules.`
-      );
-      continue;
-    }
-
-    const broadlyAllowed =
-      preset === "open" || entry.purpose === "search" || entry.purpose === "user";
-    lines.push(`# ${entry.provider}; purpose: ${entry.purpose}; source: ${entry.officialSource}`);
-    if (entry.robotsApplicable === false) {
-      lines.push("# User-triggered requests may ignore robots.txt.");
-    } else if (entry.purpose === "control") {
-      lines.push("# Product control token; not a distinct HTTP crawler user agent.");
-    }
-    lines.push(`User-agent: ${entry.token}`);
-    if (broadlyAllowed) {
-      lines.push("Allow: /");
-      for (const disallowPath of normalizedDisallowPaths) {
-        lines.push(`Disallow: ${disallowPath}`);
-      }
-    } else {
-      lines.push("Disallow: /");
-    }
-    lines.push("");
+    (groups[entry.purpose] || groups.legacy).push(entry);
   }
 
-  lines.push("# ── Default Rules ──");
-  lines.push("# All other crawlers (traditional search engines, etc.) follow these rules.");
+  const lines = [];
+  const B = " ".repeat(0); // base indent for readability
+
+  lines.push(`${B}# ───────────────────────────────────────────────────────────`);
+  lines.push(`${B}# AI Crawler Policy — generated by geo-opt`);
+  lines.push(`${B}# Registry version: ${CRAWLER_REGISTRY_VERSION}`);
+  lines.push(`${B}# Policy preset: ${preset}`);
+  lines.push(`${B}#`);
+  lines.push(`${B}# robots.txt is a voluntary policy signal, not an access`);
+  lines.push(`${B}# control. Crawlers may ignore these directives. Always verify`);
+  lines.push(`${B}# with each provider's current documentation.`);
+  lines.push(`${B}# ───────────────────────────────────────────────────────────`);
   lines.push("");
 
-  lines.push("User-agent: *");
+  // ── Section 1: Search Crawlers ──
+  // These are used by AI answer engines to fetch pages in real time
+  // when a user asks a question. Allowing them helps your content
+  // appear in AI-generated answers.
+  if (groups.search.length > 0) {
+    lines.push(`${B}# ═══ Search Crawlers ═══`);
+    lines.push(`${B}# Real-time fetchers used by AI answer engines when a user asks`);
+    lines.push(`${B}# a question. Allowing them enables citation and discovery.`);
+    lines.push("");
+
+    for (const entry of groups.search) {
+      lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
+      lines.push(`${B}# Official source: ${entry.officialSource}`);
+      lines.push(`${B}User-agent: ${entry.token}`);
+      lines.push(`${B}Allow: /`);
+      for (const disallowPath of normalizedDisallowPaths) {
+        lines.push(`${B}Disallow: ${disallowPath}`);
+      }
+      lines.push("");
+    }
+  }
+
+  // ── Section 2: User-Triggered Crawlers ──
+  // These fetch pages when a user explicitly asks (e.g. "browse this
+  // page"). Blocking them degrades the user experience without
+  // preventing training ingestion.
+  if (groups.user.length > 0) {
+    lines.push(`${B}# ═══ User-Triggered Crawlers ═══`);
+    lines.push(`${B}# Fetch content only when a user explicitly requests it (e.g.,`);
+    lines.push(`${B}# "browse this page"). Blocking degrades user experience.`);
+    lines.push(`${B}# These tokens may not respect robots.txt in all contexts.`);
+    lines.push("");
+
+    for (const entry of groups.user) {
+      const robotsNote = entry.robotsApplicable === false
+        ? `${B}# User-triggered requests may ignore robots.txt.`
+        : "";
+      if (robotsNote) lines.push(robotsNote);
+      lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
+      lines.push(`${B}# Official source: ${entry.officialSource}`);
+      lines.push(`${B}User-agent: ${entry.token}`);
+      lines.push(`${B}Allow: /`);
+      for (const disallowPath of normalizedDisallowPaths) {
+        lines.push(`${B}Disallow: ${disallowPath}`);
+      }
+      lines.push("");
+    }
+  }
+
+  // ── Section 3: Training Crawlers ──
+  // These fetch content for model training datasets. Disallowing
+  // them signals you prefer your content not be used for training,
+  // though compliance varies by provider.
+  if (groups.training.length > 0 && preset === "open") {
+    lines.push(`${B}# ═══ Training Crawlers ═══`);
+    lines.push(`${B}# Used for model training datasets. The 'open' preset allows`);
+    lines.push(`${B}# them. Switch to 'search-visible' preset to disallow.`);
+    lines.push("");
+
+    for (const entry of groups.training) {
+      lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
+      lines.push(`${B}# Official source: ${entry.officialSource}`);
+      lines.push(`${B}User-agent: ${entry.token}`);
+      lines.push(`${B}Allow: /`);
+      for (const disallowPath of normalizedDisallowPaths) {
+        lines.push(`${B}Disallow: ${disallowPath}`);
+      }
+      lines.push("");
+    }
+  } else if (groups.training.length > 0) {
+    lines.push(`${B}# ═══ Training Crawlers ═══`);
+    lines.push(`${B}# Used for model training datasets. Disallowed under the`);
+    lines.push(`${B}# '${preset}' preset. Use 'open' preset to allow training ingestion.`);
+    lines.push("");
+
+    for (const entry of groups.training) {
+      lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
+      lines.push(`${B}# Official source: ${entry.officialSource}`);
+      lines.push(`${B}User-agent: ${entry.token}`);
+      lines.push(`${B}Disallow: /`);
+      lines.push("");
+    }
+  }
+
+  // ── Section 4: Control Tokens ──
+  // Product control tokens that are not distinct HTTP crawlers.
+  if (groups.control.length > 0) {
+    lines.push(`${B}# ═══ Product Control Tokens ═══`);
+    lines.push(`${B}# These are not distinct HTTP user agents. They act as feature`);
+    lines.push(`${B}# toggles within each provider's product (e.g., Google SGE,`);
+    lines.push(`${B}# Apple Intelligence). Check the provider's documentation.`);
+    lines.push(`${B}# Under '${preset}' preset: ${preset === "open" ? "allowed (opt-in)." : "disallowed (opt-out)."}`);
+    lines.push("");
+
+    for (const entry of groups.control) {
+      lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
+      lines.push(`${B}# Official source: ${entry.officialSource}`);
+      lines.push(`${B}User-agent: ${entry.token}`);
+      if (preset === "open") {
+        lines.push(`${B}Allow: /`);
+        for (const disallowPath of normalizedDisallowPaths) {
+          lines.push(`${B}Disallow: ${disallowPath}`);
+        }
+      } else {
+        lines.push(`${B}Disallow: /`);
+      }
+      lines.push("");
+    }
+  }
+
+  // ── Section 5: Legacy / Undocumented ──
+  if (groups.legacy.length > 0 && preset === "open") {
+    lines.push(`${B}# ═══ Legacy / Undocumented Tokens ═══`);
+    lines.push(`${B}# Included for completeness under the 'open' preset. Verify`);
+    lines.push(`${B}# with the provider before relying on these tokens.`);
+    lines.push("");
+
+    for (const entry of groups.legacy) {
+      lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
+      lines.push(`${B}# Token may be obsolete or unofficial.`);
+      lines.push(`${B}# Official source: ${entry.officialSource}`);
+      lines.push(`${B}User-agent: ${entry.token}`);
+      lines.push(`${B}Allow: /`);
+      for (const disallowPath of normalizedDisallowPaths) {
+        lines.push(`${B}Disallow: ${disallowPath}`);
+      }
+      lines.push("");
+    }
+  } else if (groups.legacy.length > 0) {
+    lines.push(`${B}# ═══ Legacy / Undocumented Tokens ═══`);
+    lines.push(`${B}# Commented out under the '${preset}' preset. Use 'open'`);
+    lines.push(`${B}# preset to include these tokens.`);
+    lines.push("");
+
+    for (const entry of groups.legacy) {
+      lines.push(`${B}# ${entry.token}: legacy or undocumented token.`);
+      lines.push(`${B}# Verify with ${entry.provider} before adding rules.`);
+      lines.push(`${B}# User-agent: ${entry.token}`);
+      lines.push(`${B}# Disallow: /`);
+      lines.push("");
+    }
+  }
+
+  // ── Default Rules ──
+  lines.push(`${B}# ═══ Default Rules ═══`);
+  lines.push(`${B}# Applies to all crawlers not explicitly listed above,`);
+  lines.push(`${B}# including traditional search engines (Googlebot, Bingbot).`);
+  lines.push(`${B}# Private/admin paths are disallowed for all crawlers.`);
+  lines.push("");
+
+  lines.push(`${B}User-agent: *`);
   for (const disallowPath of normalizedDisallowPaths) {
-    lines.push(`Disallow: ${disallowPath}`);
+    lines.push(`${B}Disallow: ${disallowPath}`);
   }
 
   lines.push("");
 
   if (sitemapUrl) {
-    lines.push(`Sitemap: ${sitemapUrl}`);
+    lines.push(`${B}# ── Sitemap ──`);
+    lines.push(`${B}Sitemap: ${sitemapUrl}`);
     lines.push("");
   }
 
   return lines.join("\n").trim() + "\n";
+}
+
+/**
+ * Human-readable description of a crawler purpose.
+ * @param {string} purpose
+ * @returns {string}
+ */
+function describePurpose(purpose) {
+  const descriptions = {
+    search: "real-time answer engine fetcher",
+    user: "user-triggered page retrieval",
+    training: "model training data collection",
+    control: "product control/opt-out token",
+    legacy: "legacy or undocumented token",
+  };
+  return descriptions[purpose] || purpose;
 }

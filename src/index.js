@@ -74,8 +74,17 @@ export { validateSchemaFile } from "./validate.js";
 export {
   extractPageMetadata,
   resolvePageUrl,
+  suggestSection,
   generateLlmsTxt,
   generateLlmsFullTxt,
+  generateLlmsFullTxtFiles,
   auditLlmsTxt,
   generateRobotsTxt,
 } from "./llms-txt.js";
+export {
+  generateSitemapXml,
+  generateSitemapFiles,
+  validateSitemapXml,
+  scoreToPriority,
+  determineChangefreq,
+} from "./sitemap.js";
