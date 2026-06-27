@@ -37,6 +37,7 @@ declare module "geo-opt" {
     allowedExtensions?: string[];
     siteUrl?: string;
     siteDescription?: string;
+    profile?: string;        // "auto" | ProfileId
   }
 
   // ═══ Licensing ═══
@@ -130,6 +131,44 @@ declare module "geo-opt" {
   };
 
   export function staleEvidenceWarnings(staleDays?: number): string[];
+
+  // ═══ Profiles ═══
+  export type ProfileId = "documentation" | "open-source" | "editorial" | "commercial" | "ecommerce" | "regulated";
+
+  export interface ProfileDefinition {
+    id: ProfileId;
+    label: string;
+    description: string;
+    applicableDimensions: string[];
+  }
+
+  export const PROFILES: Readonly<Record<ProfileId, ProfileDefinition>>;
+  export const VALID_PROFILES: readonly ProfileId[];
+  export const ALL_DIMENSIONS: readonly string[];
+
+  export function isApplicable(profile: ProfileId, dimension: string): boolean;
+  export function notApplicableDimensions(profile: ProfileId): string[];
+  export function scoreCeiling(profile: ProfileId): {
+    totalMax: number;
+    dimMax: Record<string, number>;
+  };
+
+  export interface ProfileDetection {
+    profile: ProfileId;
+    confidence: number;
+    reasons: string[];
+  }
+
+  export interface ResolvedProfile extends ProfileDetection {
+    overridden: boolean;
+  }
+
+  export function detectProfile(content: string, filepath?: string): ProfileDetection;
+  export function resolveProfile(
+    config: { profile?: string; [key: string]: unknown } | null | undefined,
+    content: string,
+    filepath?: string
+  ): ResolvedProfile;
 
   // ═══ Findings ═══
   export const REPORT_VERSION: string;

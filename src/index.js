@@ -39,6 +39,16 @@ export {
 export { discoverFiles } from "./discovery.js";
 export { auditFiles, aggregateReport, batchInject } from "./batch.js";
 export {
+  PROFILES,
+  VALID_PROFILES,
+  ALL_DIMENSIONS,
+  isApplicable,
+  notApplicableDimensions,
+  scoreCeiling,
+  detectProfile,
+  resolveProfile,
+} from "./profiles.js";
+export {
   assertNewFileParentInsideCwd,
   assertWritableTargetInsideCwd,
   generateSchemaData,
