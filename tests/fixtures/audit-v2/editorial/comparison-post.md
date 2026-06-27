@@ -7,15 +7,15 @@ maturity, flag evaluation latency, audit trail quality, and pricing.
 
 ## Comparison table
 
-| Dimension           | LaunchDarkly        | Split               | Flagsmith           |
-|--------------------|--------------------|--------------------|--------------------|
-| SDK languages       | 27                 | 12                 | 8                  |
-| P99 eval latency    | 12 ms              | 8 ms               | 25 ms (self-hosted) |
-| Streaming updates   | Yes (SSE)          | Yes (SSE)          | Yes (polling)       |
-| Audit trail         | Full               | Full               | Full                |
-| Self-hosted option  | No                 | No                 | Yes                 |
-| OTel integration    | Native             | Native             | Via collector       |
-| Free tier           | 3 seats, 1 project | 5 seats, unlimited | Unlimited seats, 50k req/mo |
+| Dimension          | LaunchDarkly       | Split              | Flagsmith                   |
+| ------------------ | ------------------ | ------------------ | --------------------------- |
+| SDK languages      | 27                 | 12                 | 8                           |
+| P99 eval latency   | 12 ms              | 8 ms               | 25 ms (self-hosted)         |
+| Streaming updates  | Yes (SSE)          | Yes (SSE)          | Yes (polling)               |
+| Audit trail        | Full               | Full               | Full                        |
+| Self-hosted option | No                 | No                 | Yes                         |
+| OTel integration   | Native             | Native             | Via collector               |
+| Free tier          | 3 seats, 1 project | 5 seats, unlimited | Unlimited seats, 50k req/mo |
 
 Pricing data as of June 2026.
 
@@ -50,11 +50,11 @@ footprint.
 
 ## Recommendation
 
-| Your situation                                          | Best choice   |
-|--------------------------------------------------------|---------------|
-| Enterprise with 10+ teams, need every integration      | LaunchDarkly  |
-| Experiment-driven culture, already using data tools    | Split         |
-| Self-hosting required, cost-sensitive                  | Flagsmith     |
+| Your situation                                      | Best choice  |
+| --------------------------------------------------- | ------------ |
+| Enterprise with 10+ teams, need every integration   | LaunchDarkly |
+| Experiment-driven culture, already using data tools | Split        |
+| Self-hosting required, cost-sensitive               | Flagsmith    |
 
 None of these platforms is a bad choice. The risk is picking one that doesn't
 match your operational constraints, not picking the wrong one in absolute

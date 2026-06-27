@@ -9,6 +9,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- **Profile-aware audit model v2** (opt-in via `--model v2`):
+  - Seven content profiles (documentation, open-source, editorial, commercial,
+    ecommerce, regulated) with explicit dimension applicability.
+  - Section-level observation engine using marked AST and cheerio DOM for
+    heading hierarchy, section self-containment, paragraph distribution,
+    answer-first structure, attribution proximity, content freshness, semantic
+    HTML, and link quality.
+  - Readiness bands (production-ready, solid, needs-work, at-risk) replacing
+    the 0–100 pseudo-precise total.
+  - Auto-detection with confidence scores and explicit `config.profile` override.
+  - Profile-aware: documentation and open-source are not penalized for lacking
+    quotes or statistics. Regulated content is not penalized for lacking quotes.
+  - V1 remains the default. Migration path is user-driven.
+- A characterization corpus of 32 fixtures across 7 categories including
+  adversarial cases (fake stats, unattributed quotes, link farms, empty
+  headers, keyword stuffing, auto-generated content).
+- Fixture validator confirming every profile and edge case is represented.
+- Evidence-labeled findings bridge (`mapObservationsToFindings`) mapping
+  structural observations to the versioned finding contract.
 - A versioned finding contract (`src/findings.js`) with stable namespaced
   `ruleId`s, severity levels, evidence labels, source references, observed
   facts, and remediation hints. Every audit report now includes machine-readable
@@ -28,6 +47,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   and malformed structured data.
 - A prepublish build that protects the Pro licensing module with obfuscation and
   runtime integrity verification.
+
+### Changed
+
+- Scoring thresholds are now documented as configurable project heuristics,
+  not platform facts.
+- Recommendations are profile-aware: documentation is no longer told to add
+  quotes; legal content is no longer told to add decorative statistics.
 - Python skill parity for recursive audits, batch injection, aggregate reports,
   `llms.txt`, and AI-crawler-friendly `robots.txt` generation.
 - TypeScript type declarations (`index.d.ts`) covering all 37 public API exports.

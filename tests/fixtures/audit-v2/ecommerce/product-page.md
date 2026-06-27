@@ -51,16 +51,16 @@ back, and a 12-year warranty on the frame and mechanism.
 
 ## Specifications
 
-| Specification          | Detail                          |
-|-----------------------|---------------------------------|
-| Overall height         | 42"–46" (107–117 cm)           |
-| Seat width             | 20" (51 cm)                    |
-| Seat depth             | 18"–20" (46–51 cm)             |
-| Back height            | 24" (61 cm)                    |
-| Base diameter          | 27" (69 cm)                    |
-| Chair weight           | 42 lbs (19 kg)                 |
-| Shipping weight        | 52 lbs (24 kg)                 |
-| Certifications         | ANSI/BIFMA, GREENGUARD Gold    |
+| Specification   | Detail                      |
+| --------------- | --------------------------- |
+| Overall height  | 42"–46" (107–117 cm)        |
+| Seat width      | 20" (51 cm)                 |
+| Seat depth      | 18"–20" (46–51 cm)          |
+| Back height     | 24" (61 cm)                 |
+| Base diameter   | 27" (69 cm)                 |
+| Chair weight    | 42 lbs (19 kg)              |
+| Shipping weight | 52 lbs (24 kg)              |
+| Certifications  | ANSI/BIFMA, GREENGUARD Gold |
 
 ## Shipping & returns
 

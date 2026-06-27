@@ -490,7 +490,10 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
   }
 
   // Section self-containment
-  if (observations.sectionSelfContainment && observations.sectionSelfContainment.status !== "pass") {
+  if (
+    observations.sectionSelfContainment &&
+    observations.sectionSelfContainment.status !== "pass"
+  ) {
     const emptyCount =
       observations.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0;
     findings.push(

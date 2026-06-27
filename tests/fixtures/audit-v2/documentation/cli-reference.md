@@ -8,14 +8,14 @@ geo-opt [command] [options] <file...>
 
 ## Global options
 
-| Option              | Short | Description                          |
-|---------------------|-------|--------------------------------------|
-| `--help`            | `-h`  | Show help text and exit              |
-| `--version`         | `-V`  | Print version number and exit        |
-| `--config <path>`   | `-c`  | Path to geo_config.json              |
-| `--format <type>`   | `-f`  | Output: `text`, `json`, or `summary` |
-| `--no-branding`     |       | Suppress Tooltician branding         |
-| `--recursive`       | `-r`  | Recurse into directories             |
+| Option            | Short | Description                          |
+| ----------------- | ----- | ------------------------------------ |
+| `--help`          | `-h`  | Show help text and exit              |
+| `--version`       | `-V`  | Print version number and exit        |
+| `--config <path>` | `-c`  | Path to geo_config.json              |
+| `--format <type>` | `-f`  | Output: `text`, `json`, or `summary` |
+| `--no-branding`   |       | Suppress Tooltician branding         |
+| `--recursive`     | `-r`  | Recurse into directories             |
 
 ## Commands
 
@@ -55,17 +55,17 @@ geo-opt config show
 
 ## Exit codes
 
-| Code | Meaning                         |
-|------|---------------------------------|
-| 0    | Success                         |
-| 1    | File not found or read error    |
-| 2    | Configuration error             |
-| 3    | License validation failed       |
+| Code | Meaning                      |
+| ---- | ---------------------------- |
+| 0    | Success                      |
+| 1    | File not found or read error |
+| 2    | Configuration error          |
+| 3    | License validation failed    |
 
 ## Environment variables
 
-| Variable                    | Purpose                          |
-|-----------------------------|----------------------------------|
-| `GEO_OPT_LICENSE_KEY`       | Pro license key                  |
-| `GEO_OPT_STATE_DIR`         | Override state directory         |
-| `GEO_OPT_DISABLE_REMINDERS` | Suppress engagement reminders    |
+| Variable                    | Purpose                       |
+| --------------------------- | ----------------------------- |
+| `GEO_OPT_LICENSE_KEY`       | Pro license key               |
+| `GEO_OPT_STATE_DIR`         | Override state directory      |
+| `GEO_OPT_DISABLE_REMINDERS` | Suppress engagement reminders |

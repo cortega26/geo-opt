@@ -1,7 +1,6 @@
 # Google Updates AI Search Guidelines: Three Changes Content Teams Need to Know
 
-Google published a significant update to its AI optimization guide on June 20,
-2026. The revision clarifies how the search engine evaluates content for its AI
+Google published a significant update to its AI optimization guide on June 20, 2026. The revision clarifies how the search engine evaluates content for its AI
 Overview and Search Generative Experience features.
 
 The update matters because AI Overviews now appear in roughly 35 % of search

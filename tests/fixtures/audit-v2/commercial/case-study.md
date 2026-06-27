@@ -12,11 +12,11 @@ This case study describes the changes they made and the results they achieved.
 Vercel audited 200 pages with GeoOpt Pro in February 2026. The results
 revealed three patterns:
 
-| Issue                                     | Pages affected | Avg impact |
-|-------------------------------------------|---------------|------------|
-| No definition in opening paragraph        | 67 %          | High       |
-| Code blocks without explanatory prose     | 42 %          | Medium     |
-| Missing publication dates                 | 89 %          | Low        |
+| Issue                                 | Pages affected | Avg impact |
+| ------------------------------------- | -------------- | ---------- |
+| No definition in opening paragraph    | 67 %           | High       |
+| Code blocks without explanatory prose | 42 %           | Medium     |
+| Missing publication dates             | 89 %           | Low        |
 
 The audit score averaged 48/100 across the audited pages.
 

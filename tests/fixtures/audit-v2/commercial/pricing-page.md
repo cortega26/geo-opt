@@ -5,19 +5,19 @@ No credit card required to start.
 
 ## Plan comparison
 
-| Feature                  | Free          | Pro            | Enterprise       |
-|--------------------------|---------------|----------------|------------------|
-| Pages per month          | 10            | 500            | Unlimited         |
-| Model version            | v1            | v2             | v2                |
-| Users                    | 1             | 5              | Unlimited         |
-| API access               | —             | Yes            | Yes               |
-| Batch audit              | —             | Yes            | Yes               |
-| Custom profiles          | —             | —              | Yes               |
-| SSO / SAML               | —             | —              | Yes               |
-| SLA                      | —             | 99.5 %         | 99.95 %           |
-| Support                  | Community     | Email          | Dedicated + Slack |
-| Price (monthly)          | $0            | $29            | Custom             |
-| Price (annual)           | $0            | $24/mo         | Custom             |
+| Feature         | Free      | Pro    | Enterprise        |
+| --------------- | --------- | ------ | ----------------- |
+| Pages per month | 10        | 500    | Unlimited         |
+| Model version   | v1        | v2     | v2                |
+| Users           | 1         | 5      | Unlimited         |
+| API access      | —         | Yes    | Yes               |
+| Batch audit     | —         | Yes    | Yes               |
+| Custom profiles | —         | —      | Yes               |
+| SSO / SAML      | —         | —      | Yes               |
+| SLA             | —         | 99.5 % | 99.95 %           |
+| Support         | Community | Email  | Dedicated + Slack |
+| Price (monthly) | $0        | $29    | Custom            |
+| Price (annual)  | $0        | $24/mo | Custom            |
 
 Annual billing saves 17 % on the Pro plan. Enterprise pricing scales with
 page volume and includes a dedicated solutions engineer during onboarding.

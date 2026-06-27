@@ -30,12 +30,12 @@ POST /v2/analyze
 Content-Type: application/json
 ```
 
-| Parameter    | Type   | Required | Constraints          |
-|-------------|--------|----------|----------------------|
-| `content`   | string | yes      | 1–100 000 characters |
-| `profile`   | string | no       | See profile enum     |
-| `language`  | string | no       | BCP-47, default `en` |
-| `model`     | string | no       | `v1` (default), `v2` |
+| Parameter  | Type   | Required | Constraints          |
+| ---------- | ------ | -------- | -------------------- |
+| `content`  | string | yes      | 1–100 000 characters |
+| `profile`  | string | no       | See profile enum     |
+| `language` | string | no       | BCP-47, default `en` |
+| `model`    | string | no       | `v1` (default), `v2` |
 
 #### Profile enum
 
@@ -92,11 +92,11 @@ Details).
 
 ## Rate limiting
 
-| Tier     | Requests/hour | Burst | Timeout |
-|----------|--------------|-------|---------|
-| Free     | 100          | 10    | 60 s    |
-| Pro      | 10 000       | 100   | —       |
-| Enterprise | Custom     | Custom | —       |
+| Tier       | Requests/hour | Burst  | Timeout |
+| ---------- | ------------- | ------ | ------- |
+| Free       | 100           | 10     | 60 s    |
+| Pro        | 10 000        | 100    | —       |
+| Enterprise | Custom        | Custom | —       |
 
 Rate-limit headers are sent on every response:
 

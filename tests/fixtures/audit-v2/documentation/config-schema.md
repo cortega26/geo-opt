@@ -18,10 +18,7 @@ defaults are shown below.
     "GEO": "Generative Engine Optimization",
     "LLM": "Large Language Model"
   },
-  "ignore": [
-    "node_modules",
-    ".git"
-  ],
+  "ignore": ["node_modules", ".git"],
   "extensions": [".md", ".html", ".htm"],
   "profile": "auto",
   "output": {
@@ -33,9 +30,9 @@ defaults are shown below.
 
 ## `license`
 
-| Field | Type   | Default | Description                 |
-|-------|--------|---------|-----------------------------|
-| key   | string | `""`    | Tooltician Pro license key  |
+| Field | Type   | Default | Description                |
+| ----- | ------ | ------- | -------------------------- |
+| key   | string | `""`    | Tooltician Pro license key |
 
 Set the `GEO_OPT_LICENSE_KEY` environment variable as an alternative.
 
@@ -71,7 +68,7 @@ When set to `auto` (default), the engine detects the profile heuristically.
 
 ## `output`
 
-| Field  | Type    | Default | Description                        |
-|--------|---------|---------|------------------------------------|
-| format | string  | `text`  | `text`, `json`, or `summary`       |
-| color  | boolean | `true`  | Whether to emit ANSI color codes   |
+| Field  | Type    | Default | Description                      |
+| ------ | ------- | ------- | -------------------------------- |
+| format | string  | `text`  | `text`, `json`, or `summary`     |
+| color  | boolean | `true`  | Whether to emit ANSI color codes |

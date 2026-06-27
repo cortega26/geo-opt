@@ -5,16 +5,16 @@ workspace and budget.
 
 ## Quick comparison
 
-| Feature                | Pro 5000        | Pro 3000        | Executive        |
-|-----------------------|----------------|----------------|------------------|
-| Price                 | $749           | $549           | $999             |
-| Style                 | High-back mesh | Mid-back mesh  | High-back leather |
-| Lumbar support        | Dynamic        | Adjustable     | Fixed            |
-| Armrests              | 4D             | 3D             | 2D               |
-| Weight capacity       | 300 lbs        | 275 lbs        | 350 lbs          |
-| Warranty (frame)      | 12 years       | 10 years       | 15 years         |
-| Avg review rating     | 4.6 ★          | 4.4 ★          | 4.8 ★            |
-| Best for              | All-day desk work | Home office  | Executive office |
+| Feature           | Pro 5000          | Pro 3000      | Executive         |
+| ----------------- | ----------------- | ------------- | ----------------- |
+| Price             | $749              | $549          | $999              |
+| Style             | High-back mesh    | Mid-back mesh | High-back leather |
+| Lumbar support    | Dynamic           | Adjustable    | Fixed             |
+| Armrests          | 4D                | 3D            | 2D                |
+| Weight capacity   | 300 lbs           | 275 lbs       | 350 lbs           |
+| Warranty (frame)  | 12 years          | 10 years      | 15 years          |
+| Avg review rating | 4.6 ★             | 4.4 ★         | 4.8 ★             |
+| Best for          | All-day desk work | Home office   | Executive office  |
 
 ## Which chair is right for you?
 

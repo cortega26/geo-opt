@@ -13,14 +13,14 @@ and assumptions, and actual results may differ materially.
 
 ## Financial highlights
 
-| Metric                   | Q1 2026    | Q1 2025    | Change   |
-|--------------------------|-----------|-----------|----------|
-| Revenue                  | $847.2 M  | $712.6 M  | +18.9 %  |
-| Gross margin             | 72.4 %    | 70.1 %    | +2.3 pp  |
-| Operating income         | $156.3 M  | $98.4 M   | +58.8 %  |
-| Net income               | $124.7 M  | $76.2 M   | +63.7 %  |
-| Diluted EPS              | $1.42     | $0.88     | +61.4 %  |
-| Free cash flow           | $203.5 M  | $141.2 M  | +44.1 %  |
+| Metric           | Q1 2026  | Q1 2025  | Change  |
+| ---------------- | -------- | -------- | ------- |
+| Revenue          | $847.2 M | $712.6 M | +18.9 % |
+| Gross margin     | 72.4 %   | 70.1 %   | +2.3 pp |
+| Operating income | $156.3 M | $98.4 M  | +58.8 % |
+| Net income       | $124.7 M | $76.2 M  | +63.7 % |
+| Diluted EPS      | $1.42    | $0.88    | +61.4 % |
+| Free cash flow   | $203.5 M | $141.2 M | +44.1 % |
 
 ## Revenue breakdown
 
@@ -57,5 +57,5 @@ to $3.50 B–$3.60 B, up from previous guidance of $3.35 B–$3.50 B.
 This guidance assumes no material change in macroeconomic conditions,
 exchange rates, or regulatory requirements.
 
-*This document is a simplified illustration. It does not constitute
-investment advice or a complete regulatory filing.*
+_This document is a simplified illustration. It does not constitute
+investment advice or a complete regulatory filing._

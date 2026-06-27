@@ -55,8 +55,8 @@ name: GEO Content Audit
 on:
   pull_request:
     paths:
-      - 'content/**'
-      - 'docs/**'
+      - "content/**"
+      - "docs/**"
 
 jobs:
   audit:

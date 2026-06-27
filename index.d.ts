@@ -37,7 +37,7 @@ declare module "geo-opt" {
     allowedExtensions?: string[];
     siteUrl?: string;
     siteDescription?: string;
-    profile?: string;        // "auto" | ProfileId
+    profile?: string; // "auto" | ProfileId
   }
 
   // ═══ Licensing ═══
@@ -133,7 +133,13 @@ declare module "geo-opt" {
   export function staleEvidenceWarnings(staleDays?: number): string[];
 
   // ═══ Profiles ═══
-  export type ProfileId = "documentation" | "open-source" | "editorial" | "commercial" | "ecommerce" | "regulated";
+  export type ProfileId =
+    | "documentation"
+    | "open-source"
+    | "editorial"
+    | "commercial"
+    | "ecommerce"
+    | "regulated";
 
   export interface ProfileDefinition {
     id: ProfileId;

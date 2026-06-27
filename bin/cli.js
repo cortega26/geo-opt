@@ -98,9 +98,7 @@ function printV2Report(filepath, report) {
         `${chalk.dim(`${label}: N/A (not applicable for ${report.profile.detected} profile)`)}`
       );
     } else {
-      console.log(
-        `${chalk.bold(`${label}: ${dimColor(d.score, d.max)(`${d.score}/${d.max}`)}`)}`
-      );
+      console.log(`${chalk.bold(`${label}: ${dimColor(d.score, d.max)(`${d.score}/${d.max}`)}`)}`);
     }
     for (const detail of d.details) {
       console.log(`   ${chalk.dim(detail)}`);
@@ -122,7 +120,9 @@ function printV2Report(filepath, report) {
   if (link) {
     const linkIcon = link.hasExcessiveLinks ? chalk.red("⚠") : "";
     console.log(
-      chalk.bold(`Links: ${link.externalLinks} external${linkIcon} | Sources section: ${link.hasSourcesSection ? "yes" : "no"}`)
+      chalk.bold(
+        `Links: ${link.externalLinks} external${linkIcon} | Sources section: ${link.hasSourcesSection ? "yes" : "no"}`
+      )
     );
   }
   const fresh = report.contentFreshness;

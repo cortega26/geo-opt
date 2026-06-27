@@ -48,13 +48,13 @@ regular screening is important.
 
 Type 2 diabetes is managed through a combination of:
 
-| Approach            | Examples                                          |
-|--------------------|---------------------------------------------------|
+| Approach                 | Examples                                        |
+| ------------------------ | ----------------------------------------------- |
 | Blood glucose monitoring | Finger-stick tests, continuous glucose monitors |
-| Medication          | Metformin, GLP-1 agonists, insulin therapy        |
-| Diet                | Carbohydrate counting, Mediterranean diet          |
-| Physical activity   | 150+ minutes per week of moderate exercise         |
-| Regular checkups    | A1C tests every 3–6 months                        |
+| Medication               | Metformin, GLP-1 agonists, insulin therapy      |
+| Diet                     | Carbohydrate counting, Mediterranean diet       |
+| Physical activity        | 150+ minutes per week of moderate exercise      |
+| Regular checkups         | A1C tests every 3–6 months                      |
 
 ## When to contact your doctor
 
@@ -65,7 +65,7 @@ breath), or any foot wounds that don't heal within a few days.
 ## Sources
 
 - American Diabetes Association. Standards of Medical Care in Diabetes—2026.
-  *Diabetes Care*, 49(Supplement 1).
+  _Diabetes Care_, 49(Supplement 1).
 - Centers for Disease Control and Prevention. National Diabetes Statistics
   Report, 2025. https://www.cdc.gov/diabetes/data/statistics-report
 - International Diabetes Federation. IDF Diabetes Atlas, 10th edition, 2021.

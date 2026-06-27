@@ -36,11 +36,9 @@ describe("scoreContentV2", () => {
   });
 
   it("uses config.profile override", () => {
-    const { report } = scoreContentV2(
-      "# API Reference\n\nSome content here.",
-      "api.md",
-      { profile: "documentation" }
-    );
+    const { report } = scoreContentV2("# API Reference\n\nSome content here.", "api.md", {
+      profile: "documentation",
+    });
     assert.equal(report.profile.detected, "documentation");
     assert.equal(report.profile.overridden, true);
     assert.equal(report.profile.confidence, 1.0);
@@ -77,10 +75,7 @@ describe("scoreContentV2", () => {
     assert.equal(report.dimensions.quotations.score, 0);
     assert.equal(report.dimensions.statistics.score, 0);
     // But applicable dimensions should be scored
-    assert.ok(
-      report.dimensions.structure.score >= 0,
-      "structure should have a score"
-    );
+    assert.ok(report.dimensions.structure.score >= 0, "structure should have a score");
     // Effective score is based only on applicable dimensions
     // With 3 applicable dims, max is 60 but effective is normalized to percentage
     const structMax = report.dimensions.structure.max;
@@ -96,14 +91,10 @@ describe("scoreContentV2", () => {
 
 describe("readiness bands", () => {
   it("excellent editorial content achieves production-ready or solid", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/editorial/tech-blog.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/editorial/tech-blog.md", "utf8");
     const { report } = scoreContentV2(content, "tech-blog.md", {});
     assert.ok(
-      report.readinessBand === "production-ready" ||
-        report.readinessBand === "solid",
+      report.readinessBand === "production-ready" || report.readinessBand === "solid",
       `Expected production-ready or solid, got ${report.readinessBand} (${report.effectiveScore})`
     );
     assert.ok(report.effectiveScore >= 65);
@@ -118,8 +109,7 @@ describe("readiness bands", () => {
     // This is the critical test: excellent tech doc MUST rank well
     // even though it has zero quotes
     assert.ok(
-      report.readinessBand === "production-ready" ||
-        report.readinessBand === "solid",
+      report.readinessBand === "production-ready" || report.readinessBand === "solid",
       `Excellent tech doc should be solid+, got ${report.readinessBand} (${report.effectiveScore})`
     );
     assert.ok(
@@ -129,10 +119,7 @@ describe("readiness bands", () => {
   });
 
   it("link-farm ranks at-risk or needs-work", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/link-farm.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/link-farm.md", "utf8");
     const { report } = scoreContentV2(content, "link-farm.md", {});
     assert.ok(
       report.readinessBand === "at-risk" || report.readinessBand === "needs-work",
@@ -141,10 +128,7 @@ describe("readiness bands", () => {
   });
 
   it("empty-headers ranks at-risk", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/empty-headers.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/empty-headers.md", "utf8");
     const { report } = scoreContentV2(content, "empty.md", {});
     assert.equal(
       report.readinessBand,
@@ -158,10 +142,7 @@ describe("readiness bands", () => {
       "tests/fixtures/audit-v2/adversarial/unattributed-quotes.md",
       "utf8"
     );
-    const credible = readFileSync(
-      "tests/fixtures/audit-v2/editorial/tech-blog.md",
-      "utf8"
-    );
+    const credible = readFileSync("tests/fixtures/audit-v2/editorial/tech-blog.md", "utf8");
 
     const advResult = scoreContentV2(adversarial, "adv.md", {});
     const credResult = scoreContentV2(credible, "cred.md", {});
@@ -173,14 +154,8 @@ describe("readiness bands", () => {
   });
 
   it("fake-stats ranks below case-study", () => {
-    const fake = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/fake-stats.md",
-      "utf8"
-    );
-    const real = readFileSync(
-      "tests/fixtures/audit-v2/commercial/case-study.md",
-      "utf8"
-    );
+    const fake = readFileSync("tests/fixtures/audit-v2/adversarial/fake-stats.md", "utf8");
+    const real = readFileSync("tests/fixtures/audit-v2/commercial/case-study.md", "utf8");
 
     const fakeResult = scoreContentV2(fake, "fake.md", {});
     const realResult = scoreContentV2(real, "case-study.md", {});
@@ -196,10 +171,7 @@ describe("readiness bands", () => {
       "tests/fixtures/audit-v2/adversarial/perfect-format-bad-content.md",
       "utf8"
     );
-    const credible = readFileSync(
-      "tests/fixtures/audit-v2/editorial/news-article.md",
-      "utf8"
-    );
+    const credible = readFileSync("tests/fixtures/audit-v2/editorial/news-article.md", "utf8");
 
     const platResult = scoreContentV2(platitudes, "plat.md", {});
     const credResult = scoreContentV2(credible, "news.md", {});
@@ -217,10 +189,7 @@ describe("readiness bands", () => {
 
 describe("dimension scoring", () => {
   it("citations: link-farm gets 0 for citations", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/link-farm.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/link-farm.md", "utf8");
     const { report } = scoreContentV2(content, "lf.md", {});
     assert.equal(report.dimensions.citations.score, 0);
     assert.ok(
@@ -268,10 +237,10 @@ describe("dimension scoring", () => {
 
 describe("CLI --model v2", () => {
   it("accepts --model v2 flag", () => {
-    const result = execSync(
-      "node bin/cli.js audit tests/fixtures/sample.md --model v2 -f json",
-      { encoding: "utf8", env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" } }
-    );
+    const result = execSync("node bin/cli.js audit tests/fixtures/sample.md --model v2 -f json", {
+      encoding: "utf8",
+      env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" },
+    });
     const report = JSON.parse(result);
     assert.ok(report.modelVersion);
     assert.ok(report.profile);
@@ -281,10 +250,10 @@ describe("CLI --model v2", () => {
 
   it("rejects invalid model values", () => {
     try {
-      execSync(
-        "node bin/cli.js audit tests/fixtures/sample.md --model v3 -f json 2>&1",
-        { encoding: "utf8", env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" } }
-      );
+      execSync("node bin/cli.js audit tests/fixtures/sample.md --model v3 -f json 2>&1", {
+        encoding: "utf8",
+        env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" },
+      });
       assert.fail("Should have thrown for v3");
     } catch (e) {
       assert.ok(
@@ -295,34 +264,36 @@ describe("CLI --model v2", () => {
   });
 
   it("v2 report JSON includes profile and readiness", () => {
-    const result = execSync(
-      "node bin/cli.js audit tests/fixtures/sample.md --model v2 -f json",
-      { encoding: "utf8", env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" } }
-    );
+    const result = execSync("node bin/cli.js audit tests/fixtures/sample.md --model v2 -f json", {
+      encoding: "utf8",
+      env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" },
+    });
     const report = JSON.parse(result);
     assert.equal(typeof report.profile.detected, "string");
     assert.equal(typeof report.profile.confidence, "number");
-    assert.ok(["production-ready", "solid", "needs-work", "at-risk"].includes(report.readinessBand));
+    assert.ok(
+      ["production-ready", "solid", "needs-work", "at-risk"].includes(report.readinessBand)
+    );
     assert.equal(typeof report.effectiveScore, "number");
     assert.ok(Array.isArray(report.recommendations));
     assert.ok(Array.isArray(report.findings));
   });
 
   it("v2 text output contains profile and readiness information", () => {
-    const result = execSync(
-      "node bin/cli.js audit tests/fixtures/sample.md --model v2 -f text",
-      { encoding: "utf8", env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" } }
-    );
+    const result = execSync("node bin/cli.js audit tests/fixtures/sample.md --model v2 -f text", {
+      encoding: "utf8",
+      env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" },
+    });
     assert.ok(result.includes("Profile:"), "Text output should include Profile");
     assert.ok(result.includes("Readiness:"), "Text output should include Readiness");
     assert.ok(result.includes("GEO OPTIMIZATION AUDIT REPORT (v2)"), "Should show v2 header");
   });
 
   it("v1 remains the default when --model is omitted", () => {
-    const result = execSync(
-      "node bin/cli.js audit tests/fixtures/sample.md -f json",
-      { encoding: "utf8", env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" } }
-    );
+    const result = execSync("node bin/cli.js audit tests/fixtures/sample.md -f json", {
+      encoding: "utf8",
+      env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" },
+    });
     const report = JSON.parse(result);
     // v1 report has total_score and breakdown, not readinessBand or profile
     assert.equal(typeof report.total_score, "number");
@@ -339,10 +310,10 @@ describe("CLI --model v2", () => {
 
 describe("v1 compatibility", () => {
   it("v1 audit path still works and returns 0–100 score", () => {
-    const result = execSync(
-      "node bin/cli.js audit tests/fixtures/sample.md -f json",
-      { encoding: "utf8", env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" } }
-    );
+    const result = execSync("node bin/cli.js audit tests/fixtures/sample.md -f json", {
+      encoding: "utf8",
+      env: { ...process.env, GEO_OPT_DISABLE_REMINDERS: "1" },
+    });
     const report = JSON.parse(result);
     assert.ok(report.total_score >= 0 && report.total_score <= 100);
     // modelVersion is set by findings contract (plan 021); v1 CLI uses current version
@@ -377,9 +348,7 @@ describe("report structure", () => {
       {}
     );
     assert.ok(report.structuralObservations);
-    assert.ok(
-      ["pass", "warn", "fail"].includes(report.structuralObservations.headingHierarchy)
-    );
+    assert.ok(["pass", "warn", "fail"].includes(report.structuralObservations.headingHierarchy));
   });
 
   it("includes attributionSummary", () => {

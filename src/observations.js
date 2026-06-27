@@ -244,9 +244,7 @@ function observeHeadingHierarchy(tokens) {
 
   // Check for h1
   if (headings[0].level !== 1) {
-    issues.push(
-      `Document starts with h${headings[0].level} ("${headings[0].text}") instead of h1`
-    );
+    issues.push(`Document starts with h${headings[0].level} ("${headings[0].text}") instead of h1`);
   }
 
   // Check for skipped levels
@@ -307,9 +305,7 @@ function observeSectionSelfContainment(tokens, opts = {}) {
     };
   }
 
-  const emptySections = sections.filter(
-    (s) => s.isEmpty || s.wordCount < minWords
-  );
+  const emptySections = sections.filter((s) => s.isEmpty || s.wordCount < minWords);
   const details = sections.map((s) => ({
     header: s.header,
     wordCount: s.wordCount,
@@ -430,9 +426,7 @@ function observeAnswerFirst(textContent, tokens) {
     " represents ",
     " is the strategic ",
   ];
-  const hasDefinition = definitionMarkers.some((m) =>
-    introPara.toLowerCase().includes(m)
-  );
+  const hasDefinition = definitionMarkers.some((m) => introPara.toLowerCase().includes(m));
 
   if (wordCount >= 40 && wordCount <= 90 && hasDefinition) {
     return {
@@ -509,23 +503,27 @@ function observeAttributionProximity(textContent, tokens) {
   }
 
   // Check quote attribution
-  const blockquoteCount =
-    (textContent.match(/^>\s+/gm) || []).length;
+  const blockquoteCount = (textContent.match(/^>\s+/gm) || []).length;
   const inlineQuotes = textContent.match(/"([^"]{15,})"/g) || [];
   const totalQuotes = blockquoteCount + inlineQuotes.length;
 
-  // Look for attribution patterns near blockquotes
+  // Look for attribution patterns near blockquotes.
+  // We require either a named person (— Full Name, Title) or an
+  // explicit speech verb. "— CEO of a company" is rejected as too vague.
   const attributionPatterns = [
-    /[—–-]\s*\w+\s*\w+/,
-    /said\s+\w+/i,
-    /according\s+to/i,
-    /told\s+/i,
-    /writes?\s+/i,
+    // Named attribution: "— Sarah Chen, Research Lead" or "— Dr. Smith"
+    /[—–-]\s*[A-Z][a-z]+\s+[A-Z][a-z]+/,
+    /[—–-]\s*(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)\s+[A-Z][a-z]+/,
+    // Speech verbs with explicit subject
+    /said\s+[A-Z][a-z]+\s+[A-Z][a-z]+/,
+    /according\s+to\s+[A-Z][a-z]+/i,
+    /told\s+the\s+/i,
+    /writes?\s+[A-Z][a-z]+\s+[A-Z]/,
+    // Organizational attribution
+    /(?:according\s+to|reported\s+by|per)\s+(?:the\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Institute|University|Foundation|Association|Corporation|Inc\.?|LLC|Report|Study|Survey)/i,
   ];
 
-  const quoteRegions = textContent.match(
-    /(?:^>\s*.+|"[^"]{15,}")(?:\n|$)/gm
-  ) || [];
+  const quoteRegions = textContent.match(/(?:^>\s*.+|"[^"]{15,}")(?:\n|$)/gm) || [];
 
   let quotesWithAttribution = 0;
   let quotesWithoutAttribution = 0;
@@ -542,8 +540,8 @@ function observeAttributionProximity(textContent, tokens) {
     }
   }
 
-  // If no quotes at all, that's fine
-  if (totalQuotes === 0) {
+  // If no quotes AND no stats, nothing to check
+  if (totalQuotes === 0 && stats.length === 0) {
     return {
       kind: "attribution_proximity",
       status: "pass",
@@ -649,8 +647,7 @@ function observeContentFreshness(textContent) {
   return {
     kind: "content_freshness",
     status: "warn",
-    message:
-      "No publication or review date detected. Content freshness cannot be assessed.",
+    message: "No publication or review date detected. Content freshness cannot be assessed.",
     publishedDate: null,
     reviewedDate: null,
   };
@@ -738,7 +735,8 @@ function observeLinkQuality(textContent, tokens) {
     return {
       kind: "link_quality",
       status: "warn",
-      message: "No hyperlinks found. External citations and cross-references improve authority signals.",
+      message:
+        "No hyperlinks found. External citations and cross-references improve authority signals.",
       externalLinkCount: 0,
       internalLinkCount: 0,
       hasSourcesSection,

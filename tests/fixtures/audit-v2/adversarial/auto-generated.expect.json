@@ -28,5 +28,11 @@
     }
   },
   "notApplicableDimensions": [],
-  "adversarialFlags": ["auto_generated", "generic_patterns", "no_specifics", "filler_content", "hedging_language"]
+  "adversarialFlags": [
+    "auto_generated",
+    "generic_patterns",
+    "no_specifics",
+    "filler_content",
+    "hedging_language"
+  ]
 }

@@ -17,10 +17,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "fs";
 
-import {
-  observeContent,
-  observeAndParse,
-} from "../src/observations.js";
+import { observeContent, observeAndParse } from "../src/observations.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Heading hierarchy
@@ -43,9 +40,7 @@ describe("heading hierarchy", () => {
   it("warns when h1 is missing (starts with h2)", () => {
     const content = "## Getting Started\n\nFirst section content.\n\n## API\n\nAPI content.";
     const obs = observeContent(content, "test.md");
-    assert.ok(
-      obs.headingHierarchy.status === "warn" || obs.headingHierarchy.status === "fail"
-    );
+    assert.ok(obs.headingHierarchy.status === "warn" || obs.headingHierarchy.status === "fail");
     assert.ok(obs.headingHierarchy.issues.some((i) => i.includes("h2")));
   });
 
@@ -83,10 +78,7 @@ describe("section self-containment", () => {
   });
 
   it("detects empty fixture with heading-shell pattern", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/empty-headers.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/empty-headers.md", "utf8");
     const obs = observeContent(content, "empty-headers.md", { minWordsPerSection: 10 });
     const emptySections = obs.sectionSelfContainment.details.filter((d) => d.isEmpty);
     // The empty-headers fixture has 14 headings with no body — most should be empty
@@ -176,10 +168,7 @@ describe("attribution proximity", () => {
   });
 
   it("detects fake stats without attribution (adversarial: fake-stats)", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/fake-stats.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/fake-stats.md", "utf8");
     const obs = observeContent(content, "fake-stats.md");
     // Fake stats fixture has many stats without nearby sources
     assert.ok(
@@ -215,10 +204,7 @@ describe("content freshness", () => {
   });
 
   it("detects dates in medical fixture", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/regulated/medical-content.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/regulated/medical-content.md", "utf8");
     const obs = observeContent(content, "medical.md");
     assert.ok(
       obs.contentFreshness.publishedDate || obs.contentFreshness.reviewedDate,
@@ -241,10 +227,7 @@ describe("link quality", () => {
   });
 
   it("fails for link-farm pattern (adversarial: link-farm)", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/link-farm.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/link-farm.md", "utf8");
     const obs = observeContent(content, "link-farm.md");
     assert.equal(obs.linkQuality.hasExcessiveLinks, true);
     assert.equal(obs.linkQuality.status, "fail");
@@ -262,10 +245,7 @@ describe("link quality", () => {
   });
 
   it("passes for documentation with good external links (SDK readme)", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/documentation/sdk-readme.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/documentation/sdk-readme.md", "utf8");
     const obs = observeContent(content, "sdk-readme.md");
     assert.equal(obs.linkQuality.status, "pass");
     assert.ok(obs.linkQuality.externalLinkCount >= 2);
@@ -278,10 +258,7 @@ describe("link quality", () => {
 
 describe("semantic HTML", () => {
   it("passes for well-structured HTML with semantic tags", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/commercial/landing-page.html",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/commercial/landing-page.html", "utf8");
     const obs = observeContent(content, "landing.html");
     assert.ok(obs.semanticHtml, "Should have semantic HTML observation");
     assert.equal(obs.semanticHtml.status, "pass");
@@ -295,8 +272,7 @@ describe("semantic HTML", () => {
   });
 
   it("detects semantic HTML issues", () => {
-    const content =
-      "<html><body><div>Content</div><div>More</div></body></html>";
+    const content = "<html><body><div>Content</div><div>More</div></body></html>";
     const obs = observeContent(content, "test.html");
     assert.ok(obs.semanticHtml);
     assert.equal(obs.semanticHtml.status, "fail");
@@ -324,10 +300,7 @@ describe("adversarial fixture observations", () => {
   });
 
   it("flags keyword-stuffed content correctly", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/keyword-stuffed.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/keyword-stuffed.md", "utf8");
     const obs = observeContent(content, "keyword-stuffed.md");
     // These observations don't directly detect keyword stuffing,
     // but the link quality and paragraph distribution can provide signals
@@ -364,10 +337,7 @@ describe("adversarial fixture observations", () => {
   });
 
   it("correctly observes auto-generated content", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/auto-generated.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/auto-generated.md", "utf8");
     const obs = observeContent(content, "auto-gen.md");
 
     // Structure may be technically valid (good headings)

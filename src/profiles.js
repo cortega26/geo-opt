@@ -52,13 +52,7 @@ export const PROFILES = Object.freeze({
       "Articles, tutorials, opinion pieces, news reports. " +
       "All five dimensions apply: structure, attributed stats, " +
       "named quotes, external citations, and clear prose.",
-    applicableDimensions: [
-      "structure",
-      "statistics",
-      "quotations",
-      "citations",
-      "clarity",
-    ],
+    applicableDimensions: ["structure", "statistics", "quotations", "citations", "clarity"],
   },
 
   commercial: {
@@ -80,13 +74,7 @@ export const PROFILES = Object.freeze({
       "Valued for structured specs, customer reviews, and " +
       "cross-sell links. Stats come from product attributes; " +
       "quotes from verified reviews carry evidentiary weight.",
-    applicableDimensions: [
-      "structure",
-      "statistics",
-      "quotations",
-      "citations",
-      "clarity",
-    ],
+    applicableDimensions: ["structure", "statistics", "quotations", "citations", "clarity"],
   },
 
   regulated: {
@@ -201,7 +189,11 @@ export function detectProfile(content, filepath = "") {
   const regulatedCount = regulatedSignals.filter((re) => re.test(content)).length;
   if (regulatedCount >= 3) {
     reasons.push(`matched ${regulatedCount} regulated-content patterns`);
-    return { profile: "regulated", confidence: Math.min(0.95, 0.6 + regulatedCount * 0.1), reasons };
+    return {
+      profile: "regulated",
+      confidence: Math.min(0.95, 0.6 + regulatedCount * 0.1),
+      reasons,
+    };
   }
 
   // ── Strong signals for ecommerce ──
@@ -244,9 +236,7 @@ export function detectProfile(content, filepath = "") {
   const docCount = docSignals.filter((re) => re.test(content)).length;
 
   if (docCount >= 3 || (codeBlockCount >= 1 && docCount >= 2)) {
-    reasons.push(
-      `matched ${docCount} documentation patterns, ${codeBlockCount} code blocks`
-    );
+    reasons.push(`matched ${docCount} documentation patterns, ${codeBlockCount} code blocks`);
     return { profile: "documentation", confidence: Math.min(0.95, 0.5 + docCount * 0.1), reasons };
   }
 
@@ -281,7 +271,11 @@ export function detectProfile(content, filepath = "") {
   const commercialCount = commercialSignals.filter((re) => re.test(content)).length;
   if (commercialCount >= 3) {
     reasons.push(`matched ${commercialCount} commercial patterns`);
-    return { profile: "commercial", confidence: Math.min(0.85, 0.5 + commercialCount * 0.1), reasons };
+    return {
+      profile: "commercial",
+      confidence: Math.min(0.85, 0.5 + commercialCount * 0.1),
+      reasons,
+    };
   }
 
   // ── Weak signals → default to editorial ──

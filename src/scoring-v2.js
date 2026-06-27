@@ -134,8 +134,7 @@ function scoreStatistics(obs) {
   }
 
   // Attribution quality (0–15 pts)
-  const attributionRatio =
-    totalStats > 0 ? attr.statsWithNearbySource / totalStats : 0;
+  const attributionRatio = totalStats > 0 ? attr.statsWithNearbySource / totalStats : 0;
 
   if (attributionRatio >= 0.8 && totalStats >= 3) {
     score += 15;
@@ -217,15 +216,12 @@ function scoreQuotations(obs) {
     return { score: 0, max, details, findings };
   }
 
-  const attributionRatio =
-    totalQuotes > 0 ? attr.quotesWithAttribution / totalQuotes : 0;
+  const attributionRatio = totalQuotes > 0 ? attr.quotesWithAttribution / totalQuotes : 0;
 
   // Attribution quality (0–12 pts)
   if (attributionRatio === 1.0 && totalQuotes >= 2) {
     score += 12;
-    details.push(
-      `Quotations: All ${totalQuotes} quotes have identifiable attribution (+12 pts)`
-    );
+    details.push(`Quotations: All ${totalQuotes} quotes have identifiable attribution (+12 pts)`);
   } else if (attributionRatio >= 0.7) {
     score += 8;
     details.push(
@@ -306,14 +302,10 @@ function scoreCitations(obs) {
     );
   } else if (link.externalLinkCount >= 3) {
     score += 9;
-    details.push(
-      `Citations: ${link.externalLinkCount} external links (+9 pts)`
-    );
+    details.push(`Citations: ${link.externalLinkCount} external links (+9 pts)`);
   } else if (link.externalLinkCount >= 1) {
     score += 5;
-    details.push(
-      `Citations: ${link.externalLinkCount} external link(s) (+5 pts)`
-    );
+    details.push(`Citations: ${link.externalLinkCount} external link(s) (+5 pts)`);
   } else {
     details.push("Citations: No external links (+0 pts)");
     findings.push({
@@ -329,9 +321,7 @@ function scoreCitations(obs) {
     details.push("Citations: Dedicated sources/references section (+5 pts)");
   } else if (link.externalLinkCount >= 3) {
     score += 3;
-    details.push(
-      "Citations: No dedicated sources section, but external links present (+3 pts)"
-    );
+    details.push("Citations: No dedicated sources section, but external links present (+3 pts)");
   }
 
   // Content freshness bonus (0–3 pts) — dated content with review date
@@ -411,7 +401,19 @@ function scoreClarity(obs, textContent, config) {
     const noHeaders = textContent.replace(/^##+.*$/gm, "");
     const foundAcronyms = new Set(noHeaders.match(/\b[A-Z]{2,}\b/g) || []);
     const stopwords = new Set([
-      "THE", "AND", "FOR", "BUT", "YOU", "NOT", "YES", "OUT", "OFF", "HOW", "WHY", "OUR", "WHO",
+      "THE",
+      "AND",
+      "FOR",
+      "BUT",
+      "YOU",
+      "NOT",
+      "YES",
+      "OUT",
+      "OFF",
+      "HOW",
+      "WHY",
+      "OUR",
+      "WHO",
     ]);
     const filtered = Array.from(foundAcronyms).filter((a) => !stopwords.has(a));
     const acronymDict = config?.acronyms || {};
@@ -424,7 +426,9 @@ function scoreClarity(obs, textContent, config) {
         let explained = false;
         let match;
         while ((match = regex.exec(textContent)) !== null) {
-          const win = textContent.slice(Math.max(0, match.index - 120), match.index + 120).toLowerCase();
+          const win = textContent
+            .slice(Math.max(0, match.index - 120), match.index + 120)
+            .toLowerCase();
           if (win.includes(expansion.toLowerCase())) {
             explained = true;
             break;
@@ -442,9 +446,7 @@ function scoreClarity(obs, textContent, config) {
     if (unexplained.length > 0) {
       const deduct = Math.min(3, unexplained.length);
       score -= deduct;
-      details.push(
-        `Acronyms: Unexplained: ${unexplained.join(", ")} (-${deduct} pts)`
-      );
+      details.push(`Acronyms: Unexplained: ${unexplained.join(", ")} (-${deduct} pts)`);
     } else {
       details.push("Acronyms: All defined or none detected (+0 pts)");
     }
@@ -653,13 +655,9 @@ function generateRecommendationsV2(dimensions, profile, observations) {
   if (quotes?.applicable && quotes.score < 12) {
     const attr = observations.attributionProximity;
     if (attr.quotesWithoutAttribution > 0) {
-      recs.push(
-        "Attribute every quotation to a named person with their title and context."
-      );
+      recs.push("Attribute every quotation to a named person with their title and context.");
     } else if (attr.quotesWithAttribution === 0) {
-      recs.push(
-        "Include attributed quotes from recognized experts or verified customers."
-      );
+      recs.push("Include attributed quotes from recognized experts or verified customers.");
     }
   }
 
@@ -671,9 +669,7 @@ function generateRecommendationsV2(dimensions, profile, observations) {
         "Add external hyperlinks to authoritative sources and include a references section."
       );
     } else if (!observations.linkQuality.hasSourcesSection) {
-      recs.push(
-        "Add a dedicated 'Sources' or 'References' section to make citations explicit."
-      );
+      recs.push("Add a dedicated 'Sources' or 'References' section to make citations explicit.");
     }
   }
 

@@ -18,11 +18,11 @@ Analyzes a single content file and returns a GEO score.
 
 **Request body:**
 
-| Field    | Type   | Required | Description                |
-|----------|--------|----------|----------------------------|
-| content  | string | yes      | Raw markdown or HTML text  |
-| profile  | string | no       | Content profile override   |
-| language | string | no       | BCP-47 language tag        |
+| Field    | Type   | Required | Description               |
+| -------- | ------ | -------- | ------------------------- |
+| content  | string | yes      | Raw markdown or HTML text |
+| profile  | string | no       | Content profile override  |
+| language | string | no       | BCP-47 language tag       |
 
 **Response:**
 
@@ -49,12 +49,12 @@ Removes a specific audit result by its identifier.
 
 ## Error codes
 
-| Code | Meaning                                 |
-|------|-----------------------------------------|
-| 400  | Invalid request body                    |
-| 401  | Missing or expired API key              |
-| 429  | Rate limit exceeded — retry after 60 s  |
-| 500  | Internal server error                   |
+| Code | Meaning                                |
+| ---- | -------------------------------------- |
+| 400  | Invalid request body                   |
+| 401  | Missing or expired API key             |
+| 429  | Rate limit exceeded — retry after 60 s |
+| 500  | Internal server error                  |
 
 ## Rate limits
 

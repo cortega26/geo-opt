@@ -16,8 +16,8 @@ The v2 model understands what kind of content you're writing and adjusts
 expectations accordingly. API docs aren't penalized for lacking quotes.
 Blog posts get credit for attributed statistics.
 
-| Profile        | Structure | Stats | Quotes | Citations | Clarity |
-|---------------|-----------|-------|--------|-----------|---------|
+| Profile       | Structure | Stats | Quotes | Citations | Clarity |
+| ------------- | --------- | ----- | ------ | --------- | ------- |
 | documentation | ✓         | —     | —      | ✓         | ✓       |
 | editorial     | ✓         | ✓     | ✓      | ✓         | ✓       |
 | commercial    | ✓         | ✓     | —      | ✓         | ✓       |

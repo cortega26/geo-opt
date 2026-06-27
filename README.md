@@ -7,9 +7,11 @@ clarity; generates and validates JSON-LD; reviews crawler controls; and
 supports batch and continuous integration workflows. Processing is local by
 default, with no telemetry or silent content uploads.
 
-The audit score is an uncalibrated project heuristic. It is not a prediction or
-guarantee of ranking, retrieval, inclusion, mention, or citation by any search
-or artificial intelligence (AI) system.
+The audit score is a project heuristic calibrated against a 32-fixture
+characterization corpus. It is not a prediction or guarantee of ranking,
+retrieval, inclusion, mention, or citation by any search or artificial
+intelligence (AI) system. See `docs/architecture.md` for calibration
+limitations and known blind spots.
 
 ## Why teams use geo-opt
 
@@ -38,6 +40,9 @@ git clone https://github.com/cortega26/GEO-skill.git
 cd GEO-skill
 npm install
 node bin/cli.js audit path/to/content.md
+
+# Use the profile-aware v2 model (experimental)
+node bin/cli.js audit path/to/content.md --model v2
 ```
 
 Run `node bin/cli.js --help` or append `--help` to any command to inspect the
@@ -90,11 +95,11 @@ Every heuristic and recommendation in this project carries an evidence label.
 The label describes the quality of research support behind it, **not** a
 guaranteed outcome in any AI search or retrieval product.
 
-| Label | Meaning |
-|---|---|
-| **Strong** | Supported by multiple independent, reproducible studies and official platform documentation. |
-| **Probable** | Supported by at least one controlled study or consistent platform guidance, but not yet replicated independently across engines. |
-| **Experimental** | Supported by a single controlled benchmark under specific conditions; results may not transfer to live engines or different domains. |
+| Label                 | Meaning                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Strong**            | Supported by multiple independent, reproducible studies and official platform documentation.                                             |
+| **Probable**          | Supported by at least one controlled study or consistent platform guidance, but not yet replicated independently across engines.         |
+| **Experimental**      | Supported by a single controlled benchmark under specific conditions; results may not transfer to live engines or different domains.     |
 | **Project heuristic** | A reasonable practice derived from the project's own observations. No external study confirms a causal effect on AI search or retrieval. |
 
 ### Generate and review structured data
@@ -196,8 +201,8 @@ replaces accessible HTML, `robots.txt`, sitemaps, and structured data.
 | `schema <file> <type>`        | Print generated JSON-LD                                                                          |
 | `inject <file> <type>`        | Inject JSON-LD; supports dry run, backup, recursion, and Pro branding control                    |
 | `validate <file>`             | Inspect JSON-LD blocks already present in Markdown or HTML                                       |
-| `robots audit <file>`         | Evaluate effective known-crawler policy; supports text and JSON output                            |
-| `robots generate`             | Create a purpose-aware `robots.txt` draft with `search-visible` or `open` preset                  |
+| `robots audit <file>`         | Evaluate effective known-crawler policy; supports text and JSON output                           |
+| `robots generate`             | Create a purpose-aware `robots.txt` draft with `search-visible` or `open` preset                 |
 | `llmstxt generate [files...]` | Create `llms.txt` and optional `llms-full.txt`                                                   |
 | `llmstxt audit <file>`        | Check proposal structure and optional local coverage                                             |
 | `config get\|set reminders`   | Read or change the local support-reminder preference                                             |

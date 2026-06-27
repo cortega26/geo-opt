@@ -41,6 +41,7 @@ filter selectivity.
 ### When it doesn't trigger
 
 The optimization does not apply when:
+
 - The `PARTITION BY` column differs from the leading index column.
 - The `ORDER BY` clause sorts descending while the index is ascending
   (or vice versa) without a matching sort operator.

@@ -43,9 +43,15 @@ describe("PROFILES", () => {
     for (const [key, def] of Object.entries(PROFILES)) {
       assert.equal(def.id, key, `${key}: id mismatch`);
       assert.ok(typeof def.label === "string" && def.label.length > 0, `${key}: missing label`);
-      assert.ok(typeof def.description === "string" && def.description.length > 0, `${key}: missing description`);
+      assert.ok(
+        typeof def.description === "string" && def.description.length > 0,
+        `${key}: missing description`
+      );
       assert.ok(Array.isArray(def.applicableDimensions), `${key}: applicableDimensions not array`);
-      assert.ok(def.applicableDimensions.length >= 1, `${key}: at least one dimension must be applicable`);
+      assert.ok(
+        def.applicableDimensions.length >= 1,
+        `${key}: at least one dimension must be applicable`
+      );
       for (const dim of def.applicableDimensions) {
         assert.ok(ALL_DIMENSIONS.includes(dim), `${key}: unknown dimension "${dim}"`);
       }
@@ -223,13 +229,17 @@ describe("detectProfile", () => {
   });
 
   it("returns reasons array explaining the detection", () => {
-    const result = detectProfile("# API Reference\n\n```\nGET /users\n```\n\nBase URL: https://api.example.com\n\nRate limit: 100 req/h\n\nAuthorization: Bearer TOKEN", "api.md");
+    const result = detectProfile(
+      "# API Reference\n\n```\nGET /users\n```\n\nBase URL: https://api.example.com\n\nRate limit: 100 req/h\n\nAuthorization: Bearer TOKEN",
+      "api.md"
+    );
     assert.ok(result.reasons.length >= 1);
     assert.ok(result.reasons[0].includes("documentation"));
   });
 
   it("detects documentation from content with many code blocks", () => {
-    const content = "# CLI Reference\n\n```bash\nnpm install\n```\n\n```bash\nnpm test\n```\n\n```bash\nnpm run build\n```\n\n## Endpoints\n\n### POST /analyze\n\n| Field | Type |\n|-------|------|\n| content | string |";
+    const content =
+      "# CLI Reference\n\n```bash\nnpm install\n```\n\n```bash\nnpm test\n```\n\n```bash\nnpm run build\n```\n\n## Endpoints\n\n### POST /analyze\n\n| Field | Type |\n|-------|------|\n| content | string |";
     const result = detectProfile(content, "cli.md");
     assert.equal(result.profile, "documentation");
   });
@@ -241,11 +251,7 @@ describe("detectProfile", () => {
 
 describe("resolveProfile", () => {
   it("uses explicit override when set to a valid profile", () => {
-    const result = resolveProfile(
-      { profile: "documentation" },
-      "Some generic text.",
-      "file.md"
-    );
+    const result = resolveProfile({ profile: "documentation" }, "Some generic text.", "file.md");
     assert.equal(result.profile, "documentation");
     assert.equal(result.confidence, 1.0);
     assert.equal(result.overridden, true);
@@ -283,11 +289,7 @@ describe("resolveProfile", () => {
   });
 
   it("ignores 'auto' and auto-detects", () => {
-    const result = resolveProfile(
-      { profile: "auto" },
-      "Just some plain text.",
-      "note.md"
-    );
+    const result = resolveProfile({ profile: "auto" }, "Just some plain text.", "note.md");
     assert.equal(result.profile, "editorial");
     assert.equal(result.overridden, false);
   });
@@ -307,10 +309,7 @@ describe("detectProfile on fixtures", () => {
       "rest-endpoints",
     ];
     for (const name of fixtures) {
-      const content = readFileSync(
-        `tests/fixtures/audit-v2/documentation/${name}.md`,
-        "utf8"
-      );
+      const content = readFileSync(`tests/fixtures/audit-v2/documentation/${name}.md`, "utf8");
       const result = detectProfile(content, `${name}.md`);
       // Documentation or open-source are both acceptable for these
       assert.ok(
@@ -321,10 +320,7 @@ describe("detectProfile on fixtures", () => {
   });
 
   it("detects adversarial fake-stats as commercial or editorial (adversarial content may lack clear commercial patterns)", () => {
-    const content = readFileSync(
-      "tests/fixtures/audit-v2/adversarial/fake-stats.md",
-      "utf8"
-    );
+    const content = readFileSync("tests/fixtures/audit-v2/adversarial/fake-stats.md", "utf8");
     const result = detectProfile(content, "fake-stats.md");
     // Adversarial content with fake stats and quotes will likely fall
     // to editorial if it lacks pricing/trial/case-study signals.

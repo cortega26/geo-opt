@@ -6,11 +6,11 @@ project. We use the format described by Michael Nygard in
 
 ## Active records
 
-| ID  | Title                                     | Status   | Date       |
-|-----|-------------------------------------------|----------|------------|
-| 001 | Use marked + cheerio for content parsing  | Accepted | 2026-01-15 |
+| ID  | Title                                               | Status   | Date       |
+| --- | --------------------------------------------------- | -------- | ---------- |
+| 001 | Use marked + cheerio for content parsing            | Accepted | 2026-01-15 |
 | 002 | Keep JS and Python implementations in sync manually | Accepted | 2026-02-01 |
-| 003 | Version the scoring model from day one    | Accepted | 2026-04-10 |
+| 003 | Version the scoring model from day one              | Accepted | 2026-04-10 |
 
 ## ADR-001: Use marked + cheerio for content parsing
 
@@ -24,6 +24,7 @@ nested structures.
 ### Decision
 
 Replace regex-based parsing with:
+
 - **marked** for Markdown → AST extraction (links, blockquotes, tables, lists).
 - **cheerio** for HTML → DOM queries (semantic tags, SPA detection, structured
   data).

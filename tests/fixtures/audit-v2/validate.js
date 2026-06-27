@@ -104,9 +104,7 @@ export function validateFixtures() {
     const files = fs.readdirSync(catDir);
 
     // Find content files
-    const contentFiles = files.filter(
-      (f) => f.endsWith(".md") || f.endsWith(".html")
-    );
+    const contentFiles = files.filter((f) => f.endsWith(".md") || f.endsWith(".html"));
 
     for (const contentFile of contentFiles) {
       const baseName = contentFile.replace(/\.(md|html)$/, "");
@@ -223,10 +221,7 @@ export function validateFixtures() {
   }
 
   // Check adversarial category exists and has flags
-  if (
-    !fs.existsSync(path.join(FIXTURES_DIR, "adversarial")) ||
-    adversarialFlagsFound.size === 0
-  ) {
+  if (!fs.existsSync(path.join(FIXTURES_DIR, "adversarial")) || adversarialFlagsFound.size === 0) {
     warnings.push("No adversarial fixtures or flags found");
   }
 
@@ -246,9 +241,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(`\nFixture corpus validation\n${"=".repeat(40)}`);
   console.log(`Total fixtures: ${result.totalFixtures}`);
   console.log(`Profiles found: ${result.profilesFound.join(", ")}`);
-  console.log(
-    `Adversarial flags: ${result.adversarialFlagsFound.length} unique flags`
-  );
+  console.log(`Adversarial flags: ${result.adversarialFlagsFound.length} unique flags`);
 
   if (result.warnings.length > 0) {
     console.log(`\nWarnings (${result.warnings.length}):`);

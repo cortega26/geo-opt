@@ -14,8 +14,11 @@ constraint requires a difference.
 | Configuration and validation           | `src/config.js`                           |
 | Content discovery and ignore rules     | `src/discovery.js`                        |
 | Text extraction and normalization      | `src/text.js`                             |
-| Heuristic scoring                      | `src/scoring.js`                          |
-| Finding contract and evidence registry  | `src/findings.js` and `src/evidence.js`   |
+| Heuristic scoring (v1)                 | `src/scoring.js`                          |
+| Profile-aware scoring (v2)             | `src/scoring-v2.js`                       |
+| Content profiles and auto-detection    | `src/profiles.js`                         |
+| Section-level observation engine       | `src/observations.js`                     |
+| Finding contract and evidence registry | `src/findings.js` and `src/evidence.js`   |
 | Batch audits and injection             | `src/batch.js`                            |
 | Schema generation and injection        | `src/schema.js`                           |
 | JSON-LD validation                     | `src/validate.js`                         |
@@ -75,3 +78,49 @@ git diff --check
 For changes that affect shared behavior, add equivalent regression coverage to
 `tests/optimizer.test.js` and
 `.agents/skills/geo-optimization/scripts/test_optimizer.py`.
+
+## Scoring model v2 — calibration limitations
+
+The v2 model (`--model v2`) is calibrated against a 32-fixture characterization
+corpus covering documentation, open-source, editorial, commercial, ecommerce,
+regulated, and adversarial content. The following limitations apply:
+
+### Known blind spots
+
+- **Attribution proximity** uses pattern-based heuristics (e.g., "according to",
+  "published in") within a 150-character window. Stats attributed through
+  document-level context rather than sentence-level proximity may be
+  undercounted.
+- **Auto-detection confidence** is derived from signal density, not a trained
+  classifier. Content at the boundary between two profiles (e.g., a tutorial
+  that is also a product page) may receive low confidence.
+- **Keyword stuffing** is not directly measured. The v2 model detects it
+  indirectly through thin-content and paragraph-distribution signals.
+- **Factual accuracy** of statistics and quotations is not verified. The model
+  checks whether claims have _nearby_ attribution, not whether the attribution
+  is truthful.
+- **Non-English content** is not represented in the calibration corpus. Scores
+  for non-English text may be unreliable.
+- **Multimodal content** (images, video, audio) is not analyzed. Only text and
+  HTML structure are evaluated.
+
+### What the model cannot predict
+
+- **Live search-engine rankings or citation rates.** The model scores
+  structural quality and attribution hygiene, which correlate with citation
+  likelihood in published research, but it does not claim to predict specific
+  engine behavior.
+- **User engagement or conversion.** GEO scores reflect content structure, not
+  business outcomes.
+- **Future engine algorithm changes.** Scoring heuristics are versioned and
+  documented so users can pin to a specific model version.
+
+### Recalibration policy
+
+- Add fixtures to the corpus; never tune thresholds against a single customer's
+  desired score.
+- A default switch from v1 to v2 requires a separate release decision,
+  documented migration guide, and deprecation notice period.
+- Threshold values in `src/observations.js` and `src/scoring-v2.js` are
+  configurable heuristics. Changes that affect ranking order constitute a
+  MAJOR model version bump.

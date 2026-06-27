@@ -15,11 +15,11 @@ npm install geoopt
 ## Quickstart
 
 ```js
-import { GeoOpt } from 'geoopt';
+import { GeoOpt } from "geoopt";
 
 const client = new GeoOpt({ apiKey: process.env.GEOOPT_KEY });
 
-const { score, report } = await client.analyze('# My Article\n\n...');
+const { score, report } = await client.analyze("# My Article\n\n...");
 console.log(`GEO score: ${score}/100`);
 ```
 
@@ -27,12 +27,12 @@ console.log(`GEO score: ${score}/100`);
 
 ### `new GeoOpt(options)`
 
-| Option       | Type    | Default                  | Description              |
-|-------------|---------|--------------------------|--------------------------|
-| `apiKey`    | string  | —                        | Required. API key        |
-| `baseUrl`   | string  | `https://api.geoopt.example.com/v1` | Server URL |
-| `timeout`   | number  | `30000`                  | Request timeout in ms    |
-| `retries`   | number  | `3`                      | Retries on 5xx errors    |
+| Option    | Type   | Default                             | Description           |
+| --------- | ------ | ----------------------------------- | --------------------- |
+| `apiKey`  | string | —                                   | Required. API key     |
+| `baseUrl` | string | `https://api.geoopt.example.com/v1` | Server URL            |
+| `timeout` | number | `30000`                             | Request timeout in ms |
+| `retries` | number | `3`                                 | Retries on 5xx errors |
 
 ### `client.analyze(content, options?)`
 

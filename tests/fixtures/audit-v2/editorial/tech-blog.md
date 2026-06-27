@@ -15,7 +15,7 @@ fully without assuming the reader will click through to five related pages.
 Several benchmarks quantify the trend. The KDD 2024 GEO study found that
 optimized content appeared in AI-generated responses 40 % more often than
 unoptimized equivalents when evaluated on GPT-4-class models (Aggarwal et
-al., 2024, "GEO: Generative Engine Optimization," *KDD 2024*).
+al., 2024, "GEO: Generative Engine Optimization," _KDD 2024_).
 
 A follow-up study published in May 2025 examined real-world citation
 patterns. Among 10 000 queries across three engines, pages with
@@ -66,8 +66,8 @@ Not every legacy SEO practice is harmful, but several are irrelevant:
 
 ## References
 
-- Aggarwal, P. et al. (2024). GEO: Generative Engine Optimization. *KDD
-  2024*. https://arxiv.org/abs/2311.09735
+- Aggarwal, P. et al. (2024). GEO: Generative Engine Optimization. _KDD
+  2024_. https://arxiv.org/abs/2311.09735
 - Chen, S. & Martinez, J. (2025). What Gets Cited: Measuring the Impact of
   GEO on LLM Citations. https://arxiv.org/abs/2605.25517
 - Google Search Central. AI optimization guide.
