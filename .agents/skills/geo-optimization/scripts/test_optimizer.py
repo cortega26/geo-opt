@@ -11,6 +11,8 @@ from io import StringIO
 # Add current directory to path to import script
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from geo_optimizer import (
+    AI_CRAWLER_AGENTS,
+    AI_CRAWLER_REGISTRY,
     calculate_readability,
     audit_file,
     audit_files,
@@ -20,6 +22,7 @@ from geo_optimizer import (
     generate_llms_txt,
     generate_llms_full_txt,
     audit_llms_txt,
+    audit_robots,
     generate_robots_txt,
     check_robots,
     generate_schema_data,
@@ -516,6 +519,73 @@ class TestGeoOptimizer(unittest.TestCase):
         self.assertIn("Disallow: /admin", result)
         self.assertIn("Sitemap: https://example.com/sitemap.xml", result)
 
+    def test_crawler_registry_is_purpose_aware_and_compatible(self):
+        by_token = {entry["token"]: entry for entry in AI_CRAWLER_REGISTRY}
+        self.assertEqual(by_token["OAI-SearchBot"]["purpose"], "search")
+        self.assertEqual(by_token["GPTBot"]["purpose"], "training")
+        self.assertEqual(by_token["Claude-User"]["purpose"], "user")
+        self.assertFalse(by_token["Perplexity-User"]["robotsApplicable"])
+        self.assertEqual(by_token["Google-Extended"]["purpose"], "control")
+        self.assertEqual(
+            AI_CRAWLER_AGENTS,
+            [entry["token"] for entry in AI_CRAWLER_REGISTRY],
+        )
+        for entry in AI_CRAWLER_REGISTRY:
+            self.assertTrue(entry["officialSource"])
+            self.assertRegex(entry["lastVerified"], r"^\d{4}-\d{2}-\d{2}$")
+
+    def test_search_visible_preset_preserves_sensitive_paths(self):
+        content = generate_robots_txt()
+        root = audit_robots(content)
+        admin = audit_robots(content, "/admin/settings")
+
+        for token in ["OAI-SearchBot", "Claude-SearchBot", "PerplexityBot"]:
+            entry = next(item for item in root["agents"] if item["token"] == token)
+            self.assertTrue(entry["allowed"], f"{token} should be allowed at root")
+        gpt_bot = next(item for item in root["agents"] if item["token"] == "GPTBot")
+        self.assertFalse(gpt_bot["allowed"])
+        for entry in admin["agents"]:
+            if entry["matchedGroup"] and entry["matchedGroup"][0] != "*":
+                self.assertFalse(
+                    entry["allowed"],
+                    f"{entry['token']} should not bypass /admin",
+                )
+
+    def test_open_preset_and_invalid_preset(self):
+        content = generate_robots_txt(
+            disallow_paths=["private"],
+            preset="open",
+        )
+        self.assertTrue(all(entry["allowed"] for entry in audit_robots(content)["agents"]))
+        self.assertTrue(
+            all(
+                not entry["allowed"]
+                for entry in audit_robots(content, "/private/record")["agents"]
+            )
+        )
+        with self.assertRaisesRegex(ValueError, r"Unknown robots\.txt"):
+            generate_robots_txt(preset="invalid")
+
+    def test_audit_robots_longest_rule_and_grouped_agents(self):
+        content = (
+            "User-agent: OAI-SearchBot\n"
+            "User-agent: Claude-SearchBot\n"
+            "Disallow:\n"
+            "Disallow: /private\n"
+            "Allow: /private/public\n"
+        )
+        public_report = audit_robots(content, "/private/public/article")
+        private_report = audit_robots(content, "/private/draft")
+        for token in ["OAI-SearchBot", "Claude-SearchBot"]:
+            public_entry = next(
+                item for item in public_report["agents"] if item["token"] == token
+            )
+            private_entry = next(
+                item for item in private_report["agents"] if item["token"] == token
+            )
+            self.assertTrue(public_entry["allowed"])
+            self.assertFalse(private_entry["allowed"])
+
     def test_cli_llmstxt_generate_dry_run(self):
         """CLI llmstxt generate --dry-run should output preview."""
         tmp_dir = tempfile.mkdtemp()
@@ -548,6 +618,39 @@ class TestGeoOptimizer(unittest.TestCase):
         self.assertIn("GPTBot", result.stdout)
         self.assertIn("Allow: /", result.stdout)
         self.assertIn("[dry-run]", result.stdout)
+
+    def test_cli_robots_audit_json(self):
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "geo_optimizer.py",
+        )
+        with tempfile.NamedTemporaryFile(
+            mode="w+", suffix=".txt", delete=False
+        ) as temp:
+            temp.write(generate_robots_txt())
+            temp_path = temp.name
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    script_path,
+                    "robots",
+                    "audit",
+                    temp_path,
+                    "--format",
+                    "json",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            report = json.loads(result.stdout)
+            self.assertEqual(
+                {entry["purpose"] for entry in report["agents"]},
+                {"search", "training", "user", "control", "legacy"},
+            )
+        finally:
+            os.remove(temp_path)
 
     def test_cli_audit_recursive(self):
         """CLI audit --recursive should find files in directory."""

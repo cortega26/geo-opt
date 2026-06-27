@@ -184,22 +184,35 @@ const robotsCmd = program.command("robots").description("Audit or generate robot
 robotsCmd
   .command("audit <file>")
   .description("Audit robots.txt for AI crawler blocking rules")
-  .action((file, _options, cmd) => {
+  .option("-f, --format <format>", "Output format (text|json)", "text")
+  .action((file, options, cmd) => {
     resolveConfig(cmd);
-    checkRobots(file);
+    if (!["text", "json"].includes(options.format)) {
+      console.error(`Error: Unsupported robots audit format "${options.format}".`);
+      process.exitCode = 1;
+      return;
+    }
+    checkRobots(file, { format: options.format });
   });
 
 robotsCmd
   .command("generate")
   .description("Generate a reviewable robots.txt draft for configured AI agents")
-  .option("--disallow <paths...>", "Paths to disallow for non-AI crawlers")
+  .option("--preset <preset>", "Policy preset (search-visible|open)", "search-visible")
+  .option("--disallow <paths...>", "Paths to disallow in broadly allowed groups")
   .option("--sitemap <url>", "URL of the sitemap")
   .option("--output <path>", "Output file path", "robots.txt")
   .option("--dry-run", "Preview without writing")
   .action((options) => {
+    if (!["search-visible", "open"].includes(options.preset)) {
+      console.error(`Error: Unknown robots.txt policy preset "${options.preset}".`);
+      process.exitCode = 1;
+      return;
+    }
     const content = generateRobotsTxt({
       disallowPaths: options.disallow || [],
       sitemapUrl: options.sitemap || "",
+      preset: options.preset,
     });
 
     if (options.dryRun) {

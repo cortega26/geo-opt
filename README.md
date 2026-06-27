@@ -117,15 +117,23 @@ Audit an existing file:
 
 ```bash
 node bin/cli.js robots audit public/robots.txt
+node bin/cli.js robots audit public/robots.txt --format json
 ```
 
-Preview a generated policy:
+Preview the default `search-visible` policy, which allows documented search
+crawlers, blocks documented training/control tokens, and keeps sensitive paths
+disallowed in every broadly allowed group:
 
 ```bash
 node bin/cli.js robots generate \
+  --disallow /admin /api /private \
   --sitemap https://example.com/sitemap.xml \
   --dry-run
 ```
+
+Use `--preset open` only when the site owner explicitly wants every registry
+entry broadly allowed. Both presets preserve supplied `--disallow` paths in
+specific groups so that those groups do not bypass the wildcard policy.
 
 Crawler tokens do not all serve the same purpose. For example,
 [OpenAI separates search and training controls](https://developers.openai.com/api/docs/bots),
@@ -133,7 +141,9 @@ Crawler tokens do not all serve the same purpose. For example,
 and Anthropic documents separate
 [training, search, and user-directed agents](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler).
 Review generated rules against the site's actual publishing, training, privacy,
-and security policy before deployment.
+and security policy before deployment. `robots.txt` communicates crawler
+preferences; it is not authentication, an access control, or a guarantee of
+indexing, retrieval, or citation.
 
 ### Generate or audit `llms.txt`
 
@@ -166,8 +176,8 @@ replaces accessible HTML, `robots.txt`, sitemaps, and structured data.
 | `schema <file> <type>`        | Print generated JSON-LD                                                                          |
 | `inject <file> <type>`        | Inject JSON-LD; supports dry run, backup, recursion, and Pro branding control                    |
 | `validate <file>`             | Inspect JSON-LD blocks already present in Markdown or HTML                                       |
-| `robots audit <file>`         | Evaluate known AI crawler rules                                                                  |
-| `robots generate`             | Create a reviewable `robots.txt` draft                                                           |
+| `robots audit <file>`         | Evaluate effective known-crawler policy; supports text and JSON output                            |
+| `robots generate`             | Create a purpose-aware `robots.txt` draft with `search-visible` or `open` preset                  |
 | `llmstxt generate [files...]` | Create `llms.txt` and optional `llms-full.txt`                                                   |
 | `llmstxt audit <file>`        | Check proposal structure and optional local coverage                                             |
 | `config get\|set reminders`   | Read or change the local support-reminder preference                                             |

@@ -7,9 +7,12 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "url";
 import {
   aggregateReport,
+  AI_CRAWLER_AGENTS,
+  AI_CRAWLER_REGISTRY,
   auditFile,
   auditFiles,
   auditLlmsTxt,
+  auditRobots,
   batchInject,
   calculateReadability,
   checkRobots,
@@ -1581,6 +1584,69 @@ test("generateRobotsTxt uses default disallow when none provided", () => {
   assert.ok(result.includes("Disallow: /private"));
 });
 
+test("crawler registry is purpose-aware and retains the compatibility export", () => {
+  const byToken = new Map(AI_CRAWLER_REGISTRY.map((entry) => [entry.token, entry]));
+  assert.strictEqual(byToken.get("OAI-SearchBot").purpose, "search");
+  assert.strictEqual(byToken.get("GPTBot").purpose, "training");
+  assert.strictEqual(byToken.get("Claude-User").purpose, "user");
+  assert.strictEqual(byToken.get("Perplexity-User").robotsApplicable, false);
+  assert.strictEqual(byToken.get("Google-Extended").purpose, "control");
+  assert.deepStrictEqual(
+    AI_CRAWLER_AGENTS,
+    AI_CRAWLER_REGISTRY.map(({ token }) => token)
+  );
+  for (const entry of AI_CRAWLER_REGISTRY) {
+    assert.ok(entry.officialSource);
+    assert.match(entry.lastVerified, /^\d{4}-\d{2}-\d{2}$/);
+  }
+});
+
+test("search-visible preset preserves sensitive paths in every specific allow group", () => {
+  const content = generateRobotsTxt();
+  const root = auditRobots(content);
+  const admin = auditRobots(content, { path: "/admin/settings" });
+
+  for (const token of ["OAI-SearchBot", "Claude-SearchBot", "PerplexityBot"]) {
+    assert.strictEqual(
+      root.agents.find((entry) => entry.token === token).allowed,
+      true,
+      `${token} should be allowed at root`
+    );
+  }
+  assert.strictEqual(
+    root.agents.find((entry) => entry.token === "GPTBot").allowed,
+    false,
+    "training crawler should be blocked by default"
+  );
+  for (const entry of admin.agents.filter(({ matchedGroup }) => matchedGroup?.[0] !== "*")) {
+    assert.strictEqual(entry.allowed, false, `${entry.token} should not bypass /admin`);
+  }
+});
+
+test("open preset is explicit, preserves disallows, and rejects unknown presets", () => {
+  const content = generateRobotsTxt({ preset: "open", disallowPaths: ["private"] });
+  assert.ok(auditRobots(content).agents.every(({ allowed }) => allowed));
+  assert.ok(
+    auditRobots(content, { path: "/private/record" }).agents.every(({ allowed }) => !allowed)
+  );
+  assert.throws(() => generateRobotsTxt({ preset: "invalid" }), /Unknown robots\.txt/);
+});
+
+test("auditRobots applies longest-rule precedence and grouped user agents", () => {
+  const content = `User-agent: OAI-SearchBot
+User-agent: Claude-SearchBot
+Disallow:
+Disallow: /private
+Allow: /private/public
+`;
+  const publicReport = auditRobots(content, { path: "/private/public/article" });
+  const privateReport = auditRobots(content, { path: "/private/draft" });
+  for (const token of ["OAI-SearchBot", "Claude-SearchBot"]) {
+    assert.strictEqual(publicReport.agents.find((entry) => entry.token === token).allowed, true);
+    assert.strictEqual(privateReport.agents.find((entry) => entry.token === token).allowed, false);
+  }
+});
+
 // CLI integration tests
 test("CLI robots generate --dry-run outputs expected content", () => {
   const result = spawnSync(process.execPath, [cliPath, "robots", "generate", "--dry-run"], {
@@ -1591,6 +1657,27 @@ test("CLI robots generate --dry-run outputs expected content", () => {
   assert.ok(result.stdout.includes("GPTBot"), "Should include GPTBot");
   assert.ok(result.stdout.includes("Allow: /"), "Should allow root");
   assert.ok(result.stdout.includes("[dry-run]"), "Should mark as dry-run");
+});
+
+test("CLI robots audit JSON distinguishes crawler purposes", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-robots-"));
+  const robotsPath = path.join(tmpDir, "robots.txt");
+  fs.writeFileSync(robotsPath, generateRobotsTxt(), "utf8");
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [cliPath, "robots", "audit", robotsPath, "--format", "json"],
+      { cwd: repoRoot, encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.deepStrictEqual(
+      new Set(report.agents.map(({ purpose }) => purpose)),
+      new Set(["search", "training", "user", "control", "legacy"])
+    );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test("CLI llmstxt generate --dry-run outputs expected content", () => {

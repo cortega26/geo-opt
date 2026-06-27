@@ -9,6 +9,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- A versioned, purpose-aware crawler registry and structured `robots.txt`
+  audits with JSON CLI output.
+- Explicit `search-visible` and `open` crawler-policy presets with JavaScript
+  and Python parity.
 - `geo-opt validate` for inspecting JSON-LD blocks, required Schema.org fields,
   and malformed structured data.
 - A prepublish build that protects the Pro licensing module with obfuscation and
@@ -39,6 +43,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Generated crawler-specific groups now preserve sensitive `Disallow` paths,
+  preventing broad `Allow: /` rules from bypassing the wildcard policy.
 - Corrected the JSON-LD validator's suggested schema command.
 - Aligned TypeScript declarations with the runtime API by documenting
   `validateSchemaFile` and removing two internal-only helpers.

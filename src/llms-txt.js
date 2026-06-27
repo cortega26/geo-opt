@@ -7,7 +7,7 @@ import {
   cleanHtmlText,
   truncateDescription,
 } from "./text.js";
-import { AI_CRAWLER_AGENTS } from "./robots.js";
+import { AI_CRAWLER_REGISTRY, CRAWLER_REGISTRY_VERSION } from "./robots.js";
 
 // ---- Page metadata extraction ----
 
@@ -343,22 +343,52 @@ export function auditLlmsTxt(llmsContent, discoveredFiles = [], options = {}) {
  * Generate a reviewable robots.txt draft for configured AI agents.
  *
  * @param {object} [options={}]
- * @param {string[]} [options.disallowPaths=[]] - paths to disallow for default crawlers
+ * @param {string[]} [options.disallowPaths=[]] - paths to disallow for every broadly allowed group
  * @param {string} [options.sitemapUrl] - URL of the sitemap
+ * @param {"search-visible"|"open"} [options.preset="search-visible"] - crawler policy preset
  * @returns {string} robots.txt content
  */
 export function generateRobotsTxt(options = {}) {
-  const { disallowPaths = [], sitemapUrl = "" } = options;
+  const { disallowPaths = [], sitemapUrl = "", preset = "search-visible" } = options;
+  if (!["search-visible", "open"].includes(preset)) {
+    throw new RangeError(`Unknown robots.txt policy preset: ${preset}`);
+  }
+
+  const normalizedDisallowPaths = (
+    disallowPaths.length > 0 ? disallowPaths : ["/admin", "/api", "/private"]
+  ).map((entry) => (entry.startsWith("/") ? entry : `/${entry}`));
   const lines = [];
 
   lines.push("# ── AI Crawler Policy ──");
-  lines.push("# Draft: allow every agent in geo-opt's current registry.");
-  lines.push("# Review each permission: search, training, and user-directed agents differ.");
+  lines.push(`# Registry: ${CRAWLER_REGISTRY_VERSION}; preset: ${preset}`);
+  lines.push("# Draft policy signal only: robots.txt is not an access control.");
   lines.push("");
 
-  for (const agent of AI_CRAWLER_AGENTS) {
-    lines.push(`User-agent: ${agent}`);
-    lines.push("Allow: /");
+  for (const entry of AI_CRAWLER_REGISTRY) {
+    if (entry.purpose === "legacy" && preset !== "open") {
+      lines.push(
+        `# ${entry.token}: legacy or undocumented token; verify with ${entry.provider} before adding rules.`
+      );
+      continue;
+    }
+
+    const broadlyAllowed =
+      preset === "open" || entry.purpose === "search" || entry.purpose === "user";
+    lines.push(`# ${entry.provider}; purpose: ${entry.purpose}; source: ${entry.officialSource}`);
+    if (entry.robotsApplicable === false) {
+      lines.push("# User-triggered requests may ignore robots.txt.");
+    } else if (entry.purpose === "control") {
+      lines.push("# Product control token; not a distinct HTTP crawler user agent.");
+    }
+    lines.push(`User-agent: ${entry.token}`);
+    if (broadlyAllowed) {
+      lines.push("Allow: /");
+      for (const disallowPath of normalizedDisallowPaths) {
+        lines.push(`Disallow: ${disallowPath}`);
+      }
+    } else {
+      lines.push("Disallow: /");
+    }
     lines.push("");
   }
 
@@ -367,16 +397,8 @@ export function generateRobotsTxt(options = {}) {
   lines.push("");
 
   lines.push("User-agent: *");
-
-  if (disallowPaths.length > 0) {
-    for (const path of disallowPaths) {
-      const normalized = path.startsWith("/") ? path : "/" + path;
-      lines.push(`Disallow: ${normalized}`);
-    }
-  } else {
-    lines.push("Disallow: /admin");
-    lines.push("Disallow: /api");
-    lines.push("Disallow: /private");
+  for (const disallowPath of normalizedDisallowPaths) {
+    lines.push(`Disallow: ${disallowPath}`);
   }
 
   lines.push("");

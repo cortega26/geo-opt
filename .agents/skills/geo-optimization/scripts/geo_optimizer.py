@@ -25,22 +25,51 @@ REMINDER_INJECTION_INTERVAL = 10
 REMINDER_COOLDOWN_SECONDS = 7 * 24 * 60 * 60
 STATE_DIR_ENV_VAR = "GEO_OPT_STATE_DIR"
 SUPPORT_URL = "https://www.tooltician.com"
-AI_CRAWLER_AGENTS = [
-    "GPTBot",
-    "ChatGPT-User",
-    "OAI-SearchBot",
-    "ClaudeBot",
-    "Claude-SearchBot",
-    "Claude-User",
-    "PerplexityBot",
-    "Google-Extended",
-    "Applebot-Extended",
-    "Meta-ExternalAgent",
-    "Bytespider",
-    "CCBot",
-    "Amazonbot",
-    "anthropic-ai",
+CRAWLER_REGISTRY_VERSION = "2026-06-26"
+OPENAI_CRAWLER_SOURCE = "https://developers.openai.com/api/docs/bots"
+ANTHROPIC_CRAWLER_SOURCE = (
+    "https://support.claude.com/en/articles/"
+    "8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler"
+)
+PERPLEXITY_CRAWLER_SOURCE = "https://docs.perplexity.ai/docs/resources/perplexity-crawlers"
+AI_CRAWLER_REGISTRY = [
+    {"token": "GPTBot", "provider": "OpenAI", "purpose": "training",
+     "robotsApplicable": True, "officialSource": OPENAI_CRAWLER_SOURCE},
+    {"token": "ChatGPT-User", "provider": "OpenAI", "purpose": "user",
+     "robotsApplicable": False, "officialSource": OPENAI_CRAWLER_SOURCE},
+    {"token": "OAI-SearchBot", "provider": "OpenAI", "purpose": "search",
+     "robotsApplicable": True, "officialSource": OPENAI_CRAWLER_SOURCE},
+    {"token": "ClaudeBot", "provider": "Anthropic", "purpose": "training",
+     "robotsApplicable": True, "officialSource": ANTHROPIC_CRAWLER_SOURCE},
+    {"token": "Claude-SearchBot", "provider": "Anthropic", "purpose": "search",
+     "robotsApplicable": True, "officialSource": ANTHROPIC_CRAWLER_SOURCE},
+    {"token": "Claude-User", "provider": "Anthropic", "purpose": "user",
+     "robotsApplicable": True, "officialSource": ANTHROPIC_CRAWLER_SOURCE},
+    {"token": "PerplexityBot", "provider": "Perplexity", "purpose": "search",
+     "robotsApplicable": True, "officialSource": PERPLEXITY_CRAWLER_SOURCE},
+    {"token": "Perplexity-User", "provider": "Perplexity", "purpose": "user",
+     "robotsApplicable": False, "officialSource": PERPLEXITY_CRAWLER_SOURCE},
+    {"token": "Google-Extended", "provider": "Google", "purpose": "control",
+     "robotsApplicable": True,
+     "officialSource": "https://developers.google.com/crawling/docs/crawlers-fetchers/"
+                       "google-common-crawlers#google-extended"},
+    {"token": "Applebot-Extended", "provider": "Apple", "purpose": "control",
+     "robotsApplicable": True, "officialSource": "https://support.apple.com/en-us/119829"},
+    {"token": "Meta-ExternalAgent", "provider": "Meta", "purpose": "training",
+     "robotsApplicable": True,
+     "officialSource": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/"},
+    {"token": "Bytespider", "provider": "ByteDance", "purpose": "legacy",
+     "robotsApplicable": None, "officialSource": "https://www.bytedance.com/en/"},
+    {"token": "CCBot", "provider": "Common Crawl", "purpose": "training",
+     "robotsApplicable": True, "officialSource": "https://commoncrawl.org/ccbot"},
+    {"token": "Amazonbot", "provider": "Amazon", "purpose": "training",
+     "robotsApplicable": True, "officialSource": "https://developer.amazon.com/amazonbot"},
+    {"token": "anthropic-ai", "provider": "Anthropic", "purpose": "legacy",
+     "robotsApplicable": None, "officialSource": ANTHROPIC_CRAWLER_SOURCE},
 ]
+for crawler_entry in AI_CRAWLER_REGISTRY:
+    crawler_entry["lastVerified"] = CRAWLER_REGISTRY_VERSION
+AI_CRAWLER_AGENTS = [entry["token"] for entry in AI_CRAWLER_REGISTRY]
 
 
 def resolve_license_key(config, env=None):
@@ -489,28 +518,51 @@ def audit_llms_txt(llms_content, discovered_files=None, base_dir=""):
 
 # ---- robots.txt generation ----
 
-AI_CRAWLER_AGENTS_LIST = [
-    "GPTBot", "ChatGPT-User", "OAI-SearchBot",
-    "ClaudeBot", "Claude-SearchBot", "Claude-User",
-    "PerplexityBot", "Google-Extended", "Applebot-Extended",
-    "Meta-ExternalAgent", "Bytespider", "CCBot",
-    "Amazonbot", "anthropic-ai",
-]
 
-
-def generate_robots_txt(disallow_paths=None, sitemap_url=""):
+def generate_robots_txt(disallow_paths=None, sitemap_url="", preset="search-visible"):
     """Generate a reviewable robots.txt draft for configured AI agents."""
     if disallow_paths is None:
         disallow_paths = []
+    if preset not in {"search-visible", "open"}:
+        raise ValueError(f"Unknown robots.txt policy preset: {preset}")
+
+    normalized_paths = [
+        path if path.startswith("/") else "/" + path
+        for path in (disallow_paths or ["/admin", "/api", "/private"])
+    ]
     lines = []
     lines.append("# ── AI Crawler Policy ──")
-    lines.append("# Draft: allow every agent in geo-opt's current registry.")
-    lines.append("# Review each permission: search, training, and user-directed agents differ.")
+    lines.append(f"# Registry: {CRAWLER_REGISTRY_VERSION}; preset: {preset}")
+    lines.append("# Draft policy signal only: robots.txt is not an access control.")
     lines.append("")
 
-    for agent in AI_CRAWLER_AGENTS_LIST:
-        lines.append(f"User-agent: {agent}")
-        lines.append("Allow: /")
+    for entry in AI_CRAWLER_REGISTRY:
+        if entry["purpose"] == "legacy" and preset != "open":
+            lines.append(
+                f"# {entry['token']}: legacy or undocumented token; "
+                f"verify with {entry['provider']} before adding rules."
+            )
+            continue
+
+        broadly_allowed = (
+            preset == "open"
+            or entry["purpose"] in {"search", "user"}
+        )
+        lines.append(
+            f"# {entry['provider']}; purpose: {entry['purpose']}; "
+            f"source: {entry['officialSource']}"
+        )
+        if entry["robotsApplicable"] is False:
+            lines.append("# User-triggered requests may ignore robots.txt.")
+        elif entry["purpose"] == "control":
+            lines.append("# Product control token; not a distinct HTTP crawler user agent.")
+        lines.append(f"User-agent: {entry['token']}")
+        if broadly_allowed:
+            lines.append("Allow: /")
+            for path in normalized_paths:
+                lines.append(f"Disallow: {path}")
+        else:
+            lines.append("Disallow: /")
         lines.append("")
 
     lines.append("# ── Default Rules ──")
@@ -518,14 +570,8 @@ def generate_robots_txt(disallow_paths=None, sitemap_url=""):
     lines.append("")
     lines.append("User-agent: *")
 
-    if disallow_paths:
-        for path in disallow_paths:
-            normalized = path if path.startswith("/") else "/" + path
-            lines.append(f"Disallow: {normalized}")
-    else:
-        lines.append("Disallow: /admin")
-        lines.append("Disallow: /api")
-        lines.append("Disallow: /private")
+    for path in normalized_paths:
+        lines.append(f"Disallow: {path}")
 
     lines.append("")
     if sitemap_url:
@@ -1373,17 +1419,24 @@ def select_robots_group(groups, target_agent):
     return selected
 
 
-def rule_matches_root(path):
-    return path in ["/", "/*"]
-
-
-def blocks_root(group):
-    if not group:
+def robots_rule_matches_path(rule_path, target_path):
+    if not rule_path:
         return False
+    end_anchored = rule_path.endswith("$")
+    source = rule_path[:-1] if end_anchored else rule_path
+    pattern = "^" + re.escape(source).replace(r"\*", ".*")
+    if end_anchored:
+        pattern += "$"
+    return re.match(pattern, target_path) is not None
+
+
+def evaluate_robots_group(group, target_path):
+    if not group:
+        return {"allowed": True, "matchedRule": None}
 
     strongest_rule = None
     for rule in group["rules"]:
-        if not rule["path"] or not rule_matches_root(rule["path"]):
+        if not robots_rule_matches_path(rule["path"], target_path):
             continue
         if (
             strongest_rule is None
@@ -1395,10 +1448,58 @@ def blocks_root(group):
         ):
             strongest_rule = rule
 
-    return strongest_rule is not None and strongest_rule["directive"] == "disallow"
+    return {
+        "allowed": strongest_rule is None or strongest_rule["directive"] != "disallow",
+        "matchedRule": strongest_rule,
+    }
 
 
-def check_robots(robots_path):
+def crawler_warnings(entry):
+    warnings = []
+    if entry["robotsApplicable"] is False:
+        warnings.append(
+            "This user-triggered fetcher may ignore robots.txt; "
+            "use application security controls for private content."
+        )
+    if entry["robotsApplicable"] is None or entry["purpose"] == "legacy":
+        warnings.append(
+            "This legacy or undocumented token requires provider verification before use."
+        )
+    if entry["purpose"] == "control":
+        warnings.append(
+            "This is a product control token, not a distinct HTTP crawler user agent."
+        )
+    return warnings
+
+
+def audit_robots(content, target_path="/"):
+    """Return effective robots.txt policy for the versioned crawler registry."""
+    groups = parse_robots_groups(content)
+    wildcard_group = select_robots_group(groups, "*")
+    wildcard = {
+        "matchedGroup": wildcard_group["agents"] if wildcard_group else None,
+        **evaluate_robots_group(wildcard_group, target_path),
+    }
+    agents = []
+    for entry in AI_CRAWLER_REGISTRY:
+        group = select_robots_group(groups, entry["token"])
+        agents.append(
+            {
+                **entry,
+                "matchedGroup": group["agents"] if group else None,
+                **evaluate_robots_group(group, target_path),
+                "warnings": crawler_warnings(entry),
+            }
+        )
+    return {
+        "registryVersion": CRAWLER_REGISTRY_VERSION,
+        "path": target_path,
+        "wildcard": wildcard,
+        "agents": agents,
+    }
+
+
+def check_robots(robots_path, output_format="text"):
     if not os.path.exists(robots_path):
         print(f"Error: robots.txt not found at {robots_path}", file=sys.stderr)
         sys.exit(1)
@@ -1410,29 +1511,28 @@ def check_robots(robots_path):
         print(f"Error: Failed to read robots.txt: {e}", file=sys.stderr)
         sys.exit(1)
         
+    result = audit_robots(content)
+    if output_format == "json":
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return result
+
     print("==================================================")
     print("            ROBOTS.TXT CRAWLER AUDIT             ")
     print("==================================================")
-    
-    groups = parse_robots_groups(content)
-    blocked_agents = []
-    for agent in AI_CRAWLER_AGENTS:
-        group = select_robots_group(groups, agent)
-        if blocks_root(group):
-            blocked_agents.append(agent)
 
-    wildcard_group = select_robots_group(groups, "*")
-    wildcard_blocks_root = blocks_root(wildcard_group)
-                
-    if blocked_agents or wildcard_blocks_root:
+    blocked_agents = [entry for entry in result["agents"] if not entry["allowed"]]
+    if blocked_agents or not result["wildcard"]["allowed"]:
         print("WARNING: The following AI agents are blocked from crawling your root directory:")
-        if wildcard_blocks_root:
+        if not result["wildcard"]["allowed"]:
             print("  - User-agent: * (root access blocked for crawlers without a specific allow)")
-        for agent in blocked_agents:
-            print(f"  - User-agent: {agent} (root access blocked)")
+        for entry in blocked_agents:
+            print(
+                f"  - User-agent: {entry['token']} "
+                f"({entry['purpose']}; root access blocked)"
+            )
         print(
-            "\nThese rules may affect search, training, or user-directed retrieval "
-            "depending on the agent. Review each provider's current documentation."
+            "\nThese rules are policy signals, not access controls. "
+            "Review each provider's current documentation."
         )
     else:
         print("SUCCESS: No configured AI agents or wildcard directives are blocking root access.")
@@ -1440,7 +1540,11 @@ def check_robots(robots_path):
             "Root access is allowed under the parsed robots.txt rules; "
             "this does not guarantee indexing or citation."
         )
+    for entry in result["agents"]:
+        for warning in entry["warnings"]:
+            print(f"  {entry['token']}: {warning}")
     print("==================================================")
+    return result
 
 def generate_schema_data(filepath, schema_type, config, _content=None):
     if schema_type not in SUPPORTED_SCHEMA_TYPES:
@@ -1741,11 +1845,21 @@ def main():
     robots_sub = robots_parser.add_subparsers(dest="robots_action", help="Action")
     robots_audit = robots_sub.add_parser("audit", help="Audit robots.txt for AI crawler blocking rules")
     robots_audit.add_argument("filepath", help="Path to robots.txt")
+    robots_audit.add_argument(
+        "-f", "--format", choices=["text", "json"], default="text", help="Output format"
+    )
     robots_gen = robots_sub.add_parser(
         "generate",
         help="Generate a reviewable robots.txt draft for configured AI agents",
     )
-    robots_gen.add_argument("--disallow", nargs="*", default=[], help="Paths to disallow for non-AI crawlers")
+    robots_gen.add_argument(
+        "--preset", choices=["search-visible", "open"], default="search-visible",
+        help="Crawler policy preset",
+    )
+    robots_gen.add_argument(
+        "--disallow", nargs="*", default=[],
+        help="Paths to disallow in broadly allowed groups",
+    )
     robots_gen.add_argument("--sitemap", default="", help="URL of the sitemap")
     robots_gen.add_argument("--output", default="robots.txt", help="Output file path")
     robots_gen.add_argument("--dry-run", action="store_true", help="Preview without writing")
@@ -1872,6 +1986,7 @@ def main():
             content = generate_robots_txt(
                 disallow_paths=args.disallow or [],
                 sitemap_url=args.sitemap or "",
+                preset=args.preset,
             )
             if getattr(args, "dry_run", False):
                 print(content)
@@ -1881,7 +1996,7 @@ def main():
                     f.write(content)
                 print(f"robots.txt written to {args.output}")
         else:
-            check_robots(args.filepath)
+            check_robots(args.filepath, output_format=args.format)
 
     elif args.command == "schema":
         schema = generate_schema_data(args.filepath, args.type, config)

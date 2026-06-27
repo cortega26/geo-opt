@@ -231,8 +231,43 @@ declare module "geo-opt" {
   ): void;
 
   // ═══ Robots ═══
+  export type CrawlerPurpose = "search" | "training" | "user" | "control" | "legacy";
+  export interface CrawlerRegistryEntry {
+    token: string;
+    provider: string;
+    purpose: CrawlerPurpose;
+    robotsApplicable: boolean | null;
+    officialSource: string;
+    lastVerified: string;
+  }
+  export interface RobotsRule {
+    directive: "allow" | "disallow";
+    path: string;
+  }
+  export interface RobotsAgentAudit extends CrawlerRegistryEntry {
+    matchedGroup: string[] | null;
+    allowed: boolean;
+    matchedRule: RobotsRule | null;
+    warnings: string[];
+  }
+  export interface RobotsAuditReport {
+    registryVersion: string;
+    path: string;
+    wildcard: {
+      matchedGroup: string[] | null;
+      allowed: boolean;
+      matchedRule: RobotsRule | null;
+    };
+    agents: RobotsAgentAudit[];
+  }
+  export const CRAWLER_REGISTRY_VERSION: string;
+  export const AI_CRAWLER_REGISTRY: readonly CrawlerRegistryEntry[];
   export const AI_CRAWLER_AGENTS: string[];
-  export function checkRobots(robotsPath: string): void;
+  export function auditRobots(content: string, options?: { path?: string }): RobotsAuditReport;
+  export function checkRobots(
+    robotsPath: string,
+    options?: { path?: string; format?: "text" | "json" }
+  ): RobotsAuditReport | void;
 
   // ═══ JSON-LD validation ═══
   export function validateSchemaFile(filepath: string): void;
@@ -296,5 +331,6 @@ declare module "geo-opt" {
   export function generateRobotsTxt(options?: {
     disallowPaths?: string[];
     sitemapUrl?: string;
+    preset?: "search-visible" | "open";
   }): string;
 }

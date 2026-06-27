@@ -30,7 +30,13 @@ export {
   generateSchemaData,
   injectSchema,
 } from "./schema.js";
-export { checkRobots, AI_CRAWLER_AGENTS } from "./robots.js";
+export {
+  AI_CRAWLER_AGENTS,
+  AI_CRAWLER_REGISTRY,
+  CRAWLER_REGISTRY_VERSION,
+  auditRobots,
+  checkRobots,
+} from "./robots.js";
 export { validateSchemaFile } from "./validate.js";
 export {
   extractPageMetadata,
