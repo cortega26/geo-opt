@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -145,6 +145,106 @@ describe("validateSchemaFile — comportamiento de validación JSON-LD", () => {
     assert.ok(
       output.includes("Note:") || output.includes("not in the known-types list"),
       `Debería notar tipo desconocido, obtuvo: ${output}`
+    );
+  });
+
+  // ═══ Edge cases que faltaban (C3 del supplement de cobertura) ═══
+
+  it("lanza un error cuando el archivo existe pero no se puede leer (sin permisos)", () => {
+    const file = join(dir, "no-perms.md");
+    writeFileSync(file, "# Contenido válido\n");
+    // Quitar permisos de lectura
+    chmodSync(file, 0o000);
+
+    assert.throws(
+      () => {
+        validateSchemaFile(file);
+      },
+      /Failed to read file/,
+      "Debería lanzar error de lectura cuando el archivo no tiene permisos"
+    );
+  });
+
+  it("reporta JSON inválido dentro de un bloque como problema, no como crash", () => {
+    const file = join(dir, "bad-json.md");
+    // El regex de extracción requiere {} con @context. JSON inválido por trailing comma.
+    writeFileSync(file, '```json\n{ "@context": "https://schema.org", "@type": "Organization", "name": "Test", }\n```\n');
+
+    const { logs } = captureConsole(() => {
+      validateSchemaFile(file);
+    });
+    const output = logs.join("\n");
+    assert.ok(
+      output.includes("Invalid JSON"),
+      `Debería reportar JSON inválido, obtuvo: ${output}`
+    );
+  });
+
+  it("reporta problema cuando @context no es https://schema.org", () => {
+    const schema = JSON.stringify({
+      "@context": "https://schema.gov",
+      "@type": "Organization",
+      name: "Test",
+    });
+    const file = join(dir, "wrong-context.md");
+    writeFileSync(file, "```json\n" + schema + "\n```\n");
+
+    const { logs } = captureConsole(() => {
+      validateSchemaFile(file);
+    });
+    const output = logs.join("\n");
+    assert.ok(
+      output.includes("https://schema.org"),
+      `Debería mencionar el @context esperado, obtuvo: ${output}`
+    );
+    assert.ok(
+      output.includes("⚠️") || output.includes("Issues"),
+      `Debería reportar issues, obtuvo: ${output}`
+    );
+  });
+
+  it("reporta problema cuando @graph está vacío", () => {
+    // JSON-LD con @graph = [] — sin nodos que analizar
+    const schema = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [],
+    });
+    const file = join(dir, "empty-graph.md");
+    writeFileSync(file, "```json\n" + schema + "\n```\n");
+
+    const { logs } = captureConsole(() => {
+      validateSchemaFile(file);
+    });
+    const output = logs.join("\n");
+    assert.ok(
+      output.includes("No @graph array or root type found"),
+      `Debería reportar @graph vacío, obtuvo: ${output}`
+    );
+  });
+
+  it("reporta problema cuando un nodo del @graph no tiene @type", () => {
+    const schema = JSON.stringify({
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          name: "Sin tipo",
+        },
+        {
+          "@type": "Organization",
+          name: "Con tipo",
+        },
+      ],
+    });
+    const file = join(dir, "no-type.md");
+    writeFileSync(file, "```json\n" + schema + "\n```\n");
+
+    const { logs } = captureConsole(() => {
+      validateSchemaFile(file);
+    });
+    const output = logs.join("\n");
+    assert.ok(
+      output.includes("Node without @type"),
+      `Debería reportar nodo sin @type, obtuvo: ${output}`
     );
   });
 });

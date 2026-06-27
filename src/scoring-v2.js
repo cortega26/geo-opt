@@ -16,6 +16,7 @@
 import { preprocessContent } from "./text.js";
 import { PROFILES, isApplicable, notApplicableDimensions, resolveProfile } from "./profiles.js";
 import { observeContent } from "./observations.js";
+import { EVIDENCE_REGISTRY } from "./evidence.js";
 import {
   buildReportMeta,
   createFinding,
@@ -65,13 +66,15 @@ function scoreStructure(obs, profile) {
       createFinding({
         ruleId: "v2.structure.headings",
         category: "structure",
-        severity: "fail",
+        severity: "warn",
         message: obs.headingHierarchy.message,
         evidenceLabel: "heuristic",
         applicability: profile,
         observedFacts: { issues: obs.headingHierarchy.issues },
         remediation:
-          "Add a clear H2/H3 heading hierarchy without skipped levels so each section is addressable.",
+          obs.headingHierarchy.issues.includes("missing_h1")
+            ? "Add a single H1 heading as the page title so parsers can identify the main topic."
+            : "Fix skipped heading levels: " + obs.headingHierarchy.issues.join(", ") + ". Use a sequential H1→H2→H3 hierarchy without gaps.",
       })
     );
   }
@@ -81,6 +84,10 @@ function scoreStructure(obs, profile) {
     score += 5;
     details.push("Sections: All sections have adequate body content (+5 pts)");
   } else if (obs.sectionSelfContainment.status === "warn") {
+    const warnEmpty = obs.sectionSelfContainment.details
+      ?.filter((d) => d.isEmpty)
+      .map((d) => d.header)
+      .join(", ") ?? "";
     score += 2;
     details.push(`Sections: ${obs.sectionSelfContainment.message} (+2 pts)`);
     findings.push(
@@ -96,16 +103,22 @@ function scoreStructure(obs, profile) {
           emptySections: obs.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0,
         },
         remediation:
-          "Give every heading enough body content to stand on its own when retrieved out of context.",
+          warnEmpty
+            ? `Sections with thin body content: ${warnEmpty}. Expand each so it can stand alone when surfaced as an AI answer snippet.`
+            : "Give every heading enough body content to stand on its own when retrieved out of context.",
       })
     );
   } else {
+    const emptyDetails = obs.sectionSelfContainment.details
+      ?.filter((d) => d.isEmpty)
+      .map((d) => d.header)
+      .join(", ") ?? "";
     details.push(`Sections: ${obs.sectionSelfContainment.message} (+0 pts)`);
     findings.push(
       createFinding({
         ruleId: "v2.structure.empty_sections",
         category: "structure",
-        severity: "fail",
+        severity: "warn",
         message: obs.sectionSelfContainment.message,
         evidenceLabel: "heuristic",
         applicability: profile,
@@ -114,7 +127,9 @@ function scoreStructure(obs, profile) {
           emptySections: obs.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0,
         },
         remediation:
-          "Add substantive content under each heading; remove or merge empty placeholder sections.",
+          emptyDetails
+            ? `Sections with insufficient content: ${emptyDetails}. Expand each heading's body text so it stands on its own when retrieved out of context, or merge thin sections into parent topics.`
+            : "Add substantive content under each heading; remove or merge empty placeholder sections.",
       })
     );
   }
@@ -132,16 +147,19 @@ function scoreStructure(obs, profile) {
       createFinding({
         ruleId: "v2.structure.answer_first",
         category: "structure",
-        severity: "fail",
+        severity: "warn",
         message: obs.answerFirst.message,
         evidenceLabel: "experimental",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024"],
         observedFacts: {
           wordCount: obs.answerFirst.wordCount,
           hasDefinition: obs.answerFirst.hasDefinition,
         },
         remediation:
-          "Open with a direct, self-contained definition of the topic before adding supporting detail.",
+          obs.answerFirst.wordCount === 0
+            ? "Add an opening paragraph that defines the main topic directly. The first paragraph is the most likely to be surfaced as an AI-generated answer snippet."
+            : `Opening paragraph has ${obs.answerFirst.wordCount} words (optimal range: 40–90). Expand the intro to fully define the topic, or tighten it if too long.`,
       })
     );
   }
@@ -212,16 +230,17 @@ function scoreStatistics(obs, profile) {
         message: `${attr.statsWithoutNearbySource} of ${totalStats} statistics lack nearby source attribution.`,
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: {
           totalStats,
           statsWithNearbySource: attr.statsWithNearbySource,
           statsWithoutNearbySource: attr.statsWithoutNearbySource,
         },
-        remediation: "Cite a named source next to each statistic that currently lacks one.",
+        remediation: "Cite a named source next to each externally-sourced statistic that currently lacks one.",
       })
     );
   } else if (totalStats >= 3) {
-    // Zero attribution — strongly penalized
+    // Zero attribution — signals missing source transparency
     score += 2;
     details.push(
       `Statistics: ${totalStats} stats with NO source attribution (+2 pts — attribution required for full credit)`
@@ -230,17 +249,18 @@ function scoreStatistics(obs, profile) {
       createFinding({
         ruleId: "v2.statistics.attribution",
         category: "statistics",
-        severity: "fail",
-        message: `All ${totalStats} statistics lack nearby source attribution. Add sources and methodology.`,
+        severity: "warn",
+        message: `${totalStats} of ${totalStats} statistics lack nearby source attribution. Add sources and methodology where the data comes from external research.`,
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: {
           totalStats,
           statsWithNearbySource: attr.statsWithNearbySource,
           statsWithoutNearbySource: attr.statsWithoutNearbySource,
         },
         remediation:
-          "Attribute every statistic to a named, verifiable source and state methodology.",
+          "Attribute every statistic sourced from external research to a named, verifiable source and state methodology. Descriptive numbers (version, count, size) do not require attribution.",
       })
     );
   } else {
@@ -261,21 +281,22 @@ function scoreStatistics(obs, profile) {
   }
   // Zero-attribution stats get no density bonus
 
-  // Flag unattributed stats as adversarial signal
+  // Flag unattributed stats as low transparency signal
   if (attr.statsWithoutNearbySource >= 5 && attributionRatio < 0.3) {
     findings.push(
       createFinding({
         ruleId: "v2.statistics.implausible",
         category: "statistics",
-        severity: "fail",
-        message: `${attr.statsWithoutNearbySource} statistics without attribution — possible fabricated or unverified claims.`,
+        severity: "warn",
+        message: `${attr.statsWithoutNearbySource} of ${totalStats} statistics lack nearby source attribution — readers cannot verify these claims.`,
         evidenceLabel: "heuristic",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024"],
         observedFacts: {
           statsWithoutNearbySource: attr.statsWithoutNearbySource,
           attributionRatio: Math.round(attributionRatio * 100) / 100,
         },
-        remediation: "Verify each figure and attribute it, or remove unverifiable statistics.",
+        remediation: "Add a named source next to each externally-sourced statistic so readers can verify claims. Descriptive numbers (counts, versions, sizes) may not need attribution.",
       })
     );
   }
@@ -327,12 +348,13 @@ function scoreQuotations(obs, profile) {
         message: `${attr.quotesWithoutAttribution} of ${totalQuotes} quotes lack identifiable attribution.`,
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: {
           totalQuotes,
           quotesWithAttribution: attr.quotesWithAttribution,
           quotesWithoutAttribution: attr.quotesWithoutAttribution,
         },
-        remediation: "Attribute each quote to a named person with their title and context.",
+        remediation: "Attribute each quote to a named person with their title and context. Customer testimonials are fine without full attribution when marked as reviews.",
       })
     );
   } else {
@@ -341,16 +363,17 @@ function scoreQuotations(obs, profile) {
       createFinding({
         ruleId: "v2.quotations.attribution",
         category: "quotations",
-        severity: "fail",
-        message: `All ${totalQuotes} quotes lack attribution. Add speaker name, title, and context.`,
+        severity: "warn",
+        message: `${totalQuotes} of ${totalQuotes} quotes lack identifiable attribution. Add speaker name, title, and context to help readers assess credibility.`,
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: {
           totalQuotes,
           quotesWithAttribution: attr.quotesWithAttribution,
           quotesWithoutAttribution: attr.quotesWithoutAttribution,
         },
-        remediation: "Add a named speaker, title, and context to every quotation.",
+        remediation: "Attribute each quote to a named person with their title and context. Customer testimonials and product reviews are acceptable without full attribution when marked as such.",
       })
     );
   }
@@ -367,21 +390,22 @@ function scoreQuotations(obs, profile) {
     details.push("Quotations: Present (+2 pts)");
   }
 
-  // Flag unattributed quotes as adversarial
+  // Flag unattributed quotes as low transparency signal
   if (attr.quotesWithoutAttribution >= 3 && attributionRatio < 0.3) {
     findings.push(
       createFinding({
         ruleId: "v2.quotations.unattributed",
         category: "quotations",
-        severity: "fail",
-        message: `${attr.quotesWithoutAttribution} unattributed quotes — possible fabricated quotations.`,
+        severity: "warn",
+        message: `${attr.quotesWithoutAttribution} of ${totalQuotes} quotes lack identifiable attribution — readers cannot verify the quoted source.`,
         evidenceLabel: "heuristic",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024"],
         observedFacts: {
           quotesWithoutAttribution: attr.quotesWithoutAttribution,
           attributionRatio: Math.round(attributionRatio * 100) / 100,
         },
-        remediation: "Attribute or remove quotes that cannot be traced to a named source.",
+        remediation: "Attribute each quote to a named speaker with verifiable credentials, or clearly mark it as a testimonial/review if attribution is not possible.",
       })
     );
   }
@@ -441,12 +465,13 @@ function scoreCitations(obs, profile) {
         ruleId: "v2.citations.no_links",
         category: "citations",
         severity: "warn",
-        message: "No external hyperlinks found. Citations improve authority signals.",
+        message: "No external hyperlinks found. Citations improve authority signals for AI-driven search and retrieval.",
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: { externalLinkCount: 0 },
         remediation:
-          "Link key claims to authoritative external sources and add a references section.",
+          "Link key claims to authoritative external sources and add a references section. Even a few well-chosen citations measurably improve AI discoverability.",
       })
     );
   }

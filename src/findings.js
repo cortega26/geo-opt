@@ -511,13 +511,18 @@ export function mapLegacyToFindings({
 export function mapObservationsToFindings(observations, profile = "editorial") {
   const findings = [];
 
+  // Helper: cap observation "fail" status to "warn" for user-facing findings.
+  // Observations use "fail" internally for scoring signal strength, but
+  // user-facing findings should not assert failure on heuristics alone.
+  const capSeverity = (status) => (status === "fail" ? "warn" : status);
+
   // Heading hierarchy
   if (observations.headingHierarchy && observations.headingHierarchy.status !== "pass") {
     findings.push(
       createFinding({
         ruleId: "v2.observations.heading_hierarchy",
         category: "structure",
-        severity: observations.headingHierarchy.status,
+        severity: capSeverity(observations.headingHierarchy.status),
         message: observations.headingHierarchy.message,
         evidenceLabel: "heuristic",
         applicability: profile,
@@ -525,7 +530,9 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           issues: observations.headingHierarchy.issues,
         },
         remediation:
-          "Use a single H1 and avoid skipping heading levels so parsers can map the document outline.",
+          observations.headingHierarchy.issues.includes("missing_h1")
+            ? "Add a single H1 heading as the page title."
+            : "Fix heading hierarchy issues: " + (observations.headingHierarchy.issues || []).join(", ") + ". Use sequential H1→H2→H3 without skipping levels.",
       })
     );
   }
@@ -537,11 +544,16 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
   ) {
     const emptyCount =
       observations.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0;
+    const emptyNames = observations.sectionSelfContainment.details
+      ?.filter((d) => d.isEmpty)
+      .map((d) => d.header)
+      .slice(0, 5)
+      .join(", ") ?? "";
     findings.push(
       createFinding({
         ruleId: "v2.observations.section_containment",
         category: "structure",
-        severity: observations.sectionSelfContainment.status,
+        severity: capSeverity(observations.sectionSelfContainment.status),
         message: observations.sectionSelfContainment.message,
         evidenceLabel: "heuristic",
         applicability: profile,
@@ -550,7 +562,9 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           emptySections: emptyCount,
         },
         remediation:
-          "Give every heading enough body content to stand on its own when retrieved out of context.",
+          emptyNames
+            ? `Sections with insufficient body content: ${emptyNames}. Expand prose under each heading so it can stand alone in AI-generated answers, or merge thin sections.`
+            : "Give every heading enough body content to stand on its own when retrieved out of context.",
       })
     );
   }
@@ -561,16 +575,19 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
       createFinding({
         ruleId: "v2.observations.answer_first",
         category: "structure",
-        severity: observations.answerFirst.status,
+        severity: capSeverity(observations.answerFirst.status),
         message: observations.answerFirst.message,
         evidenceLabel: "experimental",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024"],
         observedFacts: {
           wordCount: observations.answerFirst.wordCount,
           hasDefinition: observations.answerFirst.hasDefinition,
         },
         remediation:
-          "Open with a direct, self-contained definition of the topic before adding supporting detail.",
+          observations.answerFirst.wordCount === 0
+            ? "Add an opening paragraph that clearly defines the main topic — AI engines surface intro paragraphs as direct answers."
+            : `Expand or tighten the opening paragraph (currently ${observations.answerFirst.wordCount} words, optimal: 40–90) to clearly define the topic.`,
       })
     );
   }
@@ -581,10 +598,11 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
       createFinding({
         ruleId: "v2.observations.attribution",
         category: "statistics",
-        severity: observations.attributionProximity.status,
+        severity: capSeverity(observations.attributionProximity.status),
         message: observations.attributionProximity.message,
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: {
           statsWithNearbySource: observations.attributionProximity.statsWithNearbySource,
           statsWithoutNearbySource: observations.attributionProximity.statsWithoutNearbySource,
@@ -592,18 +610,20 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           quotesWithoutAttribution: observations.attributionProximity.quotesWithoutAttribution,
         },
         remediation:
-          "Place a named source next to each statistic and quotation so claims are verifiable.",
+          "Place a named source next to each externally-sourced statistic and quotation so claims are verifiable. Descriptive numbers (version, count) do not require attribution.",
       })
     );
   }
 
   // Content freshness
   if (observations.contentFreshness && observations.contentFreshness.status !== "pass") {
+    const hasPublished = !!observations.contentFreshness.publishedDate;
+    const hasReviewed = !!observations.contentFreshness.reviewedDate;
     findings.push(
       createFinding({
         ruleId: "v2.observations.freshness",
         category: "citations",
-        severity: observations.contentFreshness.status,
+        severity: capSeverity(observations.contentFreshness.status),
         message: observations.contentFreshness.message,
         evidenceLabel: "heuristic",
         applicability: profile,
@@ -611,7 +631,12 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           publishedDate: observations.contentFreshness.publishedDate,
           reviewedDate: observations.contentFreshness.reviewedDate,
         },
-        remediation: "Add explicit published and reviewed dates so freshness can be assessed.",
+        remediation:
+          hasPublished && !hasReviewed
+            ? "Add a 'Last reviewed' date near the published date so readers and AI crawlers can assess freshness."
+            : !hasPublished && hasReviewed
+              ? "Add the original publication date alongside the review date."
+              : "Add explicit 'Published' and 'Last reviewed' dates so content freshness can be assessed by readers and AI crawlers.",
       })
     );
   }
@@ -622,17 +647,20 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
       createFinding({
         ruleId: "v2.observations.link_quality",
         category: "citations",
-        severity: observations.linkQuality.status,
+        severity: capSeverity(observations.linkQuality.status),
         message: observations.linkQuality.message,
         evidenceLabel: "strong",
         applicability: profile,
+        sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],
         observedFacts: {
           externalLinkCount: observations.linkQuality.externalLinkCount,
           hasSourcesSection: observations.linkQuality.hasSourcesSection,
           hasExcessiveLinks: observations.linkQuality.hasExcessiveLinks,
         },
         remediation:
-          "Link key claims to authoritative external sources and avoid excessive low-value links.",
+          observations.linkQuality.hasExcessiveLinks
+            ? `Reduce excessive outbound links (${observations.linkQuality.externalLinkCount} found). Keep only relevant, authoritative citations that support your claims.`
+            : "Link key claims to authoritative external sources and add a dedicated references section.",
       })
     );
   }
