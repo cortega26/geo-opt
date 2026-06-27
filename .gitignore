@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Python bytecache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Agent-local state
+.agents/local/
+.agents/tmp/
+.agents/**/*.local.*
+.agents/skills/*
+!.agents/skills/geo-optimization/
+!.agents/skills/geo-optimization/**
+.agents/skills/geo-optimization/**/__pycache__/
+.agents/skills/geo-optimization/**/*.py[cod]
+.agents/skills/geo-optimization/**/*.local.*
+
+# Project specific
+geo_config.json
+.claude/
+.continue/
+.codegraph/
+daemon.pid

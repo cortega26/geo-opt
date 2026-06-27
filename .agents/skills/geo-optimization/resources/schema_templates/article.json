@@ -1,28 +1,28 @@
 {
   "@context": "https://schema.org",
-  "@type": "NewsArticle",
-  "headline": "[Insert Headline - keep under 110 characters]",
-  "image": [
-    "[Insert Image URL 1x1]",
-    "[Insert Image URL 4x3]",
-    "[Insert Image URL 16x9]"
-  ],
-  "datePublished": "2026-06-25T12:00:00+00:00",
-  "dateModified": "2026-06-25T12:00:00+00:00",
-  "author": [{
-    "@type": "Person",
-    "name": "[Insert Author Name]",
-    "jobTitle": "[Insert Job Title, e.g., Senior Security Researcher]",
-    "sameAs": "[Insert Author LinkedIn/Twitter URL]"
-  }],
-  "publisher": {
-    "@type": "Organization",
-    "name": "[Insert Organization Name]",
-    "logo": {
-      "@type": "ImageObject",
-      "url": "[Insert Organization Logo URL]"
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://example.com/#organization",
+      "name": "Example Publisher",
+      "url": "https://example.com"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://example.com/#author",
+      "name": "Example Author"
+    },
+    {
+      "@type": "NewsArticle",
+      "@id": "https://example.com/#article",
+      "headline": "Example Article Headline",
+      "description": "A concise description extracted from the source content.",
+      "author": {
+        "@id": "https://example.com/#author"
+      },
+      "publisher": {
+        "@id": "https://example.com/#organization"
+      }
     }
-  },
-  "description": "[Insert short description / summary of the article - ideally 100-150 characters]",
-  "articleBody": "[Insert plain text of the article body here or leave for search engine extraction]"
+  ]
 }

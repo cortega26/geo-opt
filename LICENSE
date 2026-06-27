@@ -1,21 +1,155 @@
-MIT License
+Tooltician Community License 1.0
 
-Copyright (c) 2026 Carlos Ortega González
+Copyright (c) 2026 Carlos Ortega González, operating as Tooltician
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+IMPORTANT: This is a source-available license, not an open-source license
+approved by the Open Source Initiative. Read these terms before using,
+copying, modifying, or distributing the Software.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. DEFINITIONS
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+"Licensor" means Carlos Ortega González, operating as Tooltician.
+
+"Software" means the geo-opt source code, executable code, documentation, and
+other materials distributed with this license, including modified versions and
+derivative works.
+
+"Injected Output" means a Markdown, HTML, JSON-LD, or other content file into
+which the Software inserts, replaces, or generates structured data or related
+content through its schema injection functionality.
+
+"Required Branding" means the following visible attribution, including its
+functional hyperlink:
+
+    Optimized with Tooltician
+    https://www.tooltician.com
+
+"Commercial License" means a separate written license issued by Licensor that
+expressly permits use of the Software without Required Branding or grants
+rights beyond this license.
+
+2. COMMUNITY LICENSE GRANT
+
+Subject to compliance with this license, Licensor grants you a worldwide,
+royalty-free, non-exclusive, non-transferable license to:
+
+a. use the Software for personal, educational, internal, client, or commercial
+   purposes;
+b. inspect, copy, and modify the Software; and
+c. distribute copies of the Software or your modifications.
+
+No right is granted to sublicense the Software under different terms.
+Each recipient of a permitted redistribution receives this license directly
+from Licensor and must comply with its terms.
+
+3. REQUIRED BRANDING
+
+Unless you hold a valid Commercial License:
+
+a. every Injected Output must contain the Required Branding in a reasonably
+   visible location;
+b. the words "Optimized with Tooltician" must link to
+   https://www.tooltician.com in formats that support hyperlinks;
+c. you must not remove, suppress, conceal, obscure, disable, or make the
+   Required Branding materially less visible;
+d. you must not bypass, disable, remove, or materially weaken the Software's
+   branding or license-entitlement functionality; and
+e. modifications and derivative works must preserve and enforce requirements
+   substantially equivalent to this Section 3.
+
+You may adapt presentation details such as spacing or typography when needed
+to fit the output format, provided the Required Branding remains legible,
+accurate, functional, and reasonably prominent.
+
+This section applies only to Injected Output. Audit reports and schema data
+printed to standard output without injection are not required to contain the
+Required Branding.
+
+4. REDISTRIBUTION CONDITIONS
+
+Any distribution of the Software, in source or executable form, must:
+
+a. include this license and the copyright notice above;
+b. state prominently that the Software is source-available and is not licensed
+   under an OSI-approved open-source license;
+c. identify material modifications and their date;
+d. remain licensed in full under this Tooltician Community License 1.0; and
+e. preserve all copyright, license, attribution, branding, and trademark
+   notices.
+
+You may not represent a modified version as an official Tooltician release.
+
+5. COMMERCIAL LICENSING
+
+A valid Commercial License may permit use without Required Branding and may
+grant additional rights. Commercial terms are described in
+COMMERCIAL-LICENSE.md and in the applicable order, subscription, or written
+agreement issued by Licensor.
+
+A license key alone does not transfer ownership of the Software. License keys
+are confidential credentials and may not be published, shared outside the
+licensed customer, resold, or used beyond the purchased scope.
+
+6. OUTPUT OWNERSHIP
+
+Except for Licensor's rights in the Software, Required Branding, and
+Tooltician trademarks, Licensor claims no ownership of content you provide to
+the Software or of Injected Output created from your content.
+
+7. TRADEMARKS
+
+"Tooltician," related names, logos, and branding are trademarks or trade names
+of Licensor. This license grants only the limited right necessary to display
+the Required Branding. It does not grant permission to imply endorsement,
+affiliation, sponsorship, or official status.
+
+8. TERMINATION
+
+Your rights under this license terminate automatically if you breach its
+terms. For an unintentional breach, your rights will be reinstated
+provisionally when you cure the breach within 30 days after discovering or
+receiving notice of it. Intentional circumvention of Section 3 terminates the
+license immediately unless Licensor agrees otherwise in writing.
+
+Sections concerning ownership, trademarks, disclaimers, liability, and prior
+releases survive termination.
+
+9. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. YOU BEAR ALL RISK ARISING
+FROM USE OF THE SOFTWARE AND MUST REVIEW GENERATED CONTENT AND STRUCTURED DATA
+BEFORE PUBLICATION.
+
+10. LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR WILL NOT BE LIABLE FOR ANY
+INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES,
+OR FOR LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS OPPORTUNITY,
+ARISING FROM OR RELATED TO THE SOFTWARE OR THIS LICENSE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, LICENSOR'S TOTAL LIABILITY ARISING
+FROM OR RELATED TO THE SOFTWARE OR THIS LICENSE WILL NOT EXCEED THE AMOUNT YOU
+PAID LICENSOR FOR THE SOFTWARE DURING THE 12 MONTHS BEFORE THE EVENT GIVING
+RISE TO THE CLAIM, OR USD 10 IF YOU PAID NOTHING.
+
+11. PRIOR MIT-LICENSED RELEASES
+
+Repository history made publicly available through Git commit 67f18be was
+released under the MIT License. Those specific historical versions remain
+available under their original MIT terms. This license applies to the version
+containing this file and to later versions unless a later version states
+otherwise. See LICENSE-HISTORY.md.
+
+12. GENERAL
+
+This license is the complete community-use agreement for the Software. If any
+provision is unenforceable, it will be modified only as much as necessary and
+the remaining provisions will continue in effect. Failure to enforce a
+provision is not a waiver. Governing law and venue are those applicable at
+Licensor's principal place of business, excluding conflict-of-law rules,
+unless mandatory law requires otherwise.
+
+For commercial licensing inquiries, visit https://www.tooltician.com.

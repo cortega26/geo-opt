@@ -1,22 +1,18 @@
 {
   "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
+  "@graph": [
     {
-      "@type": "Question",
-      "name": "[Insert Question 1]",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "[Insert concise, answer-first, fact-filled answer 1]"
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "[Insert Question 2]",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "[Insert concise, answer-first, fact-filled answer 2]"
-      }
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Example question",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "An answer extracted from the corresponding source section."
+          }
+        }
+      ]
     }
   ]
 }

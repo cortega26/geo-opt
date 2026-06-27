@@ -1,47 +1,29 @@
 {
   "@context": "https://schema.org",
-  "@type": "Product",
-  "name": "[Insert Product Name]",
-  "image": [
-    "[Insert Product Image URL 1x1]",
-    "[Insert Product Image URL 4x3]",
-    "[Insert Product Image URL 16x9]"
-  ],
-  "description": "[Insert detailed product description emphasizing unique value and features]",
-  "sku": "[Insert SKU]",
-  "mpn": "[Insert MPN]",
-  "brand": {
-    "@type": "Brand",
-    "name": "[Insert Brand Name]"
-  },
-  "review": {
-    "@type": "Review",
-    "reviewRating": {
-      "@type": "Rating",
-      "ratingValue": "[Insert Rating, e.g., 4]",
-      "bestRating": "5"
-    },
-    "author": {
-      "@type": "Person",
-      "name": "[Insert Reviewer Name]"
-    }
-  },
-  "aggregateRating": {
-    "@type": "AggregateRating",
-    "ratingValue": "[Insert Average Rating, e.g., 4.7]",
-    "reviewCount": "[Insert Number of Reviews, e.g., 89]"
-  },
-  "offers": {
-    "@type": "Offer",
-    "url": "[Insert Product Purchase URL]",
-    "priceCurrency": "USD",
-    "price": "[Insert Price, e.g., 119.99]",
-    "priceValidUntil": "2027-01-01",
-    "itemCondition": "https://schema.org/NewCondition",
-    "availability": "https://schema.org/InStock",
-    "seller": {
+  "@graph": [
+    {
       "@type": "Organization",
-      "name": "[Insert Seller Name]"
+      "@id": "https://example.com/#organization",
+      "name": "Example Publisher",
+      "url": "https://example.com"
+    },
+    {
+      "@type": "Product",
+      "@id": "https://example.com/#product",
+      "name": "Example Product",
+      "description": "A concise description extracted from the source content.",
+      "brand": {
+        "@id": "https://example.com/#organization"
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "49.00",
+        "priceCurrency": "USD",
+        "availability": "https://schema.org/InStock",
+        "seller": {
+          "@id": "https://example.com/#organization"
+        }
+      }
     }
-  }
+  ]
 }

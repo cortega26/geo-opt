@@ -1,15 +1,4 @@
 {
-  "author": {
-    "name": "Carlos Ortega González",
-    "jobTitle": "Sr. Software Automation and Data Analyst",
-    "sameAs": "https://www.linkedin.com/in/cortega26/"
-  },
-  "publisher": {
-    "name": "Tooltician",
-    "url": "https://www.tooltician.com",
-    "logo": "https://www.tooltician.com/logo.png"
-  },
-  "signature": "Optimized by [Tooltician](https://www.tooltician.com)",
   "acronyms": {
     "AWS": "Amazon Web Services",
     "GCP": "Google Cloud Platform",
