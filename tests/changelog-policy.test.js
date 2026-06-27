@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const checkerPath = path.join(__dirname, "..", "scripts", "check-changelog.js");
+const ciWorkflowPath = path.join(__dirname, "..", ".github", "workflows", "ci.yml");
 
 function run(command, args, cwd) {
   return spawnSync(command, args, {
@@ -57,4 +58,13 @@ test("changelog policy rejects code-only changes and accepts documented changes"
   } finally {
     fs.rmSync(repository, { recursive: true, force: true });
   }
+});
+
+test("CI fetches the base branch required by the changelog policy", () => {
+  const workflow = fs.readFileSync(ciWorkflowPath, "utf8");
+  assert.match(
+    workflow,
+    /uses: actions\/checkout@v4\s+with:\s+fetch-depth: 0/,
+    "The pull-request checkout must include origin/<base> for three-dot changelog diffs"
+  );
 });
