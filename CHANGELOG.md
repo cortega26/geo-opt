@@ -46,11 +46,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - A versioned, purpose-aware crawler registry and structured `robots.txt`
   audits with JSON CLI output.
 - Explicit `search-visible` and `open` crawler-policy presets with JavaScript
-  and Python parity.
+  and Python compatibility.
 - `geo-opt validate` for inspecting JSON-LD blocks, required Schema.org fields,
   and malformed structured data.
-- A prepublish build that protects the Pro licensing module with obfuscation and
-  runtime integrity verification.
+- A prepublish obfuscation and runtime-integrity mechanism for the Pro licensing
+  module. The current source-mutating release workflow is documented as a
+  pre-release hardening item rather than a security boundary.
 
 ### Changed
 
@@ -58,13 +59,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   not platform facts.
 - Recommendations are profile-aware: documentation is no longer told to add
   quotes; legal content is no longer told to add decorative statistics.
-- Python skill parity for recursive audits, batch injection, aggregate reports,
-  `llms.txt`, and AI-crawler-friendly `robots.txt` generation.
-- TypeScript type declarations (`index.d.ts`) covering all 37 public API exports.
+- Python compatibility for legacy audits, batch injection, aggregate reports,
+  `llms.txt`, and purpose-aware `robots.txt` generation. V2 and technical HTML
+  audits remain Node-only.
+- TypeScript declarations (`index.d.ts`) for the public API available before
+  the experimental v2 export; complete export/type conformance remains a
+  pre-release gate.
 - CI/CD pipeline (`.github/workflows/ci.yml`) running lint, format, JS tests,
-  Python parity tests, changelog policy, and npm audit on PRs and pushes to main.
-
-### Changed
+  Python compatibility tests, changelog policy, and npm audit on PRs and pushes
+  to main.
 
 - Audit reports now include `reportVersion`, `modelVersion`, and `generatedAt`
   metadata fields alongside the existing breakdown and recommendations.
@@ -86,8 +89,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
-- Completed Python parity for versioned, evidence-labeled audit findings and
-  report metadata, with a cross-runtime fixture test and aligned Markdown
+- Completed Python compatibility for the legacy versioned, evidence-labeled
+  audit report on a shared cross-runtime fixture, with aligned Markdown
   blockquote counting.
 - Ensured the main CI workflow fetches pull-request base history before running
   the changelog policy check.
@@ -105,6 +108,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   single-file `injectSchema` already enforced.
 - Test coverage for `bin/cli.js` raised from 61% to 80%, covering error
   paths in `audit`, `inject`, `llmstxt`, `config`, and `init` commands.
+
+### Docs
+
+- Added a documentation-governance model defining sources of truth,
+  invariants, public contracts, plan lifecycle and change-triggered reviews.
+- Reconciled the architecture guide and bundled skill with the actual
+  Node/Python capability matrix, including Node-only v2 and technical audits.
+- Clarified that the v2 corpus provides regression characterization rather than
+  statistical calibration against live retrieval or citation outcomes.
+- Documented Node.js 20's EOL status while preserving the current manifest as
+  the implementation source of truth until the runtime migration lands.
 
 ### Security
 
@@ -139,12 +153,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Test coverage measurement via `npm run test:coverage` (c8).
 - Added an enforced changelog policy for code changes, with local verification
   and GitHub Actions coverage.
-- Added CLI contract and Python parity coverage for JSON output, robots
+- Added CLI contract and Python compatibility coverage for JSON output, robots
   semantics, config failures, HTML schema replacement, and symlink write guards.
 
 ### Changed
 
-- Changed `npm run check` to include the Python parity test suite.
+- Changed `npm run check` to include the Python compatibility test suite.
 - Reframed the GEO score documentation as an uncalibrated heuristic inspired by
   the GEO framework.
 

@@ -12,9 +12,16 @@ description: >
 
 > **Implementation note**: This skill is backed by two implementations:
 >
-> - **`node bin/cli.js`** (JavaScript/Node.js) — the canonical source CLI. Use it for CI/CD and local development from a repository checkout. The public npm package has not been released.
-> - **`python3 scripts/geo_optimizer.py`** — Python port, used by this skill for agent-driven optimization. Both produce identical results.
->   See [architecture.md](../../../docs/architecture.md) for details.
+> - **`node bin/cli.js`** (JavaScript/Node.js) — the canonical source CLI. Use
+>   it for v2, the JavaScript API, CI/CD and local development from a repository
+>   checkout. The public npm package has not been released.
+> - **`python3 scripts/geo_optimizer.py`** — capability-scoped Python
+>   compatibility port used by this skill. It supports the legacy v1 audit and
+>   selected schema, robots, `llms.txt`, batch, config and injection workflows;
+>   it does not currently support v2 or the technical HTML audit.
+>
+> See the normative capability matrix in
+> [architecture.md](../../../docs/architecture.md). Do not assume full parity.
 
 This skill guides the agent in optimizing web content (HTML, Markdown, copy) to be highly searchable, indexable, and referenceable by Retrieval-Augmented Generation (RAG) pipelines in AI search engines.
 
@@ -36,6 +43,13 @@ graph TD
 ```
 
 ### Phase 0: Setup and Custom Configuration
+
+When using the Python port from a repository checkout, install its declared
+dependencies:
+
+```bash
+python3 -m pip install -r scripts/requirements.txt
+```
 
 Before performing audits, create a `geo_config.json` configuration file in the root of the skill or project folder to store default details for Schema.org and acronym verification:
 
@@ -89,7 +103,8 @@ Understand the primary domain of the content. Optimization priorities shift depe
 
 ### Phase 2: Audit Content Using Heuristics
 
-Before making edits, run the CLI audit tool to calculate the baseline GEO score (0-100):
+Before making edits, run the Python compatibility CLI to calculate the legacy
+v1 baseline GEO score (0-100):
 
 ```bash
 # Human-readable output format (default)
@@ -222,7 +237,7 @@ Search feature.
     ```
 2.  For markdown files, it appends a ```json code block containing the structured data. For HTML files, it inserts or updates a `<script type="application/ld+json">` tag within the head or body tags.
 3.  Free injections include a visible `Optimized with Tooltician` credit. Tooltician Pro users may pass `--no-branding` with a license key configured through `TOOLTICIAN_LICENSE_KEY` or `license.key` in `geo_config.json`.
-4.  The helper may show an infrequent, non-blocking support reminder after interactive Community use. It is suppressed for Pro and automation and can be disabled with `geo_optimizer.py config set reminders false`.
+4.  The helper may show an infrequent, non-blocking support reminder after successful interactive Community injections. It is suppressed for Pro and automation and can be disabled with `geo_optimizer.py config set reminders false`.
 
 ---
 
@@ -233,7 +248,7 @@ Check that AI bot crawlers are not blocked from indexing your optimized pages:
 1.  Find the `robots.txt` path (usually at root, e.g. `public/robots.txt`).
 2.  Run the audit command:
     ```bash
-    python3 scripts/geo_optimizer.py robots <path-to-robots.txt>
+    python3 scripts/geo_optimizer.py robots audit <path-to-robots.txt>
     ```
 3.  Review whether the site's intended policy allows or blocks each relevant
     agent. Search, training, and user-directed agents have different purposes;
@@ -339,14 +354,15 @@ directory. Additional patterns can be added via `geo_config.json`:
 
 ### Profile-aware auditing (v2, experimental)
 
-The v2 scoring model (`--model v2`) adjusts expectations based on content type:
+The v2 scoring model adjusts expectations based on content type. It is
+currently Node-only and its report contract remains experimental:
 
 ```bash
 # Auto-detect profile
-geo-opt audit ./docs --model v2
+node bin/cli.js audit ./docs --recursive --model v2
 
 # Explicit profile override
-python3 scripts/geo_optimizer.py audit ./docs --model v2 --profile documentation
+node bin/cli.js --config geo_config.json audit ./docs --recursive --model v2
 ```
 
 Available profiles: `auto` (default), `documentation`, `open-source`,
@@ -370,7 +386,7 @@ Available profiles: `auto` (default), `documentation`, `open-source`,
 - **Needs Work** (45–64 %) — structural or attribution gaps.
 - **At Risk** (<45 %) — multiple quality issues.
 
-Set `profile` in `geo_config.json` to lock a profile for all audits:
+Set `profile` in `geo_config.json` to lock a profile for Node v2 audits:
 
 ```json
 {

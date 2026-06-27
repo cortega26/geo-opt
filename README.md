@@ -7,11 +7,11 @@ clarity; generates and validates JSON-LD; reviews crawler controls; and
 supports batch and continuous integration workflows. Processing is local by
 default, with no telemetry or silent content uploads.
 
-The audit score is a project heuristic calibrated against a 32-fixture
-characterization corpus. It is not a prediction or guarantee of ranking,
-retrieval, inclusion, mention, or citation by any search or artificial
-intelligence (AI) system. See `docs/architecture.md` for calibration
-limitations and known blind spots.
+The audit score is a project heuristic characterized against a 32-fixture
+regression corpus. It is not statistically calibrated and is not a prediction
+or guarantee of ranking, retrieval, inclusion, mention, or citation by any
+search or artificial intelligence (AI) system. See `docs/architecture.md` for
+characterization limitations and known blind spots.
 
 ## Why teams use geo-opt
 
@@ -24,7 +24,7 @@ limitations and known blind spots.
 | `robots.txt` audit and generation             | Make crawler policy explicit and detect blocking rules before publication                           |
 | `llms.txt` generation and audit               | Produce and check files that follow the current community proposal                                  |
 | Dry runs, backups, and path confinement       | Preview content changes and reduce accidental writes outside the working tree                       |
-| Node.js and Python implementations            | Use the npm-oriented runtime or the bundled agent skill with aligned behavior                       |
+| Node.js and Python implementations            | Use the canonical Node runtime or the capability-scoped Python compatibility port                   |
 
 `geo-opt` is designed for evidence-backed remediation: it reports observable
 content and delivery signals, then leaves editorial and publication decisions
@@ -33,7 +33,11 @@ with the operator.
 ## Project status
 
 The public npm package has not been released. Use the repository checkout for
-the current implementation. The project requires Node.js 20 or newer.
+the current implementation. The manifest currently accepts Node.js 20 or newer,
+but Node.js 20 reached
+[end of life](https://nodejs.org/en/about/previous-releases) on 2026-03-24.
+Until roadmap plan 033 updates the manifest and CI, use Node.js 22 or 24 LTS for
+development rather than treating Node 20 as a supported production target.
 
 ```bash
 git clone https://github.com/cortega26/GEO-skill.git
@@ -47,6 +51,17 @@ node bin/cli.js audit path/to/content.md --model v2
 
 Run `node bin/cli.js --help` or append `--help` to any command to inspect the
 current interface.
+
+### Runtime capability status
+
+Node.js is the canonical CLI/library implementation. The bundled Python script
+supports the legacy v1 audit plus selected schema, robots, `llms.txt`, batch,
+configuration and injection workflows. Python does not currently implement v2,
+content profiles, the technical HTML audit or the typed JavaScript API.
+
+The normative capability matrix is in
+[`docs/architecture.md`](docs/architecture.md). Do not assume that similarly
+named Node and Python functions imply full parity.
 
 ## Core workflows
 
@@ -278,10 +293,12 @@ distinction and current limitations.
 
 ## JavaScript library
 
-The package entry point exports the same building blocks used by the CLI,
-including scoring, discovery, batch aggregation, schema generation, crawler
-inspection, validation, `llms.txt` helpers, and local preference management.
-Type declarations are provided in [`index.d.ts`](index.d.ts).
+The package entry point exports the building blocks used by the CLI, including
+scoring, discovery, batch aggregation, schema generation, crawler inspection,
+validation, `llms.txt` helpers, technical HTML observations and local preference
+management. Type declarations are provided in [`index.d.ts`](index.d.ts), but
+the experimental v2 export is not yet part of the verified typed contract; that
+gap is a release blocker in roadmap plan 031.
 
 ```javascript
 import { loadConfig, scoreContent } from "geo-opt";
@@ -292,17 +309,24 @@ const { score, report } = scoreContent(markdown, "article.md", config);
 
 ## Development and verification
 
-| Check               | Command                     |
-| ------------------- | --------------------------- |
-| Full project check  | `npm run check`             |
-| JavaScript tests    | `npm test`                  |
-| Python parity tests | `npm run test:python`       |
-| Lint                | `npm run lint`              |
-| Format check        | `npm run format:check`      |
-| Package preview     | `npm pack --dry-run --json` |
+| Check              | Command                     |
+| ------------------ | --------------------------- |
+| Full project check | `npm run check`             |
+| JavaScript tests   | `npm test`                  |
+| Python port tests  | `npm run test:python`       |
+| Lint               | `npm run lint`              |
+| Format check       | `npm run format:check`      |
+| Package preview    | `npm pack --dry-run --json` |
 
-The [architecture and parity guide](docs/architecture.md) explains module
-ownership and the relationship between the Node.js and Python implementations.
+The [architecture and contract guide](docs/architecture.md) explains module
+ownership and the capability-scoped relationship between the Node.js and Python
+implementations.
+
+Documentation sources of truth, invariants and update triggers are defined in
+the [documentation governance model](docs/documentation-governance.md).
+Maintainers use the local `plans/README.md` as the canonical execution index;
+dated audits and archived plans are evidence rather than current instructions.
+
 Report reproducible defects through
 [GitHub Issues](https://github.com/cortega26/GEO-skill/issues).
 

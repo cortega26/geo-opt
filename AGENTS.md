@@ -6,10 +6,11 @@ Canonical instructions for AI coding agents working in this repository.
 ## Project
 
 `geo-opt` is a source-available CLI tool for Generative Engine Optimization
-(GEO). It audits Markdown/HTML content with an uncalibrated 0–100 heuristic
-inspired by the Princeton GEO framework (KDD 2024). It also generates,
-injects, and validates JSON-LD Schema.org structured data; audits
-`robots.txt`; and supports `llms.txt`, batch, and CI workflows.
+(GEO). It provides a legacy 0–100 heuristic and an experimental,
+profile-aware v2 model characterized against repository fixtures. Neither is a
+ranking or citation predictor. The project also generates, injects, and
+validates JSON-LD Schema.org structured data; audits `robots.txt`; and supports
+`llms.txt`, batch, and CI workflows.
 
 Current releases are source-available under the Tooltician Community License
 1.0, with separate commercial licensing for branding-free use.
@@ -18,7 +19,11 @@ Current releases are source-available under the Tooltician Community License
 
 - `src/` contains the JavaScript/Node.js ESM implementation published as the
   npm package `geo-opt`.
-  - `scoring.js` handles GEO scoring.
+  - `scoring.js` handles legacy v1 scoring.
+  - `scoring-v2.js`, `profiles.js`, and `observations.js` implement the
+    experimental profile-aware model.
+  - `findings.js` and `evidence.js` define report findings and evidence metadata.
+  - `technical.js` exposes the pure local technical HTML audit.
   - `schema.js` generates Schema.org JSON-LD.
   - `text.js` extracts and normalizes content.
   - `robots.js` audits AI crawler access.
@@ -30,31 +35,34 @@ Current releases are source-available under the Tooltician Community License
 - `.agents/skills/geo-optimization/` contains the bundled GEO optimization
   agent skill.
 - `.agents/skills/geo-optimization/scripts/geo_optimizer.py` is the Python 3
-  parity implementation used by the bundled skill.
+  compatibility port used by the bundled skill.
 - `tests/` contains Node.js tests using `node:test`.
 - `.agents/skills/geo-optimization/scripts/test_optimizer.py` contains Python
-  parity tests using `unittest`.
+  compatibility and cross-runtime tests using `unittest`.
 
-When a behavior exists in both the Node.js CLI/library and the Python skill
-script, keep them functionally aligned unless the change explicitly documents a
-reason for divergence.
+Node.js is canonical. The capability matrix in `docs/architecture.md` defines
+which behavior is equivalent, compatible or Node-only. A new Node capability
+requires an explicit matrix decision, not automatic duplication in Python.
 
 ## Commands
 
-| Purpose            | Command                                                             |
-| ------------------ | ------------------------------------------------------------------- |
-| Test JavaScript    | `npm test`                                                          |
-| Test Python parity | `python3 .agents/skills/geo-optimization/scripts/test_optimizer.py` |
-| Lint               | `npm run lint`                                                      |
-| Format check       | `npm run format:check`                                              |
-| Format apply       | `npm run format`                                                    |
-| Changelog policy   | `npm run changelog:check`                                           |
-| Full check         | `npm run check`                                                     |
-| Run CLI            | `node bin/cli.js <command> [args]`                                  |
-| Package preview    | `npm pack --dry-run --json`                                         |
+| Purpose          | Command                                                             |
+| ---------------- | ------------------------------------------------------------------- |
+| Test JavaScript  | `npm test`                                                          |
+| Test Python port | `python3 .agents/skills/geo-optimization/scripts/test_optimizer.py` |
+| Lint             | `npm run lint`                                                      |
+| Format check     | `npm run format:check`                                              |
+| Format apply     | `npm run format`                                                    |
+| Changelog policy | `npm run changelog:check`                                           |
+| Full check       | `npm run check`                                                     |
+| Run CLI          | `node bin/cli.js <command> [args]`                                  |
+| Package preview  | `npm pack --dry-run --json`                                         |
 
 Before handing off code changes, run checks proportional to the risk. For most
-changes, prefer `npm run check`, the Python parity test, and `git diff --check`.
+changes, prefer `npm run check`, the Python port test, and `git diff --check`.
+
+The manifest still accepts Node.js 20, but that runtime is EOL. Use Node.js 22
+or 24 LTS for development until plan 033 updates the supported range and CI.
 
 ## CodeGraph
 
@@ -131,6 +139,26 @@ section of `CHANGELOG.md`. CI and `npm run check` enforce this through
 
 Use concise bullets grouped under Keep a Changelog-style sections such as
 `Added`, `Changed`, `Fixed`, `Security`, and `Docs`.
+
+## Documentation governance
+
+`docs/documentation-governance.md` defines document classes, sources of truth,
+invariants, public contracts and update triggers. Apply it to every behavior or
+documentation change.
+
+Key rules:
+
+- `plans/README.md` is the maintainer-local source of truth for current
+  execution order; active plan files are handoffs and `plans/archive/` is
+  historical evidence.
+- Runtime behavior and tests outrank prose when they disagree.
+- CLI changes require review of README, bundled skill, capability matrix, tests
+  and changelog.
+- Public export/report changes require synchronized `src/index.js`,
+  `index.d.ts`, contract tests and architecture documentation.
+- Python support claims must match the capability matrix and executable tests.
+- Do not modernize archived plans or changelog entries as if they were current;
+  add a dated correction or supersession note instead.
 
 ## Licensing and product policy
 
