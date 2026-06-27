@@ -43,6 +43,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Ensured the main CI workflow fetches pull-request base history before running
+  the changelog policy check.
 - Generated crawler-specific groups now preserve sensitive `Disallow` paths,
   preventing broad `Allow: /` rules from bypassing the wildcard policy.
 - Corrected the JSON-LD validator's suggested schema command.
