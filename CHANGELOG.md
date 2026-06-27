@@ -118,6 +118,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Added `AGENTS.md` as the canonical AI-agent instruction file and reduced
   `CLAUDE.md` to a compatibility pointer.
+- Introduced an evidence vocabulary (`strong`, `probable`, `experimental`,
+  `project heuristic`) in README, the bundled GEO skill, and architecture docs
+  so that every recommendation carries a verifiable research-support label.
+- Reframed prescriptive GEO heuristics (fixed word counts, quote counts,
+  statistics counts, and pronoun thresholds) as observable heuristics with
+  audience and context checks, and added explicit prohibitions against
+  fabricating evidence.
+- Corrected platform-specific positioning: `llms.txt` is an inference-time
+  community proposal not used by Google Search, Schema.org structured data
+  powers supported Search features rather than a special GEO mechanism, and
+  MCP is agent integration rather than web ranking.
 
 ## [2.0.0] - 2026-06-25
 

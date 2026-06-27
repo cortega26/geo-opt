@@ -58,12 +58,28 @@ Before performing audits, create a `geo_config.json` configuration file in the r
 
 ---
 
+### Evidence levels
+
+Each heuristic in this skill carries an **evidence label** that describes the
+strength of support behind the recommendation. The label reflects the quality
+and breadth of the underlying research, **not a guaranteed outcome** in any
+specific AI search or retrieval product.
+
+| Label | Meaning |
+|---|---|
+| **Strong** | Supported by multiple independent, reproducible studies and official platform documentation. |
+| **Probable** | Supported by at least one controlled study or consistent platform guidance, but not yet replicated independently across engines. |
+| **Experimental** | Supported by a single controlled benchmark under specific conditions; results may not transfer to live engines or different domains. |
+| **Project heuristic** | A reasonable practice derived from the project's own observations. No external study confirms a causal effect on AI search or retrieval. |
+
+---
+
 ### Phase 1: Context & Domain Assessment
-Understand the primary domain of the content. Optimization priorities shift depending on the target audience and vertical:
-*   **Law, Policy, and Government**: Emphasize **Statistics Addition** and **Citing Sources**.
-*   **History, Culture, and Arts**: Emphasize **Quotation Addition** (expert opinions, original quotes).
-*   **Science, Technology, and Medicine**: Emphasize **Fluency (simplification)**, **Acronym Clarity**, and **Citing Sources**.
-*   **Commercial (e.g. Products/Services)**: Emphasize **Unique Selling Propositions (USPs)** and **Structured Tables** for feature/pricing comparisons.
+Understand the primary domain of the content. Optimization priorities shift depending on the target audience and vertical. Each domain suggestion below is a **project heuristic** unless a specific study is cited:
+*   **Law, Policy, and Government**: Emphasize **Statistics Addition** `[experimental]` and **Citing Sources** `[probable]`.
+*   **History, Culture, and Arts**: Emphasize **Quotation Addition** `[experimental]` (expert opinions, original quotes).
+*   **Science, Technology, and Medicine**: Emphasize **Fluency (simplification)** `[project heuristic]`, **Acronym Clarity** `[project heuristic]`, and **Citing Sources** `[probable]`.
+*   **Commercial (e.g. Products/Services)**: Emphasize **Unique Selling Propositions (USPs)** `[project heuristic]` and **Structured Tables** `[experimental]` for feature/pricing comparisons.
 
 ---
 
@@ -78,47 +94,122 @@ python3 scripts/geo_optimizer.py audit <path-to-file>
 python3 scripts/geo_optimizer.py audit <path-to-file> --format json
 ```
 
-This returns a scorecard covering:
-1.  **Answer-First & Structure (20 pts)**: Presence of 40-90 word intro definition, tables, headers, and lists.
-2.  **Statistics Density (20 pts)**: Frequency of numbers, currencies, percentages, and metrics.
-3.  **Quotation Density (20 pts)**: Direct quotes and expert/authoritative attribution.
-4.  **Citation & Authority (20 pts)**: Reference links and dedicated bibliography.
-5.  **Semantic Clarity (20 pts)**: Check for ambiguous pronouns (e.g., "it", "they") and unexplained acronyms (verified against `geo_config.json` definition expansions).
+This returns a scorecard covering five heuristic dimensions. Each dimension
+carries an evidence label (see [Evidence levels](#evidence-levels) above):
+
+1.  **Answer-First & Structure (20 pts)** `[experimental]`: Presence of a direct introductory definition, tables, headers, and lists.
+2.  **Statistics Density (20 pts)** `[project heuristic]`: Frequency of numbers, currencies, percentages, and metrics.
+3.  **Quotation Density (20 pts)** `[experimental]`: Direct quotes and expert/authoritative attribution.
+4.  **Citation & Authority (20 pts)** `[probable]`: Reference links and dedicated bibliography.
+5.  **Semantic Clarity (20 pts)** `[project heuristic]`: Check for ambiguous pronouns (e.g., "it", "they") and unexplained acronyms (verified against `geo_config.json` definition expansions).
 
 ---
 
 ### Phase 3: Content Optimization Rules
 
-Apply the following modifications to the source content:
+Apply the following modifications to the source content. Every rule carries an
+evidence label (defined in [Evidence levels](#evidence-levels) above). The label
+describes research support, not a guaranteed outcome.
 
-#### 1. Answer-First Formatting (RAG-Friendly)
-Concise, self-contained summaries make a page easier to retrieve and interpret.
-*   **Action**: Structure the opening paragraph to be between **40 and 90 words**.
-*   **Style**: Start with a direct definition of the main topic or entity (e.g., *"[Entity] is a [category] that does [primary function]..."*). Avoid conversational filler ("In this post, we are going to look at...").
+**Important prohibitions (all evidence levels):**
+- Do **not** invent statistics, data, or metrics to increase a score.
+- Do **not** fabricate quotes, authorship, job titles, or affiliations.
+- Do **not** restructure content solely to gain audit points at the expense of
+  accuracy, readability, or user needs.
+- Do **not** add references you have not verified.
 
-#### 2. Statistics Addition
-Concrete, verifiable data is more useful than unsupported qualitative claims.
-*   **Action**: Replace words like *"many"*, *"most"*, or *"significantly"* with precise metrics.
-*   **Example**: Change *"Our database saves a lot of storage"* to *"Our deduplication algorithm reduces storage capacity requirements by 34%"*.
+#### 1. Answer-First Formatting (RAG-Friendly) `[experimental]`
 
-#### 3. Quotation Addition
-Verified, attributed quotes can strengthen provenance and provide distinct
-segments for retrieval.
-*   **Action**: Add 1 to 2 direct expert or stakeholder quotes, citing their full name, job title, and organization. Use markdown blockquotes (`>`).
+The Princeton GEO benchmark observed that leading with a direct definition
+correlated with higher visibility in its controlled setup. This has not been
+replicated across live AI engines.
 
-#### 4. Citation and References
-*   **Action**: Link key claims directly to reputable primary sources (studies, government reports, official docs) using standard hyperlinks.
-*   **Action**: Append a `# Sources` or `# References` section at the end of the document listing all cited resources.
+*   **Heuristic**: Lead with a direct, self-contained definition of the main
+    topic or entity (e.g., *"[Entity] is a [category] that does [primary
+    function]..."*). Avoid conversational filler ("In this post, we are going to
+    look at...").
+*   **Context check**: The appropriate length and structure depend on the
+    audience, topic complexity, and domain. A compact opening (roughly 40–90
+    words) was observed in one controlled benchmark; it is not a universal
+    requirement.
 
-#### 5. Semantic Clarity & Entity Grounding
-LLM parsers are easily confused by ambiguous pronouns and unexplained terms.
-*   **Action**: Limit ambiguous pronouns (like *it*, *they*, *this*, *them*) to less than **2% of the word count**. Replace them with the actual nouns (e.g., *"this setup"* -> *"the hybrid cloud infrastructure"*).
-*   **Action**: Spell out acronyms on their first occurrence followed by the abbreviation in parentheses, e.g., *"SaaS (Software as a Service)"*.
+#### 2. Statistics Addition `[project heuristic]`
+
+Concrete, verifiable data can make claims more precise than qualitative
+language alone. There is no independent study confirming that adding numbers
+improves AI search visibility.
+
+*   **Heuristic**: Where accurate data is already available, prefer specific
+    metrics over vague quantifiers ("many", "most", "significantly").
+*   **Example**: If your own measurements support it, *"Our deduplication
+    algorithm reduces storage capacity requirements by 34%"* is more precise
+    than *"Our database saves a lot of storage"*.
+*   **Context check**: Only use data you can source and verify. If no
+    measurement exists, qualitative description is preferable to invention.
+
+#### 3. Quotation Addition `[experimental]`
+
+The GEO paper observed a correlation between attributed quotes and visibility
+in its benchmark. Quotes may also help retrieval systems surface distinct
+viewpoints, but there is no evidence that a specific number of quotes improves
+outcomes in live AI products.
+
+*   **Heuristic**: Where relevant, include attributed quotes from named
+    sources with verifiable credentials (full name, role, organization). Use
+    markdown blockquotes (`>`).
+*   **Context check**: Add quotes when they strengthen the content's
+    authority or provide genuine expert perspective. Do not add quotes solely
+    to meet a quota. Unsourced or invented quotes damage credibility and may
+    violate platform policies.
+
+#### 4. Citation and References `[probable]`
+
+Linking claims to primary sources is consistent with general information
+quality guidance across multiple platforms. "What Gets Cited"
+(arXiv:2605.25517) found relevance and source position stronger than
+formatting-only changes in its controlled setup.
+
+*   **Heuristic**: Link key claims directly to reputable primary sources
+    (studies, government reports, official documentation) using standard
+    hyperlinks.
+*   **Heuristic**: Consider a `# Sources` or `# References` section listing
+    cited resources.
+*   **Context check**: Cite sources you have reviewed. Prefer primary sources
+    over secondary summaries. Do not add citations to irrelevant or unverified
+    material.
+
+#### 5. Semantic Clarity & Entity Grounding `[project heuristic]`
+
+Clear entity references may help language models resolve meaning, but no
+external study has established a causal link between pronoun density and AI
+search performance.
+
+*   **Heuristic**: Prefer explicit nouns over ambiguous pronouns (*it*, *they*,
+    *this*, *them*) where clarity is at risk. Replace vague references with the
+    actual entity name (e.g., *"the hybrid cloud infrastructure"* instead of
+    *"this setup"*).
+*   **Heuristic**: Spell out acronyms on first occurrence followed by the
+    abbreviation in parentheses, e.g., *"SaaS (Software as a Service)"*.
+*   **Context check**: Pronoun use is natural in many writing styles. A fixed
+    percentage threshold (such as 2%) is a project-internal benchmark
+    convention, not a platform requirement. Prioritize readability and
+    audience expectations over mechanical substitution.
 
 ---
 
 ### Phase 4: Schema.org Injection
-Add structured JSON-LD data to help search engine crawlers explicitly map entity relationships.
+
+Structured data via JSON-LD helps search engines understand entity
+relationships on a page. Schema.org markup is useful for supported Google
+Search features (articles, FAQs, products, breadcrumbs) but is **not** a
+special GEO ranking mechanism. Google's own guidance states there is no
+special schema for AI optimization
+([AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide)).
+
+Note: Google retired the FAQ rich result in June 2026. `FAQ` Schema.org markup
+remains valid for other purposes, but it no longer triggers that specific
+Search feature.
+
 1.  Run the helper script to auto-generate and directly inject the schema block into your Markdown or HTML file:
     ```bash
     python3 scripts/geo_optimizer.py inject <path-to-file> <article|faq|product>
@@ -146,9 +237,10 @@ Check that AI bot crawlers are not blocked from indexing your optimized pages:
 ### Phase 6: llms.txt Generation & Management
 
 The [`llms.txt` community proposal](https://llmstxt.org/) defines a structured,
-LLM-friendly map of a site. It is not a formal web standard or a guaranteed
-ranking mechanism, and it complements rather than replaces accessible HTML,
-sitemaps, `robots.txt`, and structured data.
+LLM-friendly map of a site. It is an inference-time convenience for tools that
+choose to consume it, not a formal web standard. Google Search does not use
+`llms.txt` for ranking or indexing. It complements rather than replaces
+accessible HTML, sitemaps, `robots.txt`, and structured data.
 
 Generate `llms.txt` and `llms-full.txt` from your content files:
 

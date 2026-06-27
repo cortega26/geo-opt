@@ -69,20 +69,40 @@ Fail automation when any audited page scores below a chosen project baseline:
 node bin/cli.js audit content/ --recursive --threshold 60
 ```
 
-The score covers five heuristic dimensions:
+The score covers five heuristic dimensions, each labeled with the strength of
+evidence behind it (see [Evidence vocabulary](#evidence-vocabulary) below):
 
-1. answer-first structure and document organization;
-2. numerical evidence density;
-3. quotation and attribution density;
-4. citation and link density;
-5. semantic clarity, including ambiguous pronouns and unexplained acronyms.
+1. answer-first structure and document organization `[experimental]`;
+2. numerical evidence density `[project heuristic]`;
+3. quotation and attribution density `[experimental]`;
+4. citation and link density `[probable]`;
+5. semantic clarity, including ambiguous pronouns and unexplained acronyms
+   `[project heuristic]`.
 
 The scoring model is inspired by the
 [GEO research paper accepted at KDD 2024](https://arxiv.org/abs/2311.09735),
 but `geo-opt` does not reproduce the paper's benchmark or establish causal
 effects on live AI products.
 
+### Evidence vocabulary
+
+Every heuristic and recommendation in this project carries an evidence label.
+The label describes the quality of research support behind it, **not** a
+guaranteed outcome in any AI search or retrieval product.
+
+| Label | Meaning |
+|---|---|
+| **Strong** | Supported by multiple independent, reproducible studies and official platform documentation. |
+| **Probable** | Supported by at least one controlled study or consistent platform guidance, but not yet replicated independently across engines. |
+| **Experimental** | Supported by a single controlled benchmark under specific conditions; results may not transfer to live engines or different domains. |
+| **Project heuristic** | A reasonable practice derived from the project's own observations. No external study confirms a causal effect on AI search or retrieval. |
+
 ### Generate and review structured data
+
+Structured data helps search engines understand page entities and powers
+supported Search features (articles, products, breadcrumbs). It is not a
+special GEO ranking mechanism. Google explicitly states there is no special
+schema for AI optimization.
 
 Generate Schema.org JSON-LD without changing the source file:
 
@@ -298,9 +318,13 @@ Historical versions through commit `67f18be` remain available under the
 
 - [GEO: Generative Engine Optimization](https://arxiv.org/abs/2311.09735),
   accepted at KDD 2024.
+- [Google AI optimization guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide)
+  (official guidance on AI and Search).
 - [Schema.org vocabulary](https://schema.org/).
 - [`llms.txt` community proposal](https://llmstxt.org/).
 - [OpenAI crawler documentation](https://developers.openai.com/api/docs/bots).
 - [Google crawler documentation](https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers).
 - [Anthropic crawler documentation](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler).
 - [Perplexity crawler documentation](https://docs.perplexity.ai/docs/resources/perplexity-crawlers).
+- [What Gets Cited: Measuring the Impact of GEO on LLM
+  Citations](https://arxiv.org/abs/2605.25517).
