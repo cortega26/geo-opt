@@ -9,7 +9,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const __dirname = new URL(".", import.meta.url).pathname;
@@ -351,6 +351,32 @@ describe("CLI generate-all", () => {
     },
     { timeout: 30_000 }
   );
+
+  it("generated sitemap.xml contains <lastmod> from real file mtimes (plan 047)", () => {
+    const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-lastmod-"));
+    const contentDir = join(tmpDir, "content");
+    const outDir = join(tmpDir, "out");
+    mkdirSync(contentDir, { recursive: true });
+    writeFileSync(join(contentDir, "page.md"), "# Test Page\n\nBody content here.");
+    const { status, stderr: _stderr } = run([
+      "generate-all",
+      contentDir,
+      "--recursive",
+      "--output",
+      outDir,
+      "--site-url",
+      "https://example.com",
+    ]);
+    assert.equal(status, 0, `generate-all failed: ${_stderr}`);
+    const sitemapPath = join(outDir, "sitemap.xml");
+    assert.ok(existsSync(sitemapPath), "sitemap.xml debe existir");
+    const sitemapXml = readFileSync(sitemapPath, "utf8");
+    assert.ok(
+      sitemapXml.includes("<lastmod>"),
+      `sitemap.xml debe contener <lastmod>, pero contiene:\n${sitemapXml}`
+    );
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

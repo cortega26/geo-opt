@@ -42,6 +42,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - `validateSchemaFile` output now separates `❌ Errors`, `⚠️ Warnings`, and `ℹ️ Notes`
   into distinct sections instead of a single flat issues list.
 - `COMMUNITY_SCHEMA_TYPES` now includes `"news-article"`.
+- `auditFiles` results now include the audited file `content`; `generate-all`
+  reuses it instead of re-reading each file from disk.
 
 ### Added
 
@@ -108,6 +110,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   scores on affected content (model patch — see PR for per-fixture deltas).
 - v2 attribution proximity now evaluates each repeated statistic/quote at its
   own position instead of always the first occurrence.
+- `generate-all` now emits correct `<lastmod>` values in the generated sitemap
+  (previously every URL pointed at a nonexistent path, so `<lastmod>` was dropped).
 
 ### Added
 

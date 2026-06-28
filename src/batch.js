@@ -35,7 +35,7 @@ export function auditFiles(files, config, model = "v1", onProgress) {
         continue;
       }
       const { score, report } = auditContent(content, filepath, config, model);
-      results.push({ file: filepath, status: "success", score, report });
+      results.push({ file: filepath, status: "success", score, report, content });
     } catch (err) {
       results.push({ file: filepath, status: "error", error: err.message });
     }

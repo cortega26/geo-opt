@@ -1049,7 +1049,7 @@ program
       }
       // Read content for full-text generation
       try {
-        const content = fs.readFileSync(r.file, { encoding: "utf8" });
+        const content = r.content ?? fs.readFileSync(r.file, { encoding: "utf8" });
         const { title } = extractPageMetadata(content, r.file);
         const rel = path.relative(process.cwd(), r.file).split(path.sep).join("/");
         const ext = path.extname(rel);
@@ -1060,7 +1060,7 @@ program
         const url = siteUrl ? siteUrl.replace(/\/+$/, "") + urlPath : urlPath;
         const section = suggestSection(r.file, content);
         const score = r.score ?? r.report?.total_score ?? r.report?.effectiveScore ?? undefined;
-        fullEntries.push({ title, url, section, content, score });
+        fullEntries.push({ file: r.file, title, url, section, content, score });
       } catch {
         // Skip files that can't be read
       }

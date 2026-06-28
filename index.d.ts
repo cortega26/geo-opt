@@ -604,6 +604,7 @@ declare module "geo-opt" {
     status: "success" | "error";
     score?: number;
     report?: AuditReport;
+    content?: string;
     error?: string;
   }
 
