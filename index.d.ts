@@ -556,6 +556,37 @@ declare module "geo-opt" {
 
   export function renderV2Summary(summary: AggregateReport): string;
 
+  // ═══ Pro HTML reports ═══
+
+  export interface HtmlReportOptions {
+    noBranding?: boolean;
+  }
+
+  export function renderV1ReportHtml(
+    report: AuditReport,
+    filepath: string,
+    options?: HtmlReportOptions
+  ): string;
+
+  export function renderV2ReportHtml(
+    report: V2Report,
+    filepath: string,
+    options?: HtmlReportOptions
+  ): string;
+
+  export function renderAggregateReportHtml(
+    results: AuditResult[],
+    summary: AggregateReport,
+    options?: HtmlReportOptions
+  ): string;
+
+  export function renderComparisonHtml(
+    before: AuditReport | V2Report,
+    after: AuditReport | V2Report,
+    filepath: string,
+    options?: HtmlReportOptions
+  ): string;
+
   // ═══ Discovery ═══
   export interface DiscoverOptions {
     recursive?: boolean;
@@ -649,9 +680,16 @@ declare module "geo-opt" {
     filepath: string
   ): { valid: true; targetRealPath: string; cwdRealPath: string } | { valid: false; error: string };
 
+  export const COMMUNITY_SCHEMA_TYPES: ReadonlySet<"article" | "faq" | "product">;
+  export const PRO_SCHEMA_TYPES: ReadonlySet<"course" | "event" | "recipe" | "howto">;
+
+  export type CommunitySchemaType = "article" | "faq" | "product";
+  export type ProSchemaType = "course" | "event" | "recipe" | "howto";
+  export type SchemaType = CommunitySchemaType | ProSchemaType;
+
   export function generateSchemaData(
     filepath: string,
-    schemaType: "article" | "faq" | "product",
+    schemaType: SchemaType | string,
     config: GeoConfig,
     _content?: string | null
   ): SchemaGraphObject;

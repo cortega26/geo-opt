@@ -181,8 +181,7 @@ export function generateSitemapXml(entries, options = {}) {
   const resolved = entries.map((entry) => {
     const url = entry.url.startsWith("http") ? entry.url : baseUrl + entry.url;
 
-    const lastmod =
-      formatLastmod(entry.lastmod) || fileLastmod(entry.filePath) || null;
+    const lastmod = formatLastmod(entry.lastmod) || fileLastmod(entry.filePath) || null;
 
     const priority = scoreToPriority(entry.score);
 
@@ -238,8 +237,7 @@ export function generateSitemapFiles(entries, options = {}) {
 
   const resolved = entries.map((entry) => {
     const url = entry.url.startsWith("http") ? entry.url : baseUrl + entry.url;
-    const lastmod =
-      formatLastmod(entry.lastmod) || fileLastmod(entry.filePath) || null;
+    const lastmod = formatLastmod(entry.lastmod) || fileLastmod(entry.filePath) || null;
     const priority = scoreToPriority(entry.score);
     const changefreq = determineChangefreq({
       publishedDate: entry.publishedDate,
@@ -260,10 +258,7 @@ export function generateSitemapFiles(entries, options = {}) {
   const indexEntries = [];
 
   for (let i = 0; i < pages; i++) {
-    const chunk = resolved.slice(
-      i * MAX_URLS_PER_SITEMAP,
-      (i + 1) * MAX_URLS_PER_SITEMAP
-    );
+    const chunk = resolved.slice(i * MAX_URLS_PER_SITEMAP, (i + 1) * MAX_URLS_PER_SITEMAP);
     files.push({
       name: `sitemap-${i + 1}.xml`,
       content: _renderUrlset(chunk),
@@ -378,9 +373,7 @@ export function validateSitemapXml(xml) {
 function _renderUrlset(entries) {
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push(
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
-  );
+  lines.push('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"');
   lines.push('         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">');
 
   for (const entry of entries) {
@@ -397,14 +390,10 @@ function _renderUrlset(entries) {
         lines.push("    <image:image>");
         lines.push(`      <image:loc>${xmlEscape(img.loc)}</image:loc>`);
         if (img.caption) {
-          lines.push(
-            `      <image:caption>${xmlEscape(img.caption)}</image:caption>`
-          );
+          lines.push(`      <image:caption>${xmlEscape(img.caption)}</image:caption>`);
         }
         if (img.title) {
-          lines.push(
-            `      <image:title>${xmlEscape(img.title)}</image:title>`
-          );
+          lines.push(`      <image:title>${xmlEscape(img.title)}</image:title>`);
         }
         lines.push("    </image:image>");
       }
@@ -426,9 +415,7 @@ function _renderUrlset(entries) {
 function _renderSitemapIndex(entries) {
   const lines = [];
   lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-  lines.push(
-    '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-  );
+  lines.push('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
 
   for (const entry of entries) {
     lines.push("  <sitemap>");

@@ -18,6 +18,7 @@ import {
   calculateReadability,
   checkRobots,
   cleanMarkdownToPlainText,
+  COMMUNITY_SCHEMA_TYPES,
   createFinding,
   discoverFiles,
   EVIDENCE_REGISTRY,
@@ -35,14 +36,20 @@ import {
   preprocessContent,
   isHtmlContent,
   extractHtmlVisibleText,
+  PRO_SCHEMA_TYPES,
   readEngagementState,
   recordSuccessfulFreeInjection,
   remindersAreEnabled,
   REPORT_VERSION,
   scoreContent,
+  scoreContentV2,
   setRemindersEnabled,
   staleEvidenceWarnings,
   validateSourceRefs,
+  renderV1ReportHtml,
+  renderV2ReportHtml,
+  renderAggregateReportHtml,
+  renderComparisonHtml,
 } from "../src/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -2022,6 +2029,421 @@ test("CLI audit --explain shows evidence labels in text output", () => {
       result.stdout.includes("[experimental]") || result.stdout.includes("[heuristic]"),
       "Should show evidence labels with --explain"
     );
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+// ═══ Plan 038 — Pro schema types ═══
+
+const PRO_KEY = "tt_pro_AAAAAAAAAAAAAAAAAAAA";
+const proConfig = { license: { key: PRO_KEY } };
+
+test("COMMUNITY_SCHEMA_TYPES and PRO_SCHEMA_TYPES are disjoint sets", () => {
+  for (const type of PRO_SCHEMA_TYPES) {
+    assert.ok(
+      !COMMUNITY_SCHEMA_TYPES.has(type),
+      `"${type}" must not appear in COMMUNITY_SCHEMA_TYPES`
+    );
+  }
+  for (const type of COMMUNITY_SCHEMA_TYPES) {
+    assert.ok(!PRO_SCHEMA_TYPES.has(type), `"${type}" must not appear in PRO_SCHEMA_TYPES`);
+  }
+  assert.deepStrictEqual([...COMMUNITY_SCHEMA_TYPES].sort(), ["article", "faq", "product"]);
+  assert.deepStrictEqual([...PRO_SCHEMA_TYPES].sort(), ["course", "event", "howto", "recipe"]);
+});
+
+test("generateSchemaData blocks Pro type without Pro license", () => {
+  const tempFile = path.join(os.tmpdir(), "pro-gate-test.md");
+  fs.writeFileSync(tempFile, "# Test\n\nContent.\n");
+  try {
+    for (const type of PRO_SCHEMA_TYPES) {
+      assert.throws(
+        () => generateSchemaData(tempFile, type, {}),
+        (err) => {
+          assert.ok(
+            err.message.includes("Pro license"),
+            `Expected Pro license error for "${type}"`
+          );
+          return true;
+        }
+      );
+    }
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData rejects unknown schema type with helpful message", () => {
+  const tempFile = path.join(os.tmpdir(), "unknown-type-test.md");
+  fs.writeFileSync(tempFile, "# Test\n\nContent.\n");
+  try {
+    assert.throws(
+      () => generateSchemaData(tempFile, "blogpost", {}),
+      (err) => {
+        assert.ok(err.message.includes("Community types"), "Should list community types");
+        assert.ok(err.message.includes("Pro types"), "Should list Pro types");
+        return true;
+      }
+    );
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates Course schema (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "course-test.md");
+  fs.writeFileSync(
+    tempFile,
+    "# Introduction to Machine Learning\n\nLearn the fundamentals of ML from scratch.\n\n## What you will learn\nNeural networks and deep learning basics.\n"
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "course", {
+      ...proConfig,
+      course: { provider: "Tooltician Academy" },
+    });
+    assert.strictEqual(schema["@context"], "https://schema.org");
+    const course = schema["@graph"].find((n) => n["@type"] === "Course");
+    assert.ok(course, "Should contain a Course node");
+    assert.strictEqual(course.name, "Introduction to Machine Learning");
+    assert.ok(course.description, "Should have a description");
+    assert.deepStrictEqual(course.provider, {
+      "@type": "Organization",
+      name: "Tooltician Academy",
+    });
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates Course schema using publisher as provider fallback (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "course-publisher-test.md");
+  fs.writeFileSync(tempFile, "# Advanced CSS\n\nMaster modern CSS techniques.\n");
+  try {
+    const schema = generateSchemaData(tempFile, "course", {
+      ...proConfig,
+      publisher: { name: "Tooltician", url: "https://tooltician.com" },
+    });
+    const course = schema["@graph"].find((n) => n["@type"] === "Course");
+    assert.ok(course, "Should contain a Course node");
+    assert.ok(course.provider, "Should have provider from publisher");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates Event schema with startDate and location (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "event-test.md");
+  fs.writeFileSync(
+    tempFile,
+    "# GEO Summit 2026\n\nThe premier event for AI discoverability professionals.\n"
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "event", {
+      ...proConfig,
+      event: { startDate: "2026-09-15", endDate: "2026-09-16", location: "San Francisco, CA" },
+    });
+    const event = schema["@graph"].find((n) => n["@type"] === "Event");
+    assert.ok(event, "Should contain an Event node");
+    assert.strictEqual(event.name, "GEO Summit 2026");
+    assert.strictEqual(event.startDate, "2026-09-15");
+    assert.strictEqual(event.endDate, "2026-09-16");
+    assert.deepStrictEqual(event.location, { "@type": "Place", name: "San Francisco, CA" });
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates Event schema without optional fields when unconfigured (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "event-minimal-test.md");
+  fs.writeFileSync(tempFile, "# Webinar: GEO Basics\n\nA free online webinar.\n");
+  try {
+    const schema = generateSchemaData(tempFile, "event", proConfig);
+    const event = schema["@graph"].find((n) => n["@type"] === "Event");
+    assert.ok(event, "Should contain an Event node");
+    assert.strictEqual(event.startDate, undefined);
+    assert.strictEqual(event.location, undefined);
+    assert.strictEqual(event.endDate, undefined);
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates Recipe schema with extracted ingredients and steps (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "recipe-test.md");
+  fs.writeFileSync(
+    tempFile,
+    `# Classic Banana Bread
+
+Moist and delicious banana bread recipe.
+
+## Ingredients
+- 3 ripe bananas
+- 1/3 cup melted butter
+- 3/4 cup sugar
+
+## Instructions
+1. Preheat oven to 175°C
+2. Mash bananas in a bowl
+3. Mix in butter and sugar
+4. Pour into loaf pan and bake 60 minutes
+`
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "recipe", {
+      ...proConfig,
+      recipe: { totalTime: "PT1H15M", recipeYield: "1 loaf" },
+    });
+    const recipe = schema["@graph"].find((n) => n["@type"] === "Recipe");
+    assert.ok(recipe, "Should contain a Recipe node");
+    assert.strictEqual(recipe.name, "Classic Banana Bread");
+    assert.ok(Array.isArray(recipe.recipeIngredient), "Should have recipeIngredient array");
+    assert.strictEqual(recipe.recipeIngredient.length, 3);
+    assert.ok(recipe.recipeIngredient.includes("3 ripe bananas"));
+    assert.ok(Array.isArray(recipe.recipeInstructions), "Should have recipeInstructions array");
+    assert.strictEqual(recipe.recipeInstructions.length, 4);
+    assert.strictEqual(recipe.recipeInstructions[0]["@type"], "HowToStep");
+    assert.strictEqual(recipe.recipeInstructions[0].text, "Preheat oven to 175°C");
+    assert.strictEqual(recipe.totalTime, "PT1H15M");
+    assert.strictEqual(recipe.recipeYield, "1 loaf");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates Recipe with empty arrays when no structured content found (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "recipe-minimal-test.md");
+  fs.writeFileSync(tempFile, "# Simple Recipe\n\nA quick and easy dish.\n");
+  try {
+    const schema = generateSchemaData(tempFile, "recipe", proConfig);
+    const recipe = schema["@graph"].find((n) => n["@type"] === "Recipe");
+    assert.ok(recipe, "Should contain a Recipe node");
+    assert.deepStrictEqual(recipe.recipeIngredient, []);
+    assert.deepStrictEqual(recipe.recipeInstructions, []);
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates HowTo schema from H2 sections (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "howto-test.md");
+  fs.writeFileSync(
+    tempFile,
+    `# How to Deploy a Node.js App
+
+Step-by-step guide to deploying on any cloud provider.
+
+## Install dependencies
+Run npm install to install all required packages.
+
+## Configure environment
+Set environment variables for your deployment target.
+
+## Deploy
+Push your code and trigger the CI/CD pipeline.
+`
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "howto", {
+      ...proConfig,
+      howto: { totalTime: "PT30M" },
+    });
+    const howto = schema["@graph"].find((n) => n["@type"] === "HowTo");
+    assert.ok(howto, "Should contain a HowTo node");
+    assert.strictEqual(howto.name, "How to Deploy a Node.js App");
+    assert.ok(Array.isArray(howto.step), "Should have step array");
+    assert.ok(howto.step.length >= 3, "Should have at least 3 steps");
+    assert.strictEqual(howto.step[0]["@type"], "HowToStep");
+    assert.strictEqual(howto.step[0].name, "Install dependencies");
+    assert.strictEqual(howto.totalTime, "PT30M");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData generates HowTo from numbered list when no sections (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "howto-numbered-test.md");
+  fs.writeFileSync(
+    tempFile,
+    `# How to Boil an Egg
+
+1. Fill a pot with water
+2. Bring to a boil
+3. Add egg and cook 8 minutes
+`
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "howto", proConfig);
+    const howto = schema["@graph"].find((n) => n["@type"] === "HowTo");
+    assert.ok(howto, "Should contain a HowTo node");
+    assert.ok(Array.isArray(howto.step), "Should have step array");
+    assert.ok(howto.step.length === 3, "Should extract 3 numbered steps");
+    assert.strictEqual(howto.step[0].text, "Fill a pot with water");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData supports multi-type (course,howto) in one @graph (Pro)", () => {
+  const tempFile = path.join(os.tmpdir(), "multitype-test.md");
+  fs.writeFileSync(
+    tempFile,
+    `# Learn Git in 30 Minutes
+
+A hands-on course with step-by-step instructions.
+
+## Setup
+Install Git on your machine.
+
+## First commit
+Create your first repository and commit.
+`
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "course,howto", {
+      ...proConfig,
+      course: { provider: "Tooltician Academy" },
+    });
+    assert.strictEqual(schema["@context"], "https://schema.org");
+    const course = schema["@graph"].find((n) => n["@type"] === "Course");
+    const howto = schema["@graph"].find((n) => n["@type"] === "HowTo");
+    assert.ok(course, "Should contain a Course node");
+    assert.ok(howto, "Should contain a HowTo node");
+    assert.strictEqual(course.name, "Learn Git in 30 Minutes");
+    assert.strictEqual(howto.name, "Learn Git in 30 Minutes");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+// ═══ Plan 039 — Pro HTML reports ═══
+
+const SAMPLE_CONTENT = `# Cloud Architecture Best Practices
+
+Hybrid cloud architecture integrates private and public cloud resources.
+
+## Scalability
+Auto-scaling reduces costs by 40% according to AWS benchmarks.
+
+## Security
+End-to-end encryption protects all data in transit and at rest.
+`;
+
+test("renderV1ReportHtml returns valid HTML structure", () => {
+  const tempFile = path.join(os.tmpdir(), "html-report-v1.md");
+  fs.writeFileSync(tempFile, SAMPLE_CONTENT);
+  try {
+    const { report } = scoreContent(SAMPLE_CONTENT, tempFile, {});
+    const html = renderV1ReportHtml(report, tempFile);
+    assert.ok(html.startsWith("<!DOCTYPE html>"), "Should start with DOCTYPE");
+    assert.ok(html.includes("<html"), "Should have html tag");
+    assert.ok(html.includes("<head>"), "Should have head tag");
+    assert.ok(html.includes("<body>"), "Should have body tag");
+    assert.ok(html.includes("GEO Optimization Audit Report"), "Should contain report title");
+    assert.ok(html.includes("/100"), "Should show score");
+    assert.ok(html.includes("Tooltician"), "Should include branding by default");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("renderV1ReportHtml with noBranding omits Tooltician", () => {
+  const tempFile = path.join(os.tmpdir(), "html-report-v1-nobrand.md");
+  fs.writeFileSync(tempFile, SAMPLE_CONTENT);
+  try {
+    const { report } = scoreContent(SAMPLE_CONTENT, tempFile, {});
+    const html = renderV1ReportHtml(report, tempFile, { noBranding: true });
+    assert.ok(
+      !html.includes("tooltician.com"),
+      "Should not include Tooltician URL with noBranding"
+    );
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("renderV1ReportHtml shows score in SVG gauge", () => {
+  const tempFile = path.join(os.tmpdir(), "html-report-gauge.md");
+  fs.writeFileSync(tempFile, SAMPLE_CONTENT);
+  try {
+    const { report } = scoreContent(SAMPLE_CONTENT, tempFile, {});
+    const html = renderV1ReportHtml(report, tempFile);
+    assert.ok(html.includes("<svg"), "Should include SVG gauge");
+    assert.ok(html.includes("stroke-dashoffset"), "Should include gauge animation");
+    assert.ok(html.includes("Dimension Breakdown"), "Should include dimension chart");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("renderV2ReportHtml returns valid HTML with profile info", () => {
+  const tempFile = path.join(os.tmpdir(), "html-report-v2.md");
+  fs.writeFileSync(tempFile, SAMPLE_CONTENT);
+  try {
+    const { report: v2report } = scoreContentV2(SAMPLE_CONTENT, tempFile, {});
+    const html = renderV2ReportHtml(v2report, tempFile);
+    assert.ok(html.startsWith("<!DOCTYPE html>"), "Should start with DOCTYPE");
+    assert.ok(html.includes("v2"), "Should mention v2");
+    assert.ok(html.includes("Profile"), "Should include profile section");
+    assert.ok(html.includes("Effective Score"), "Should show effective score");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("renderAggregateReportHtml returns valid HTML with summary stats", () => {
+  const tempFile = path.join(os.tmpdir(), "html-agg-report.md");
+  fs.writeFileSync(tempFile, SAMPLE_CONTENT);
+  try {
+    const results = auditFiles([tempFile], {});
+    const summary = aggregateReport(results);
+    const html = renderAggregateReportHtml(results, summary);
+    assert.ok(html.startsWith("<!DOCTYPE html>"), "Should start with DOCTYPE");
+    assert.ok(html.includes("Site Audit Report"), "Should include site audit title");
+    assert.ok(html.includes("files audited"), "Should mention files audited");
+    assert.ok(html.includes("Average GEO Score"), "Should include average score");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("renderComparisonHtml shows before/after scores and delta", () => {
+  const tempFile = path.join(os.tmpdir(), "html-comparison.md");
+  fs.writeFileSync(tempFile, SAMPLE_CONTENT);
+  try {
+    const { report: beforeReport } = scoreContent(
+      "# Simple\n\nShort content without much structure.",
+      tempFile,
+      {}
+    );
+    const { report: afterReport } = scoreContent(SAMPLE_CONTENT, tempFile, {});
+    const html = renderComparisonHtml(beforeReport, afterReport, tempFile);
+    assert.ok(html.startsWith("<!DOCTYPE html>"), "Should start with DOCTYPE");
+    assert.ok(html.includes("Before / After Comparison"), "Should include comparison title");
+    assert.ok(html.includes("Before"), "Should show Before label");
+    assert.ok(html.includes("After"), "Should show After label");
+    assert.ok(html.includes("Net change"), "Should show net change");
+    assert.ok(html.includes("Dimension Changes"), "Should show dimension comparison table");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("geo-opt report command is blocked without Pro license", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "report-gate-"));
+  const sampleFile = path.join(tmpDir, "sample.md");
+  fs.writeFileSync(sampleFile, SAMPLE_CONTENT);
+  try {
+    const result = spawnSync(
+      "node",
+      [cliPath, "report", sampleFile, "--output", path.join(tmpDir, "out.html")],
+      {
+        encoding: "utf8",
+        env: { ...process.env, TOOLTICIAN_LICENSE_KEY: "" },
+      }
+    );
+    assert.ok(result.status !== 0, "Should exit non-zero without Pro license");
+    assert.ok(result.stderr.includes("Pro license"), "Should mention Pro license requirement");
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

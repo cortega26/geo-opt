@@ -134,9 +134,7 @@ describe("determineChangefreq", () => {
 
 describe("generateSitemapXml", () => {
   it("genera XML válido con declaración y namespace", () => {
-    const xml = generateSitemapXml([
-      { url: "https://example.com/", score: 90 },
-    ]);
+    const xml = generateSitemapXml([{ url: "https://example.com/", score: 90 }]);
     assert.ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>'));
     assert.ok(xml.includes('xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'));
     assert.ok(xml.includes("<urlset"));
@@ -163,16 +161,12 @@ describe("generateSitemapXml", () => {
   });
 
   it("omite <lastmod> cuando no hay fecha", () => {
-    const xml = generateSitemapXml([
-      { url: "https://example.com/", score: 80 },
-    ]);
+    const xml = generateSitemapXml([{ url: "https://example.com/", score: 80 }]);
     assert.equal(xml.includes("<lastmod>"), false);
   });
 
   it("escapa caracteres XML especiales en URLs", () => {
-    const xml = generateSitemapXml([
-      { url: "https://example.com/?a=1&b=<2>", score: 50 },
-    ]);
+    const xml = generateSitemapXml([{ url: "https://example.com/?a=1&b=<2>", score: 50 }]);
     assert.ok(xml.includes("&amp;"));
     assert.ok(xml.includes("&lt;"));
     assert.ok(xml.includes("&gt;"));
@@ -188,18 +182,16 @@ describe("generateSitemapXml", () => {
   });
 
   it("resuelve URLs relativas con baseUrl", () => {
-    const xml = generateSitemapXml(
-      [{ url: "/about", score: 60 }],
-      { baseUrl: "https://example.com" }
-    );
+    const xml = generateSitemapXml([{ url: "/about", score: 60 }], {
+      baseUrl: "https://example.com",
+    });
     assert.ok(xml.includes("<loc>https://example.com/about</loc>"));
   });
 
   it("no duplica baseUrl cuando la URL ya es absoluta", () => {
-    const xml = generateSitemapXml(
-      [{ url: "https://example.com/about", score: 60 }],
-      { baseUrl: "https://example.com" }
-    );
+    const xml = generateSitemapXml([{ url: "https://example.com/about", score: 60 }], {
+      baseUrl: "https://example.com",
+    });
     assert.ok(xml.includes("<loc>https://example.com/about</loc>"));
   });
 
@@ -234,9 +226,7 @@ describe("generateSitemapFiles", () => {
   });
 
   it("cada archivo retornado tiene name y content strings", () => {
-    const files = generateSitemapFiles([
-      { url: "https://example.com/", score: 50 },
-    ]);
+    const files = generateSitemapFiles([{ url: "https://example.com/", score: 50 }]);
     for (const f of files) {
       assert.ok(typeof f.name === "string" && f.name.length > 0);
       assert.ok(typeof f.content === "string" && f.content.length > 0);
@@ -271,9 +261,7 @@ describe("sitemap — integración de prioridades con scoring", () => {
   });
 
   it("entradas sin score obtienen prioridad 0.5 (default)", () => {
-    const xml = generateSitemapXml([
-      { url: "https://example.com/unknown" },
-    ]);
+    const xml = generateSitemapXml([{ url: "https://example.com/unknown" }]);
     assert.ok(xml.includes("<priority>0.5</priority>"));
   });
 });

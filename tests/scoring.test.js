@@ -185,9 +185,15 @@ Source: Internal Analytics Dashboard, accessed 2024-10-01
  */
 function assertReportContract(report, file) {
   // Top-level fields
-  assert.ok(typeof report.file === "string", `report.file debe ser string, obtuvo ${typeof report.file}`);
+  assert.ok(
+    typeof report.file === "string",
+    `report.file debe ser string, obtuvo ${typeof report.file}`
+  );
   assert.ok(typeof report.total_score === "number", `total_score debe ser number`);
-  assert.ok(report.total_score >= 0 && report.total_score <= 100, `total_score debe estar entre 0 y 100, obtuvo ${report.total_score}`);
+  assert.ok(
+    report.total_score >= 0 && report.total_score <= 100,
+    `total_score debe estar entre 0 y 100, obtuvo ${report.total_score}`
+  );
 
   // Breakdown
   const dims = ["structure", "statistics", "quotations", "citations", "clarity"];
@@ -209,11 +215,15 @@ function assertReportContract(report, file) {
   for (const f of report.findings) {
     assert.ok(typeof f.ruleId === "string", "finding.ruleId debe ser string");
     assert.ok(typeof f.category === "string", "finding.category debe ser string");
-    assert.ok(["pass", "warn", "fail", "not_applicable"].includes(f.severity),
-      `severity inválida: ${f.severity}`);
+    assert.ok(
+      ["pass", "warn", "fail", "not_applicable"].includes(f.severity),
+      `severity inválida: ${f.severity}`
+    );
     assert.ok(typeof f.message === "string", "finding.message debe ser string");
-    assert.ok(["strong", "probable", "experimental", "heuristic"].includes(f.evidenceLabel),
-      `evidenceLabel inválido: ${f.evidenceLabel}`);
+    assert.ok(
+      ["strong", "probable", "experimental", "heuristic"].includes(f.evidenceLabel),
+      `evidenceLabel inválido: ${f.evidenceLabel}`
+    );
     assert.ok(Array.isArray(f.sourceRefs), "sourceRefs debe ser array");
     assert.ok(typeof f.observedFacts === "object", "observedFacts debe ser object");
   }
@@ -249,7 +259,10 @@ describe("scoreContent — diferenciación buena calidad vs mala calidad", () =>
     assert.ok(score >= 65, `Markdown bueno debería puntuar ≥65, obtuvo ${score}`);
     assertReportContract(report, "good.md");
     // Debe tener tabla (estructura), links, stats verbales, citas
-    assert.ok(report.breakdown.structure.score >= 8, "Estructura debería ser ≥8 para MD con tabla+H2");
+    assert.ok(
+      report.breakdown.structure.score >= 8,
+      "Estructura debería ser ≥8 para MD con tabla+H2"
+    );
   });
 
   it("contenido Markdown pobre obtiene puntuación baja (<45)", () => {
@@ -285,7 +298,10 @@ describe("scoreContent — diferenciación buena calidad vs mala calidad", () =>
     assert.ok(score >= 50, `Contenido con stats+quotes debería puntuar ≥50, obtuvo ${score}`);
     assertReportContract(report, "stats.md");
     // Debe reconocer las stats numéricas
-    assert.ok(report.breakdown.statistics.score > 0, "Stats deberían ser >0 para contenido con números");
+    assert.ok(
+      report.breakdown.statistics.score > 0,
+      "Stats deberían ser >0 para contenido con números"
+    );
   });
 });
 
@@ -308,8 +324,10 @@ describe("scoreContent — estructura del breakdown", () => {
     // - scoring.js tiene lógica de ajuste con MAX_TOTAL_SCORE
     // - HTML content puede tener penalizaciones específicas
     // Sin embargo, para Markdown deberían ser cercanos
-    assert.ok(Math.abs(dimSum - score) <= 20 || score === 100,
-      `Suma de dimensiones (${dimSum}) vs total_score (${score}) divergen demasiado`);
+    assert.ok(
+      Math.abs(dimSum - score) <= 20 || score === 100,
+      `Suma de dimensiones (${dimSum}) vs total_score (${score}) divergen demasiado`
+    );
   });
 
   it("cada dimensión tiene max=20", () => {
@@ -325,8 +343,16 @@ describe("scoreContent — findings cumplen el contrato", () => {
     const { report } = scoreContent(GOOD_MD, "test.md", {});
     assert.ok(report.findings.length > 0, "Debería haber al menos 1 finding");
     const requiredFields = [
-      "ruleId", "category", "severity", "status", "message",
-      "evidenceLabel", "applicability", "sourceRefs", "observedFacts", "remediation",
+      "ruleId",
+      "category",
+      "severity",
+      "status",
+      "message",
+      "evidenceLabel",
+      "applicability",
+      "sourceRefs",
+      "observedFacts",
+      "remediation",
     ];
     for (const f of report.findings) {
       for (const field of requiredFields) {
@@ -339,8 +365,10 @@ describe("scoreContent — findings cumplen el contrato", () => {
     const valid = ["strong", "probable", "experimental", "heuristic"];
     const { report } = scoreContent(GOOD_MD, "test.md", {});
     for (const f of report.findings) {
-      assert.ok(valid.includes(f.evidenceLabel),
-        `evidenceLabel "${f.evidenceLabel}" no es válido para ${f.ruleId}`);
+      assert.ok(
+        valid.includes(f.evidenceLabel),
+        `evidenceLabel "${f.evidenceLabel}" no es válido para ${f.ruleId}`
+      );
     }
   });
 
@@ -348,8 +376,10 @@ describe("scoreContent — findings cumplen el contrato", () => {
     const valid = ["pass", "warn", "fail", "not_applicable"];
     const { report } = scoreContent(GOOD_MD, "test.md", {});
     for (const f of report.findings) {
-      assert.ok(valid.includes(f.severity),
-        `severity "${f.severity}" no es válido para ${f.ruleId}`);
+      assert.ok(
+        valid.includes(f.severity),
+        `severity "${f.severity}" no es válido para ${f.ruleId}`
+      );
       assert.equal(f.status, f.severity, `status debe reflejar severity para ${f.ruleId}`);
     }
   });
@@ -359,8 +389,10 @@ describe("scoreContent — findings cumplen el contrato", () => {
     const warnFindings = report.findings.filter((f) => f.severity === "warn");
     // Puede haber 0 warn findings en contenido pobre, OK
     for (const f of warnFindings) {
-      assert.ok(f.remediation && f.remediation.length > 0,
-        `Finding warn ${f.ruleId} debería tener remediation`);
+      assert.ok(
+        f.remediation && f.remediation.length > 0,
+        `Finding warn ${f.ruleId} debería tener remediation`
+      );
     }
   });
 
@@ -369,8 +401,10 @@ describe("scoreContent — findings cumplen el contrato", () => {
     const passFindings = report.findings.filter((f) => f.severity === "pass");
     for (const f of passFindings) {
       // pass findings: remediation puede ser null o string vacío
-      assert.ok(f.remediation === null || typeof f.remediation === "string",
-        `Finding pass ${f.ruleId} remediation debe ser null o string`);
+      assert.ok(
+        f.remediation === null || typeof f.remediation === "string",
+        `Finding pass ${f.ruleId} remediation debe ser null o string`
+      );
     }
   });
 });
@@ -399,14 +433,18 @@ describe("scoreContent — diferenciación por tipo de contenido", () => {
 
   it("Markdown con links externos recibe puntos de citación", () => {
     const { report } = scoreContent(GOOD_MD, "good.md", {});
-    assert.ok(report.breakdown.citations.score > 0,
-      `Contenido con 4 links externos debería recibir puntos de citación, obtuvo ${report.breakdown.citations.score}`);
+    assert.ok(
+      report.breakdown.citations.score > 0,
+      `Contenido con 4 links externos debería recibir puntos de citación, obtuvo ${report.breakdown.citations.score}`
+    );
   });
 
   it("contenido con stats y fuentes cercanas recibe puntuación alta de stats", () => {
     const { report } = scoreContent(STATS_HEAVY_MD, "stats.md", {});
-    assert.ok(report.breakdown.statistics.score >= 10,
-      `Contenido con múltiples stats debería puntuar ≥10 en stats, obtuvo ${report.breakdown.statistics.score}`);
+    assert.ok(
+      report.breakdown.statistics.score >= 10,
+      `Contenido con múltiples stats debería puntuar ≥10 en stats, obtuvo ${report.breakdown.statistics.score}`
+    );
   });
 });
 
@@ -415,20 +453,27 @@ describe("scoreContent — generación de recommendations", () => {
     const { report } = scoreContent(GOOD_HTML, "good.html", {});
     // El HTML bueno tiene buena estructura, stats, citas, links
     // Puede tener recomendaciones menores, pero no masivas
-    assert.ok(report.recommendations.length < 8,
-      `Contenido bueno debería tener <8 recomendaciones, obtuvo ${report.recommendations.length}`);
+    assert.ok(
+      report.recommendations.length < 8,
+      `Contenido bueno debería tener <8 recomendaciones, obtuvo ${report.recommendations.length}`
+    );
   });
 
   it("contenido pobre tiene múltiples recomendaciones", () => {
     const { report } = scoreContent(POOR_MD, "poor.md", {});
-    assert.ok(report.recommendations.length >= 2,
-      `Contenido pobre debería tener ≥2 recomendaciones, obtuvo ${report.recommendations.length}`);
+    assert.ok(
+      report.recommendations.length >= 2,
+      `Contenido pobre debería tener ≥2 recomendaciones, obtuvo ${report.recommendations.length}`
+    );
   });
 
   it("cada recomendación es un string no vacío", () => {
     const { report } = scoreContent(GOOD_MD, "good.md", {});
     for (const rec of report.recommendations) {
-      assert.ok(typeof rec === "string" && rec.length > 0, "Cada recomendación debe ser string no vacío");
+      assert.ok(
+        typeof rec === "string" && rec.length > 0,
+        "Cada recomendación debe ser string no vacío"
+      );
     }
   });
 });
@@ -447,24 +492,33 @@ describe("scoreContent — edge cases de HTML", () => {
     const { report } = scoreContent(GOOD_HTML, "good.html", {});
     const dynFinding = report.findings.find((f) => f.ruleId === "content.dynamic_rendering");
     // GOOD_HTML no tiene app container ni createApp/ReactDOM.render
-    assert.ok(!dynFinding || dynFinding.severity === "pass",
-      "HTML bueno sin JS dinámico no debería tener dynamic_rendering warn/fail");
+    assert.ok(
+      !dynFinding || dynFinding.severity === "pass",
+      "HTML bueno sin JS dinámico no debería tener dynamic_rendering warn/fail"
+    );
   });
 });
 
 describe("scoreContent — metadata del reporte", () => {
   it("reportVersion y modelVersion son strings con formato de versión", () => {
     const { report } = scoreContent(GOOD_MD, "test.md", {});
-    assert.ok(/^\d+\.\d+\.\d+/.test(report.reportVersion),
-      `reportVersion debe ser semver-like, obtuvo ${report.reportVersion}`);
-    assert.ok(/^\d+\.\d+\.\d+/.test(report.modelVersion),
-      `modelVersion debe ser semver-like, obtuvo ${report.modelVersion}`);
+    assert.ok(
+      /^\d+\.\d+\.\d+/.test(report.reportVersion),
+      `reportVersion debe ser semver-like, obtuvo ${report.reportVersion}`
+    );
+    assert.ok(
+      /^\d+\.\d+\.\d+/.test(report.modelVersion),
+      `modelVersion debe ser semver-like, obtuvo ${report.modelVersion}`
+    );
   });
 
   it("generatedAt es una fecha ISO 8601 válida", () => {
     const { report } = scoreContent(GOOD_MD, "test.md", {});
     const d = new Date(report.generatedAt);
-    assert.ok(!isNaN(d.getTime()), `generatedAt debe ser fecha ISO8601 válida, obtuvo ${report.generatedAt}`);
+    assert.ok(
+      !isNaN(d.getTime()),
+      `generatedAt debe ser fecha ISO8601 válida, obtuvo ${report.generatedAt}`
+    );
   });
 
   it("file en el reporte coincide con el filepath pasado", () => {

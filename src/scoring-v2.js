@@ -16,7 +16,6 @@
 import { preprocessContent } from "./text.js";
 import { PROFILES, isApplicable, notApplicableDimensions, resolveProfile } from "./profiles.js";
 import { observeContent } from "./observations.js";
-import { EVIDENCE_REGISTRY } from "./evidence.js";
 import {
   buildReportMeta,
   createFinding,
@@ -71,10 +70,11 @@ function scoreStructure(obs, profile) {
         evidenceLabel: "heuristic",
         applicability: profile,
         observedFacts: { issues: obs.headingHierarchy.issues },
-        remediation:
-          obs.headingHierarchy.issues.includes("missing_h1")
-            ? "Add a single H1 heading as the page title so parsers can identify the main topic."
-            : "Fix skipped heading levels: " + obs.headingHierarchy.issues.join(", ") + ". Use a sequential H1→H2→H3 hierarchy without gaps.",
+        remediation: obs.headingHierarchy.issues.includes("missing_h1")
+          ? "Add a single H1 heading as the page title so parsers can identify the main topic."
+          : "Fix skipped heading levels: " +
+            obs.headingHierarchy.issues.join(", ") +
+            ". Use a sequential H1→H2→H3 hierarchy without gaps.",
       })
     );
   }
@@ -84,10 +84,11 @@ function scoreStructure(obs, profile) {
     score += 5;
     details.push("Sections: All sections have adequate body content (+5 pts)");
   } else if (obs.sectionSelfContainment.status === "warn") {
-    const warnEmpty = obs.sectionSelfContainment.details
-      ?.filter((d) => d.isEmpty)
-      .map((d) => d.header)
-      .join(", ") ?? "";
+    const warnEmpty =
+      obs.sectionSelfContainment.details
+        ?.filter((d) => d.isEmpty)
+        .map((d) => d.header)
+        .join(", ") ?? "";
     score += 2;
     details.push(`Sections: ${obs.sectionSelfContainment.message} (+2 pts)`);
     findings.push(
@@ -102,17 +103,17 @@ function scoreStructure(obs, profile) {
           totalSections: obs.sectionSelfContainment.details?.length ?? 0,
           emptySections: obs.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0,
         },
-        remediation:
-          warnEmpty
-            ? `Sections with thin body content: ${warnEmpty}. Expand each so it can stand alone when surfaced as an AI answer snippet.`
-            : "Give every heading enough body content to stand on its own when retrieved out of context.",
+        remediation: warnEmpty
+          ? `Sections with thin body content: ${warnEmpty}. Expand each so it can stand alone when surfaced as an AI answer snippet.`
+          : "Give every heading enough body content to stand on its own when retrieved out of context.",
       })
     );
   } else {
-    const emptyDetails = obs.sectionSelfContainment.details
-      ?.filter((d) => d.isEmpty)
-      .map((d) => d.header)
-      .join(", ") ?? "";
+    const emptyDetails =
+      obs.sectionSelfContainment.details
+        ?.filter((d) => d.isEmpty)
+        .map((d) => d.header)
+        .join(", ") ?? "";
     details.push(`Sections: ${obs.sectionSelfContainment.message} (+0 pts)`);
     findings.push(
       createFinding({
@@ -126,10 +127,9 @@ function scoreStructure(obs, profile) {
           totalSections: obs.sectionSelfContainment.details?.length ?? 0,
           emptySections: obs.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0,
         },
-        remediation:
-          emptyDetails
-            ? `Sections with insufficient content: ${emptyDetails}. Expand each heading's body text so it stands on its own when retrieved out of context, or merge thin sections into parent topics.`
-            : "Add substantive content under each heading; remove or merge empty placeholder sections.",
+        remediation: emptyDetails
+          ? `Sections with insufficient content: ${emptyDetails}. Expand each heading's body text so it stands on its own when retrieved out of context, or merge thin sections into parent topics.`
+          : "Add substantive content under each heading; remove or merge empty placeholder sections.",
       })
     );
   }
@@ -236,7 +236,8 @@ function scoreStatistics(obs, profile) {
           statsWithNearbySource: attr.statsWithNearbySource,
           statsWithoutNearbySource: attr.statsWithoutNearbySource,
         },
-        remediation: "Cite a named source next to each externally-sourced statistic that currently lacks one.",
+        remediation:
+          "Cite a named source next to each externally-sourced statistic that currently lacks one.",
       })
     );
   } else if (totalStats >= 3) {
@@ -296,7 +297,8 @@ function scoreStatistics(obs, profile) {
           statsWithoutNearbySource: attr.statsWithoutNearbySource,
           attributionRatio: Math.round(attributionRatio * 100) / 100,
         },
-        remediation: "Add a named source next to each externally-sourced statistic so readers can verify claims. Descriptive numbers (counts, versions, sizes) may not need attribution.",
+        remediation:
+          "Add a named source next to each externally-sourced statistic so readers can verify claims. Descriptive numbers (counts, versions, sizes) may not need attribution.",
       })
     );
   }
@@ -354,7 +356,8 @@ function scoreQuotations(obs, profile) {
           quotesWithAttribution: attr.quotesWithAttribution,
           quotesWithoutAttribution: attr.quotesWithoutAttribution,
         },
-        remediation: "Attribute each quote to a named person with their title and context. Customer testimonials are fine without full attribution when marked as reviews.",
+        remediation:
+          "Attribute each quote to a named person with their title and context. Customer testimonials are fine without full attribution when marked as reviews.",
       })
     );
   } else {
@@ -373,7 +376,8 @@ function scoreQuotations(obs, profile) {
           quotesWithAttribution: attr.quotesWithAttribution,
           quotesWithoutAttribution: attr.quotesWithoutAttribution,
         },
-        remediation: "Attribute each quote to a named person with their title and context. Customer testimonials and product reviews are acceptable without full attribution when marked as such.",
+        remediation:
+          "Attribute each quote to a named person with their title and context. Customer testimonials and product reviews are acceptable without full attribution when marked as such.",
       })
     );
   }
@@ -405,7 +409,8 @@ function scoreQuotations(obs, profile) {
           quotesWithoutAttribution: attr.quotesWithoutAttribution,
           attributionRatio: Math.round(attributionRatio * 100) / 100,
         },
-        remediation: "Attribute each quote to a named speaker with verifiable credentials, or clearly mark it as a testimonial/review if attribution is not possible.",
+        remediation:
+          "Attribute each quote to a named speaker with verifiable credentials, or clearly mark it as a testimonial/review if attribution is not possible.",
       })
     );
   }
@@ -465,7 +470,8 @@ function scoreCitations(obs, profile) {
         ruleId: "v2.citations.no_links",
         category: "citations",
         severity: "warn",
-        message: "No external hyperlinks found. Citations improve authority signals for AI-driven search and retrieval.",
+        message:
+          "No external hyperlinks found. Citations improve authority signals for AI-driven search and retrieval.",
         evidenceLabel: "strong",
         applicability: profile,
         sourceRefs: ["geo-kdd-2024", "what-gets-cited-2025"],

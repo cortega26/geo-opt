@@ -8,6 +8,11 @@ const REQUIRED_FIELDS = {
   Product: ["name"],
   Organization: ["name"],
   Person: ["name"],
+  // Pro types
+  Course: ["name", "description"],
+  Event: ["name", "startDate"],
+  Recipe: ["name", "recipeIngredient", "recipeInstructions"],
+  HowTo: ["name", "step"],
 };
 
 export function validateSchemaFile(filepath) {

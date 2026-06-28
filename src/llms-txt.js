@@ -215,7 +215,7 @@ function renderPageForFullTxt(entry, maxChars, lines) {
     if (lines.join("\n").length >= maxChars) {
       lines.push("");
       lines.push(`> ⚠️ Content truncated at ~${maxChars.toLocaleString()} characters.`);
-      lines.push(`> Remaining pages omitted. Increase --max-chars or split into multiple files.`);
+      lines.push("> Remaining pages omitted. Increase --max-chars or split into multiple files.");
       return false;
     }
   }
@@ -289,25 +289,27 @@ function extractHtmlBodyForFullTxt(html) {
 
   // Convert to text preserving heading markers
   const parts = [];
-  $content.find("h1, h2, h3, h4, h5, h6, p, ul, ol, li, table, pre, code, blockquote").each((_, el) => {
-    const tag = el.tagName.toLowerCase();
-    const text = $(el).text().replace(/\s+/g, " ").trim();
-    if (!text) return;
+  $content
+    .find("h1, h2, h3, h4, h5, h6, p, ul, ol, li, table, pre, code, blockquote")
+    .each((_, el) => {
+      const tag = el.tagName.toLowerCase();
+      const text = $(el).text().replace(/\s+/g, " ").trim();
+      if (!text) return;
 
-    if (tag.startsWith("h")) {
-      const level = parseInt(tag[1]);
-      parts.push("\n" + "#".repeat(level) + " " + text + "\n");
-    } else if (tag === "li") {
-      parts.push("- " + text);
-    } else if (tag === "pre" || tag === "code") {
-      const code = $(el).text();
-      parts.push("\n```\n" + code + "\n```\n");
-    } else if (tag === "blockquote") {
-      parts.push("> " + text);
-    } else {
-      parts.push(text);
-    }
-  });
+      if (tag.startsWith("h")) {
+        const level = parseInt(tag[1]);
+        parts.push("\n" + "#".repeat(level) + " " + text + "\n");
+      } else if (tag === "li") {
+        parts.push("- " + text);
+      } else if (tag === "pre" || tag === "code") {
+        const code = $(el).text();
+        parts.push("\n```\n" + code + "\n```\n");
+      } else if (tag === "blockquote") {
+        parts.push("> " + text);
+      } else {
+        parts.push(text);
+      }
+    });
 
   return parts.join("\n\n");
 }
@@ -408,8 +410,7 @@ export function generateLlmsFullTxtFiles(entries, options = {}) {
       // Finalize current file
       fileIndex++;
       const title = fileIndex === 1 ? siteTitle : `${siteTitle} (Part ${fileIndex})`;
-      const fileName =
-        fileIndex === 1 ? "llms-full.txt" : `llms-full-${fileIndex}.txt`;
+      const fileName = fileIndex === 1 ? "llms-full.txt" : `llms-full-${fileIndex}.txt`;
       files.push({
         name: fileName,
         content: header(title) + currentEntries.join(""),
@@ -426,11 +427,8 @@ export function generateLlmsFullTxtFiles(entries, options = {}) {
   if (currentEntries.length > 0) {
     fileIndex++;
     const title =
-      fileIndex === 1 && files.length === 0
-        ? siteTitle
-        : `${siteTitle} (Part ${fileIndex})`;
-    const fileName =
-      files.length === 0 ? "llms-full.txt" : `llms-full-${fileIndex}.txt`;
+      fileIndex === 1 && files.length === 0 ? siteTitle : `${siteTitle} (Part ${fileIndex})`;
+    const fileName = files.length === 0 ? "llms-full.txt" : `llms-full-${fileIndex}.txt`;
     files.push({
       name: fileName,
       content: header(title) + currentEntries.join(""),
@@ -669,9 +667,10 @@ export function generateRobotsTxt(options = {}) {
     lines.push("");
 
     for (const entry of groups.user) {
-      const robotsNote = entry.robotsApplicable === false
-        ? `${B}# User-triggered requests may ignore robots.txt.`
-        : "";
+      const robotsNote =
+        entry.robotsApplicable === false
+          ? `${B}# User-triggered requests may ignore robots.txt.`
+          : "";
       if (robotsNote) lines.push(robotsNote);
       lines.push(`${B}# ${entry.provider} — ${describePurpose(entry.purpose)}`);
       lines.push(`${B}# Official source: ${entry.officialSource}`);
@@ -726,7 +725,9 @@ export function generateRobotsTxt(options = {}) {
     lines.push(`${B}# These are not distinct HTTP user agents. They act as feature`);
     lines.push(`${B}# toggles within each provider's product (e.g., Google SGE,`);
     lines.push(`${B}# Apple Intelligence). Check the provider's documentation.`);
-    lines.push(`${B}# Under '${preset}' preset: ${preset === "open" ? "allowed (opt-in)." : "disallowed (opt-out)."}`);
+    lines.push(
+      `${B}# Under '${preset}' preset: ${preset === "open" ? "allowed (opt-in)." : "disallowed (opt-out)."}`
+    );
     lines.push("");
 
     for (const entry of groups.control) {

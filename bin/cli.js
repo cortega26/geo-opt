@@ -15,11 +15,14 @@ import {
   discoverFiles,
   extractPageMetadata,
   generateLlmsTxt,
-  generateLlmsFullTxt,
   generateLlmsFullTxtFiles,
   suggestSection,
   generateRobotsTxt,
   generateSchemaData,
+  COMMUNITY_SCHEMA_TYPES,
+  PRO_SCHEMA_TYPES,
+  hasProEntitlement,
+  LICENSE_ENV_VAR,
   loadConfig,
   getNoBrandingError,
   recordSuccessfulFreeInjection,
@@ -27,8 +30,6 @@ import {
   setRemindersEnabled,
   validateSchemaFile,
   generateSitemapXml,
-  scoreToPriority,
-  determineChangefreq,
 } from "../src/index.js";
 import {
   renderV1Report,
@@ -36,6 +37,12 @@ import {
   renderV1Summary,
   renderV2Summary,
 } from "../src/renderer.js";
+import {
+  renderV1ReportHtml,
+  renderV2ReportHtml,
+  renderAggregateReportHtml,
+  renderComparisonHtml,
+} from "../src/html-report.js";
 import { CONSENT_GRANTED, resolveTelemetryStatus, setTelemetryConsent } from "../src/telemetry.js";
 
 // --- Global --config option ---
@@ -138,12 +145,17 @@ program
 
     // ── Unified audit: one path for v1 and v2 ──
     const showProgress = format !== "json" && discovered.length > 1;
-    const results = auditFiles(discovered, config, model,
-      showProgress ? (i, total, fp) => {
-        const pct = Math.round(((i + 1) / total) * 100);
-        process.stderr.write(`\r  Auditing... ${i + 1}/${total} (${pct}%)`);
-        if (i + 1 === total) process.stderr.write("\n");
-      } : undefined
+    const results = auditFiles(
+      discovered,
+      config,
+      model,
+      showProgress
+        ? (i, total, _fp) => {
+            const pct = Math.round(((i + 1) / total) * 100);
+            process.stderr.write(`\r  Auditing... ${i + 1}/${total} (${pct}%)`);
+            if (i + 1 === total) process.stderr.write("\n");
+          }
+        : undefined
     );
 
     if (format === "json") {
@@ -255,9 +267,7 @@ robotsCmd
   });
 
 // --- Sitemap ---
-const sitemapCmd = program
-  .command("sitemap")
-  .description("Generate sitemap.xml from content tree");
+const sitemapCmd = program.command("sitemap").description("Generate sitemap.xml from content tree");
 
 sitemapCmd
   .command("generate [files...]")
@@ -361,7 +371,12 @@ sitemapCmd
 // --- Schema ---
 program
   .command("schema <file> <type>")
-  .description("Generate JSON-LD structured data (article|faq|product)")
+  .description(
+    "Generate JSON-LD structured data.\n" +
+      `  Community types: ${[...COMMUNITY_SCHEMA_TYPES].join(", ")}\n` +
+      `  Pro types:       ${[...PRO_SCHEMA_TYPES].join(", ")} (requires Pro license)\n` +
+      "  Multi-type:      comma-separated, e.g. course,howto"
+  )
   .action((file, type, options, cmd) => {
     const config = resolveConfig(cmd);
     try {
@@ -814,6 +829,121 @@ program
     }
   });
 
+// --- Report (Pro): HTML audit reports with charts and comparison mode ---
+program
+  .command("report <files...>")
+  .description(
+    "Generate a Pro HTML audit report with charts (requires Pro license).\n" +
+      "  Open the output file in a browser; use File > Print > Save as PDF for PDF export."
+  )
+  .option("-o, --output <file>", "Output HTML file", "geo-report.html")
+  .option("-m, --model <version>", "Scoring model: v1 or v2", "v1")
+  .option("-r, --recursive", "Recursively scan directories")
+  .option("--ignore <patterns...>", "Additional ignore patterns")
+  .option("--compare <file>", "Compare against a previous JSON report (before/after mode)")
+  .option("--no-branding", "Remove Tooltician branding (Pro only)")
+  .action((files, options, cmd) => {
+    const config = resolveConfig(cmd);
+    if (!hasProEntitlement(config)) {
+      console.error(
+        "Error: 'geo-opt report' requires a Tooltician Pro license.\n" +
+          `Set ${LICENSE_ENV_VAR} or license.key in geo_config.json.`
+      );
+      process.exit(1);
+    }
+
+    const noBranding = options.branding === false;
+    if (noBranding) {
+      const err = getNoBrandingError(config);
+      if (err) {
+        console.error(`Error: ${err}`);
+        process.exit(1);
+      }
+    }
+
+    const model = options.model || "v1";
+    if (!["v1", "v2"].includes(model)) {
+      console.error(`Error: --model must be "v1" or "v2", got "${model}".`);
+      process.exit(1);
+    }
+
+    const allowedExts = new Set([".md", ".html", ".htm"]);
+    let discovered;
+    try {
+      discovered = discoverFiles(files, {
+        recursive: options.recursive || false,
+        ignorePatterns: options.ignore || [],
+        allowedExtensions: allowedExts,
+        cwd: process.cwd(),
+        config,
+      });
+    } catch (e) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+
+    if (discovered.length === 0) {
+      console.error("No matching files found.");
+      process.exit(1);
+    }
+
+    const results = auditFiles(discovered, config, model);
+    const summary = aggregateReport(results);
+    const successResults = results.filter((r) => r.status === "success");
+
+    let html;
+    if (options.compare) {
+      // Comparison mode: single file vs saved baseline JSON
+      if (discovered.length !== 1) {
+        console.error("Error: --compare requires exactly one input file.");
+        process.exit(1);
+      }
+      let baseline;
+      try {
+        baseline = JSON.parse(fs.readFileSync(options.compare, { encoding: "utf8" }));
+      } catch (e) {
+        console.error(`Error: Failed to read baseline report "${options.compare}": ${e.message}`);
+        process.exit(1);
+      }
+      const current = successResults[0]?.report;
+      if (!current) {
+        console.error(`Error: Could not audit ${discovered[0]}.`);
+        process.exit(1);
+      }
+      html = renderComparisonHtml(baseline, current, discovered[0], { noBranding });
+    } else if (successResults.length === 1) {
+      // Single-file report
+      const r = successResults[0];
+      html =
+        model === "v2"
+          ? renderV2ReportHtml(r.report, r.file, { noBranding })
+          : renderV1ReportHtml(r.report, r.file, { noBranding });
+    } else {
+      // Multi-file aggregate report
+      html = renderAggregateReportHtml(results, summary, { noBranding });
+    }
+
+    const outPath = path.resolve(options.output);
+    try {
+      assertNewFileParentInsideCwd(outPath);
+      fs.writeFileSync(outPath, html, { encoding: "utf8" });
+    } catch (e) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+
+    const rel = path.relative(process.cwd(), outPath);
+    console.log(`✓ Report written → ${rel}`);
+    if (successResults.length > 1) {
+      console.log(
+        `  ${successResults.length} files · avg score: ${summary.averageScore ?? "N/A"}/100`
+      );
+    } else if (successResults.length === 1) {
+      console.log(`  Score: ${successResults[0].score ?? "N/A"}/100`);
+    }
+    console.log("  Open in a browser. Use File > Print > Save as PDF for PDF export.");
+  });
+
 // --- Generate-All: complete GEO optimization package ---
 program
   .command("generate-all [dir]")
@@ -879,7 +1009,7 @@ program
     const fullEntries = [];
     for (const r of auditResults) {
       if (r.status === "success" && r.report) {
-        const score = r.score ?? (r.report.total_score ?? r.report.effectiveScore);
+        const score = r.score ?? r.report.total_score ?? r.report.effectiveScore;
         scoreEntries.push({ file: r.file, score });
       }
       // Read content for full-text generation
@@ -894,7 +1024,7 @@ program
         else if (!urlPath.startsWith("/")) urlPath = "/" + urlPath;
         const url = siteUrl ? siteUrl.replace(/\/+$/, "") + urlPath : urlPath;
         const section = suggestSection(r.file, content);
-        const score = r.score ?? (r.report?.total_score ?? r.report?.effectiveScore ?? undefined);
+        const score = r.score ?? r.report?.total_score ?? r.report?.effectiveScore ?? undefined;
         fullEntries.push({ title, url, section, content, score });
       } catch {
         // Skip files that can't be read
@@ -942,11 +1072,15 @@ program
     if (options.dryRun) {
       console.log("=== DRY RUN — No files will be written ===\n");
       console.log(`Would create package in: ${outDir}/`);
-      console.log(`  • audit-report.json (${files.length} files, avg score: ${aggregate.averageScore ?? "N/A"})`);
-      console.log(`  • llms.txt (${fullEntries.length} pages, ${new Set(fullEntries.map(e => e.section)).size} sections)`);
+      console.log(
+        `  • audit-report.json (${files.length} files, avg score: ${aggregate.averageScore ?? "N/A"})`
+      );
+      console.log(
+        `  • llms.txt (${fullEntries.length} pages, ${new Set(fullEntries.map((e) => e.section)).size} sections)`
+      );
       console.log(`  • llms-full.txt (${llmsFullFiles.length} file(s))`);
       console.log(`  • sitemap.xml (${sitemapEntries.length} URLs)`);
-      console.log(`  • robots.txt`);
+      console.log("  • robots.txt");
       console.log("");
       console.log("Preview — llms.txt:");
       console.log(llmsContent.substring(0, 500));
@@ -963,13 +1097,15 @@ program
 
       console.log("");
       console.log("✅ GEO optimization package generated:");
-      console.log(`   📊 audit-report.json  (${files.length} files, avg: ${aggregate.averageScore ?? "N/A"})`);
+      console.log(
+        `   📊 audit-report.json  (${files.length} files, avg: ${aggregate.averageScore ?? "N/A"})`
+      );
       console.log(`   📋 llms.txt           (${fullEntries.length} pages)`);
       for (const file of llmsFullFiles) {
         console.log(`   📄 ${file.name.padEnd(20)} (full content)`);
       }
       console.log(`   🗺️  sitemap.xml        (${sitemapEntries.length} URLs)`);
-      console.log(`   🤖 robots.txt`);
+      console.log("   🤖 robots.txt");
       console.log(`\n   Output: ${outDir}/`);
     }
 
@@ -977,7 +1113,7 @@ program
       // Show top-level summary
       const topIssues = (aggregate.topFindings || []).slice(0, 3);
       if (topIssues.length > 0) {
-        console.log(`\n📝 Top issues to fix:`);
+        console.log("\n📝 Top issues to fix:");
         for (const issue of topIssues) {
           console.log(`   • ${issue.message} (${issue.fileCount} files)`);
         }

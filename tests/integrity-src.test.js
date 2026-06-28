@@ -153,9 +153,7 @@ console.log(JSON.stringify(result));
     copyFileSync(realLicensing, join(tmpDir, "licensing.js"));
 
     // Calcular hash real del licensing.js para que coincida
-    const realHash = createHash("sha256")
-      .update(readFileSync(realLicensing, "utf8"))
-      .digest("hex");
+    const realHash = createHash("sha256").update(readFileSync(realLicensing, "utf8")).digest("hex");
 
     writeFileSync(
       testFile,

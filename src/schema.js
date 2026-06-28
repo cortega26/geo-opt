@@ -8,13 +8,15 @@ import {
   cleanHtmlText,
   truncateDescription,
 } from "./text.js";
-import { getNoBrandingError } from "./integrity.js";
+import { getNoBrandingError, hasProEntitlement, LICENSE_ENV_VAR } from "./integrity.js";
 
 export const TOOLTICIAN_BRANDING_MARKDOWN =
   "Optimized with [Tooltician](https://www.tooltician.com)";
 export const TOOLTICIAN_BRANDING_HTML =
   '<div class="geo-signature"><p>Optimized with <a href="https://www.tooltician.com">Tooltician</a></p></div>';
-const SUPPORTED_SCHEMA_TYPES = new Set(["article", "faq", "product"]);
+export const COMMUNITY_SCHEMA_TYPES = new Set(["article", "faq", "product"]);
+export const PRO_SCHEMA_TYPES = new Set(["course", "event", "recipe", "howto"]);
+const SUPPORTED_SCHEMA_TYPES = new Set([...COMMUNITY_SCHEMA_TYPES, ...PRO_SCHEMA_TYPES]);
 
 function optionalId(baseUrl, fragment) {
   return baseUrl ? `${baseUrl}/#${fragment}` : null;
@@ -111,12 +113,190 @@ export function assertNewFileParentInsideCwd(filepath) {
   return { parentRealPath: result.parentRealPath, cwdRealPath: result.cwdRealPath };
 }
 
+function extractListItems(rawText) {
+  const items = [];
+  for (const line of rawText.split("\n")) {
+    const m = line.match(/^[-*+]\s+(.+)$/);
+    if (m) items.push(m[1].trim());
+  }
+  return items;
+}
+
+function extractNumberedSteps(rawText) {
+  const steps = [];
+  for (const line of rawText.split("\n")) {
+    const m = line.match(/^\d+\.\s+(.+)$/);
+    if (m) steps.push(m[1].trim());
+  }
+  return steps;
+}
+
+// Extract the raw body of a named markdown section (preserves list markers).
+function extractRawSection(rawContent, ...names) {
+  const lower = names.map((n) => n.toLowerCase());
+  const lines = rawContent.split("\n");
+  let inSection = false;
+  let sectionDepth = 0;
+  const bodyLines = [];
+  for (const line of lines) {
+    const hm = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hm) {
+      const level = hm[1].length;
+      const header = hm[2].trim().toLowerCase();
+      if (!inSection && lower.includes(header) && level >= 2) {
+        inSection = true;
+        sectionDepth = level;
+        continue;
+      }
+      if (inSection && level <= sectionDepth) {
+        break;
+      }
+    }
+    if (inSection) bodyLines.push(line);
+  }
+  return bodyLines.join("\n");
+}
+
+function buildCourseNodes(
+  title,
+  description,
+  config,
+  pubUrl,
+  orgNode,
+  orgId,
+  authorNode,
+  authorId
+) {
+  const courseNode = { "@type": "Course", name: title };
+  const courseId = optionalId(pubUrl, "course");
+  if (courseId) courseNode["@id"] = courseId;
+  if (description) courseNode.description = description;
+  const providerName = config.course?.provider;
+  if (providerName) {
+    courseNode.provider = { "@type": "Organization", name: providerName };
+  } else if (orgNode) {
+    courseNode.provider = referenceOrInline(orgNode, orgId);
+  }
+  if (authorNode) courseNode.author = referenceOrInline(authorNode, authorId);
+  return [courseNode];
+}
+
+function buildEventNodes(title, description, config, pubUrl, orgNode, orgId) {
+  const eventConfig = config.event || {};
+  const eventNode = { "@type": "Event", name: title };
+  const eventId = optionalId(pubUrl, "event");
+  if (eventId) eventNode["@id"] = eventId;
+  if (description) eventNode.description = description;
+  if (eventConfig.startDate) eventNode.startDate = eventConfig.startDate;
+  if (eventConfig.endDate) eventNode.endDate = eventConfig.endDate;
+  if (eventConfig.location) {
+    eventNode.location = { "@type": "Place", name: eventConfig.location };
+  }
+  if (orgNode) eventNode.organizer = referenceOrInline(orgNode, orgId);
+  return [eventNode];
+}
+
+function buildRecipeNodes(title, description, content, config, pubUrl, authorNode, authorId) {
+  const recipeConfig = config.recipe || {};
+  const ingredientRaw = extractRawSection(
+    content,
+    "ingredients",
+    "what you'll need",
+    "what you need"
+  );
+  const ingredients = extractListItems(ingredientRaw);
+  const instructionRaw = extractRawSection(
+    content,
+    "instructions",
+    "steps",
+    "method",
+    "directions",
+    "how to make"
+  );
+  let stepTexts = extractNumberedSteps(instructionRaw);
+  if (stepTexts.length === 0) stepTexts = extractListItems(instructionRaw);
+  const recipeNode = {
+    "@type": "Recipe",
+    name: title,
+    recipeIngredient: ingredients,
+    recipeInstructions: stepTexts.map((text, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      text,
+    })),
+  };
+  const recipeId = optionalId(pubUrl, "recipe");
+  if (recipeId) recipeNode["@id"] = recipeId;
+  if (description) recipeNode.description = description;
+  if (recipeConfig.totalTime) recipeNode.totalTime = recipeConfig.totalTime;
+  if (recipeConfig.recipeYield) recipeNode.recipeYield = recipeConfig.recipeYield;
+  if (recipeConfig.recipeCategory) recipeNode.recipeCategory = recipeConfig.recipeCategory;
+  if (authorNode) recipeNode.author = referenceOrInline(authorNode, authorId);
+  return [recipeNode];
+}
+
+function buildHowToNodes(title, description, content, config, pubUrl) {
+  const howtoConfig = config.howto || {};
+  const sections = extractSections(content);
+  const skippedHeaders = new Set([
+    "introduction",
+    "overview",
+    "summary",
+    "conclusion",
+    "references",
+    "sources",
+    "bibliography",
+  ]);
+  let stepNodes = sections
+    .filter((s) => !skippedHeaders.has(s.header.toLowerCase()))
+    .map((s) => ({
+      "@type": "HowToStep",
+      name: s.header,
+      text: cleanMarkdownToPlainText(s.body),
+    }));
+  if (stepNodes.length === 0) {
+    stepNodes = extractNumberedSteps(content).map((text, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      text,
+    }));
+  }
+  const howtoNode = { "@type": "HowTo", name: title, step: stepNodes };
+  const howtoId = optionalId(pubUrl, "howto");
+  if (howtoId) howtoNode["@id"] = howtoId;
+  if (description) howtoNode.description = description;
+  if (howtoConfig.totalTime) howtoNode.totalTime = howtoConfig.totalTime;
+  if (howtoConfig.estimatedCost) howtoNode.estimatedCost = howtoConfig.estimatedCost;
+  return [howtoNode];
+}
+
 // _content is an optional pre-read file body. When provided, the file
 // existence check and read are skipped — the caller (injectSchema) has
 // already read the file once to avoid double I/O.
 export function generateSchemaData(filepath, schemaType, config, _content = null) {
-  if (!SUPPORTED_SCHEMA_TYPES.has(schemaType)) {
-    throw new Error(`Unsupported schema type "${schemaType}". Expected article, faq, or product.`);
+  const types = String(schemaType)
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (types.length === 0) {
+    throw new Error(
+      "Schema type is required. Community types: article, faq, product. Pro types: course, event, recipe, howto."
+    );
+  }
+
+  for (const type of types) {
+    if (!SUPPORTED_SCHEMA_TYPES.has(type)) {
+      throw new Error(
+        `Unsupported schema type "${type}". Community types: article, faq, product. Pro types: course, event, recipe, howto.`
+      );
+    }
+    if (PRO_SCHEMA_TYPES.has(type) && !hasProEntitlement(config)) {
+      throw new Error(
+        `Schema type "${type}" requires a Tooltician Pro license. ` +
+          `Set ${LICENSE_ENV_VAR} or license.key in geo_config.json to unlock Pro types: course, event, recipe, howto.`
+      );
+    }
   }
 
   let content = _content;
@@ -200,22 +380,54 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
     if (authorId) graphNodes.push(authorNode);
   }
 
-  if (schemaType === "article") {
-    const articleNode = {
-      "@type": "NewsArticle",
-      headline: title,
-    };
-    const articleId = optionalId(pubUrl, "article");
-    if (articleId) articleNode["@id"] = articleId;
-    if (description) articleNode.description = description;
-    if (config.datePublished) articleNode.datePublished = config.datePublished;
-    if (authorNode) articleNode.author = referenceOrInline(authorNode, authorId);
-    if (orgNode) articleNode.publisher = referenceOrInline(orgNode, orgId);
-    graphNodes.push(articleNode);
+  for (const type of types) {
+    if (type === "article") {
+      const articleNode = {
+        "@type": "NewsArticle",
+        headline: title,
+      };
+      const articleId = optionalId(pubUrl, "article");
+      if (articleId) articleNode["@id"] = articleId;
+      if (description) articleNode.description = description;
+      if (config.datePublished) articleNode.datePublished = config.datePublished;
+      if (authorNode) articleNode.author = referenceOrInline(authorNode, authorId);
+      if (orgNode) articleNode.publisher = referenceOrInline(orgNode, orgId);
+      graphNodes.push(articleNode);
 
-    // FAQ extraction
-    const sections = extractSections(content);
-    if (sections.length > 0) {
+      // FAQ extraction
+      const sections = extractSections(content);
+      if (sections.length > 0) {
+        const qaList = [];
+        for (const section of sections.slice(0, 5)) {
+          if (
+            section.body.length < 15 ||
+            ["sources", "references", "citations", "bibliography"].includes(
+              section.header.toLowerCase()
+            )
+          ) {
+            continue;
+          }
+          qaList.push({
+            "@type": "Question",
+            name: section.header,
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: cleanMarkdownToPlainText(section.body),
+            },
+          });
+        }
+        if (qaList.length > 0) {
+          const faqNode = {
+            "@type": "FAQPage",
+            mainEntity: qaList,
+          };
+          const faqId = optionalId(pubUrl, "faq");
+          if (faqId) faqNode["@id"] = faqId;
+          graphNodes.push(faqNode);
+        }
+      }
+    } else if (type === "faq") {
+      const sections = extractSections(content);
       const qaList = [];
       for (const section of sections.slice(0, 5)) {
         if (
@@ -235,69 +447,60 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
           },
         });
       }
-      if (qaList.length > 0) {
-        const faqNode = {
-          "@type": "FAQPage",
-          mainEntity: qaList,
-        };
-        const faqId = optionalId(pubUrl, "faq");
-        if (faqId) faqNode["@id"] = faqId;
-        graphNodes.push(faqNode);
-      }
-    }
-  } else if (schemaType === "faq") {
-    const sections = extractSections(content);
-    const qaList = [];
-    for (const section of sections.slice(0, 5)) {
-      if (
-        section.body.length < 15 ||
-        ["sources", "references", "citations", "bibliography"].includes(
-          section.header.toLowerCase()
-        )
-      ) {
-        continue;
-      }
-      qaList.push({
-        "@type": "Question",
-        name: section.header,
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: cleanMarkdownToPlainText(section.body),
-        },
-      });
-    }
-    const faqNode = {
-      "@type": "FAQPage",
-      mainEntity: qaList,
-    };
-    const faqId = optionalId(pubUrl, "faq");
-    if (faqId) faqNode["@id"] = faqId;
-    graphNodes.push(faqNode);
-  } else if (schemaType === "product") {
-    const productNode = {
-      "@type": "Product",
-      name: title,
-    };
-    const productId = optionalId(pubUrl, "product");
-    if (productId) productNode["@id"] = productId;
-    if (description) productNode.description = description;
-    if (orgNode) productNode.brand = referenceOrInline(orgNode, orgId);
-
-    const offerInfo = config.product?.offer;
-    if (offerInfo?.price !== undefined && offerInfo?.priceCurrency) {
-      productNode.offers = {
-        "@type": "Offer",
-        price: String(offerInfo.price),
-        priceCurrency: offerInfo.priceCurrency,
+      const faqNode = {
+        "@type": "FAQPage",
+        mainEntity: qaList,
       };
-      if (offerInfo.availability) {
-        productNode.offers.availability = offerInfo.availability;
+      const faqId = optionalId(pubUrl, "faq");
+      if (faqId) faqNode["@id"] = faqId;
+      graphNodes.push(faqNode);
+    } else if (type === "product") {
+      const productNode = {
+        "@type": "Product",
+        name: title,
+      };
+      const productId = optionalId(pubUrl, "product");
+      if (productId) productNode["@id"] = productId;
+      if (description) productNode.description = description;
+      if (orgNode) productNode.brand = referenceOrInline(orgNode, orgId);
+
+      const offerInfo = config.product?.offer;
+      if (offerInfo?.price !== undefined && offerInfo?.priceCurrency) {
+        productNode.offers = {
+          "@type": "Offer",
+          price: String(offerInfo.price),
+          priceCurrency: offerInfo.priceCurrency,
+        };
+        if (offerInfo.availability) {
+          productNode.offers.availability = offerInfo.availability;
+        }
+        if (orgNode) {
+          productNode.offers.seller = referenceOrInline(orgNode, orgId);
+        }
       }
-      if (orgNode) {
-        productNode.offers.seller = referenceOrInline(orgNode, orgId);
-      }
+      graphNodes.push(productNode);
+    } else if (type === "course") {
+      graphNodes.push(
+        ...buildCourseNodes(
+          title,
+          description,
+          config,
+          pubUrl,
+          orgNode,
+          orgId,
+          authorNode,
+          authorId
+        )
+      );
+    } else if (type === "event") {
+      graphNodes.push(...buildEventNodes(title, description, config, pubUrl, orgNode, orgId));
+    } else if (type === "recipe") {
+      graphNodes.push(
+        ...buildRecipeNodes(title, description, content, config, pubUrl, authorNode, authorId)
+      );
+    } else if (type === "howto") {
+      graphNodes.push(...buildHowToNodes(title, description, content, config, pubUrl));
     }
-    graphNodes.push(productNode);
   }
 
   return {

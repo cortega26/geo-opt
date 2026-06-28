@@ -9,6 +9,29 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- `geo-opt report` command (Pro): generates standalone HTML audit reports with SVG score
+  gauges, dimension bar charts, and print-ready styling (open in browser, use File > Print >
+  Save as PDF). Supports single-file, multi-file aggregate, and before/after comparison mode
+  (`--compare <baseline.json>`). License-gated: exits non-zero without a Pro key.
+- `renderV1ReportHtml`, `renderV2ReportHtml`, `renderAggregateReportHtml`, `renderComparisonHtml`
+  pure renderer functions in `src/html-report.js`. Exported from `src/index.js` and typed
+  in `index.d.ts` (`HtmlReportOptions` interface).
+- 7 new tests in `tests/optimizer.test.js` covering HTML structure, branding suppression, SVG
+  gauge presence, V2 profile display, aggregate site report, comparison delta rendering, and CLI
+  Pro gate.
+
+- Pro-only schema types: `course`, `event`, `recipe`, `howto` in `generateSchemaData`. Pro types
+  require a valid Tooltician Pro license key; Community users receive a descriptive upgrade error.
+  Multi-type support via comma-separated values (e.g. `course,howto` in one `@graph`).
+- Exported `COMMUNITY_SCHEMA_TYPES` and `PRO_SCHEMA_TYPES` sets from `src/schema.js` and the
+  public API (`src/index.js`, `index.d.ts`). New `CommunitySchemaType`, `ProSchemaType`, and
+  `SchemaType` type aliases in `index.d.ts`.
+- `validate.js` `REQUIRED_FIELDS` extended with Course, Event, Recipe, and HowTo required fields
+  per Schema.org guidelines.
+- Schema CLI description now lists Community and Pro types with multi-type example.
+- 12 new tests in `tests/optimizer.test.js` covering Pro type generation, entitlement gating, recipe
+  ingredient/step extraction, HowTo section and numbered-list extraction, and multi-type combos.
+
 - Behavior tests for JSON-LD validation outcomes (`tests/validate.test.js`):
   file-not-found exits 1, no-block info message, valid schema, missing required
   fields, HTML script-tag extraction, multi-block count, and unknown-type note.

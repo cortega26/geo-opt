@@ -529,10 +529,11 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
         observedFacts: {
           issues: observations.headingHierarchy.issues,
         },
-        remediation:
-          observations.headingHierarchy.issues.includes("missing_h1")
-            ? "Add a single H1 heading as the page title."
-            : "Fix heading hierarchy issues: " + (observations.headingHierarchy.issues || []).join(", ") + ". Use sequential H1→H2→H3 without skipping levels.",
+        remediation: observations.headingHierarchy.issues.includes("missing_h1")
+          ? "Add a single H1 heading as the page title."
+          : "Fix heading hierarchy issues: " +
+            (observations.headingHierarchy.issues || []).join(", ") +
+            ". Use sequential H1→H2→H3 without skipping levels.",
       })
     );
   }
@@ -544,11 +545,12 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
   ) {
     const emptyCount =
       observations.sectionSelfContainment.details?.filter((d) => d.isEmpty).length ?? 0;
-    const emptyNames = observations.sectionSelfContainment.details
-      ?.filter((d) => d.isEmpty)
-      .map((d) => d.header)
-      .slice(0, 5)
-      .join(", ") ?? "";
+    const emptyNames =
+      observations.sectionSelfContainment.details
+        ?.filter((d) => d.isEmpty)
+        .map((d) => d.header)
+        .slice(0, 5)
+        .join(", ") ?? "";
     findings.push(
       createFinding({
         ruleId: "v2.observations.section_containment",
@@ -561,10 +563,9 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           totalSections: observations.sectionSelfContainment.details?.length ?? 0,
           emptySections: emptyCount,
         },
-        remediation:
-          emptyNames
-            ? `Sections with insufficient body content: ${emptyNames}. Expand prose under each heading so it can stand alone in AI-generated answers, or merge thin sections.`
-            : "Give every heading enough body content to stand on its own when retrieved out of context.",
+        remediation: emptyNames
+          ? `Sections with insufficient body content: ${emptyNames}. Expand prose under each heading so it can stand alone in AI-generated answers, or merge thin sections.`
+          : "Give every heading enough body content to stand on its own when retrieved out of context.",
       })
     );
   }
@@ -657,10 +658,9 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
           hasSourcesSection: observations.linkQuality.hasSourcesSection,
           hasExcessiveLinks: observations.linkQuality.hasExcessiveLinks,
         },
-        remediation:
-          observations.linkQuality.hasExcessiveLinks
-            ? `Reduce excessive outbound links (${observations.linkQuality.externalLinkCount} found). Keep only relevant, authoritative citations that support your claims.`
-            : "Link key claims to authoritative external sources and add a dedicated references section.",
+        remediation: observations.linkQuality.hasExcessiveLinks
+          ? `Reduce excessive outbound links (${observations.linkQuality.externalLinkCount} found). Keep only relevant, authoritative citations that support your claims.`
+          : "Link key claims to authoritative external sources and add a dedicated references section.",
       })
     );
   }

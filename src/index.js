@@ -58,6 +58,8 @@ export { scoreContentV2 } from "./scoring-v2.js";
 export {
   assertNewFileParentInsideCwd,
   assertWritableTargetInsideCwd,
+  COMMUNITY_SCHEMA_TYPES,
+  PRO_SCHEMA_TYPES,
   generateSchemaData,
   injectSchema,
   validateWritableTargetInsideCwd,
@@ -88,3 +90,9 @@ export {
   scoreToPriority,
   determineChangefreq,
 } from "./sitemap.js";
+export {
+  renderV1ReportHtml,
+  renderV2ReportHtml,
+  renderAggregateReportHtml,
+  renderComparisonHtml,
+} from "./html-report.js";

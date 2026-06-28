@@ -49,7 +49,10 @@ describe("CLI audit", () => {
   it("--model v2 produces profile info", () => {
     const { status, stdout } = run(["audit", fixture, "--model", "v2", "--format", "text"]);
     assert.equal(status, 0);
-    assert.ok(stdout.includes("Profile") || stdout.includes("profile"), "v2 debería mostrar perfil");
+    assert.ok(
+      stdout.includes("Profile") || stdout.includes("profile"),
+      "v2 debería mostrar perfil"
+    );
   });
 
   it("--model v2 --format json produces JSON with profile", () => {
@@ -71,7 +74,10 @@ describe("CLI audit", () => {
   it("rejects invalid --model value", () => {
     const { status, stderr } = run(["audit", fixture, "--model", "v3", "--format", "json"]);
     assert.notEqual(status, 0);
-    assert.ok(stderr.includes("model") || stderr.includes("Unknown"), "Debería rechazar modelo inválido");
+    assert.ok(
+      stderr.includes("model") || stderr.includes("Unknown"),
+      "Debería rechazar modelo inválido"
+    );
   });
 
   it("handles non-existent file gracefully", () => {
@@ -100,7 +106,11 @@ describe("CLI schema", () => {
   });
 
   it("rejects invalid type", () => {
-    const { status } = run(["schema", "tests/fixtures/audit-v2/editorial/tech-blog.md", "invalid_type"]);
+    const { status } = run([
+      "schema",
+      "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "invalid_type",
+    ]);
     assert.notEqual(status, 0);
   });
 });
@@ -161,7 +171,16 @@ describe("CLI llmstxt", () => {
   });
 
   it("generate with --full produces llms-full preview", () => {
-    const { status, stdout } = run(["llmstxt", "generate", dir, "-r", "--full", "--dry-run", "--site-url", "https://example.com"]);
+    const { status, stdout } = run([
+      "llmstxt",
+      "generate",
+      dir,
+      "-r",
+      "--full",
+      "--dry-run",
+      "--site-url",
+      "https://example.com",
+    ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("llms-full.txt"), "Debería incluir llms-full");
   });
@@ -170,19 +189,28 @@ describe("CLI llmstxt", () => {
     // Generate first, then audit
     const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms-"));
     const { status: genStatus } = run([
-      "llmstxt", "generate", dir, "-r",
-      "--output", tmpDir2,
-      "--site-url", "https://example.com",
-      "--title", "Test Site",
-      "--description", "A test site",
+      "llmstxt",
+      "generate",
+      dir,
+      "-r",
+      "--output",
+      tmpDir2,
+      "--site-url",
+      "https://example.com",
+      "--title",
+      "Test Site",
+      "--description",
+      "A test site",
     ]);
     assert.equal(genStatus, 0);
 
     const llmsPath = join(tmpDir2, "llms.txt");
     const { status, stdout } = run(["llmstxt", "audit", llmsPath]);
     assert.equal(status, 0);
-    assert.ok(stdout.includes("valid") || stdout.includes("issues") || stdout.includes("✓"),
-      "Debería reportar resultado de auditoría");
+    assert.ok(
+      stdout.includes("valid") || stdout.includes("issues") || stdout.includes("✓"),
+      "Debería reportar resultado de auditoría"
+    );
     rmSync(tmpDir2, { recursive: true, force: true });
   });
 
@@ -201,8 +229,10 @@ describe("CLI robots", () => {
     const { status, stdout } = run(["robots", "generate", "--dry-run"]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("User-agent"), "Debería incluir reglas de user-agent");
-    assert.ok(stdout.includes("Search Crawlers") || stdout.includes("AI Crawler"),
-      "Debería tener secciones de crawlers");
+    assert.ok(
+      stdout.includes("Search Crawlers") || stdout.includes("AI Crawler"),
+      "Debería tener secciones de crawlers"
+    );
   });
 
   it("generate with --preset open allows all agents", () => {
@@ -231,14 +261,29 @@ describe("CLI sitemap", () => {
   const dir = "tests/fixtures/audit-v2/editorial";
 
   it("generate --dry-run exits 0", () => {
-    const { status, stdout } = run(["sitemap", "generate", dir, "-r", "--dry-run", "--base-url", "https://example.com"]);
+    const { status, stdout } = run([
+      "sitemap",
+      "generate",
+      dir,
+      "-r",
+      "--dry-run",
+      "--base-url",
+      "https://example.com",
+    ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("urlset") || stdout.includes("sitemap"), "Debería mostrar XML");
   });
 
   it("generate with --audit includes score-based priorities", () => {
     const { status, stdout } = run([
-      "sitemap", "generate", dir, "-r", "--dry-run", "--base-url", "https://example.com", "--audit"
+      "sitemap",
+      "generate",
+      dir,
+      "-r",
+      "--dry-run",
+      "--base-url",
+      "https://example.com",
+      "--audit",
     ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("<priority>"), "Debería incluir prioridades");
@@ -261,8 +306,14 @@ describe("CLI generate-all", () => {
 
   it("--dry-run exits 0 and reports all artifacts", () => {
     const { status, stdout } = run([
-      "generate-all", dir, "-r", "--dry-run", "--site-url", "https://example.com",
-      "--title", "Test Site"
+      "generate-all",
+      dir,
+      "-r",
+      "--dry-run",
+      "--site-url",
+      "https://example.com",
+      "--title",
+      "Test Site",
     ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("llms.txt"), "Debería mencionar llms.txt");
@@ -271,21 +322,31 @@ describe("CLI generate-all", () => {
     assert.ok(stdout.includes("audit-report.json"), "Debería mencionar audit-report.json");
   });
 
-  it("generates complete package to output directory", () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-pkg-"));
-    const { status, stdout } = run([
-      "generate-all", dir, "--output", tmpDir, "--site-url", "https://example.com",
-      "--title", "Test Site"
-    ]);
-    assert.equal(status, 0);
-    assert.ok(stdout.includes("✅"), "Debería mostrar éxito");
-    // Verify files exist
-    assert.ok(existsSync(join(tmpDir, "audit-report.json")), "audit-report.json debe existir");
-    assert.ok(existsSync(join(tmpDir, "llms.txt")), "llms.txt debe existir");
-    assert.ok(existsSync(join(tmpDir, "sitemap.xml")), "sitemap.xml debe existir");
-    assert.ok(existsSync(join(tmpDir, "robots.txt")), "robots.txt debe existir");
-    rmSync(tmpDir, { recursive: true, force: true });
-  }, { timeout: 30_000 });
+  it(
+    "generates complete package to output directory",
+    () => {
+      const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-pkg-"));
+      const { status, stdout } = run([
+        "generate-all",
+        dir,
+        "--output",
+        tmpDir,
+        "--site-url",
+        "https://example.com",
+        "--title",
+        "Test Site",
+      ]);
+      assert.equal(status, 0);
+      assert.ok(stdout.includes("✅"), "Debería mostrar éxito");
+      // Verify files exist
+      assert.ok(existsSync(join(tmpDir, "audit-report.json")), "audit-report.json debe existir");
+      assert.ok(existsSync(join(tmpDir, "llms.txt")), "llms.txt debe existir");
+      assert.ok(existsSync(join(tmpDir, "sitemap.xml")), "sitemap.xml debe existir");
+      assert.ok(existsSync(join(tmpDir, "robots.txt")), "robots.txt debe existir");
+      rmSync(tmpDir, { recursive: true, force: true });
+    },
+    { timeout: 30_000 }
+  );
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -353,23 +414,43 @@ describe("CLI error paths", () => {
   });
 
   it("audit with --recursive scans directory", () => {
-    const { status } = run(["audit", "tests/fixtures/audit-v2/editorial", "-r", "--format", "text"]);
+    const { status } = run([
+      "audit",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--format",
+      "text",
+    ]);
     assert.equal(status, 0);
   });
 
   it("audit --format json --summary produces aggregate report", () => {
     const { status, stdout } = run([
-      "audit", "tests/fixtures/audit-v2/editorial", "-r", "--format", "json", "--summary"
+      "audit",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--format",
+      "json",
+      "--summary",
     ]);
     assert.equal(status, 0);
     const parsed = JSON.parse(stdout);
-    assert.ok(typeof parsed.averageScore === "number" || typeof parsed.totalFiles === "number",
-      "Summary debería tener aggregate fields");
+    assert.ok(
+      typeof parsed.averageScore === "number" || typeof parsed.totalFiles === "number",
+      "Summary debería tener aggregate fields"
+    );
   });
 
   it("audit --model v2 --format json --summary", () => {
     const { status, stdout } = run([
-      "audit", "tests/fixtures/audit-v2/editorial", "-r", "--format", "json", "--summary", "--model", "v2"
+      "audit",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--format",
+      "json",
+      "--summary",
+      "--model",
+      "v2",
     ]);
     assert.equal(status, 0);
     const parsed = JSON.parse(stdout);
@@ -430,7 +511,14 @@ describe("CLI error paths", () => {
   it("robots generate writes to file (non-dry-run)", () => {
     const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-robots3-"));
     const outPath = join(tmpDir2, "robots.txt");
-    const { status } = run(["robots", "generate", "--output", outPath, "--preset", "search-visible"]);
+    const { status } = run([
+      "robots",
+      "generate",
+      "--output",
+      outPath,
+      "--preset",
+      "search-visible",
+    ]);
     assert.equal(status, 0);
     const content = readFileSync(outPath, "utf8");
     assert.ok(content.includes("User-agent"), "Debería escribir robots.txt");
@@ -440,8 +528,16 @@ describe("CLI error paths", () => {
   it("llmstxt generate writes to file (non-dry-run)", () => {
     const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms2-"));
     const { status } = run([
-      "llmstxt", "generate", "tests/fixtures/audit-v2/editorial", "-r",
-      "--output", tmpDir2, "--site-url", "https://example.com", "--title", "Test"
+      "llmstxt",
+      "generate",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--output",
+      tmpDir2,
+      "--site-url",
+      "https://example.com",
+      "--title",
+      "Test",
     ]);
     assert.equal(status, 0);
     assert.ok(existsSync(join(tmpDir2, "llms.txt")), "llms.txt debe existir");
@@ -451,8 +547,14 @@ describe("CLI error paths", () => {
   it("sitemap generate writes to file (non-dry-run)", () => {
     const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-sitemap2-"));
     const { status } = run([
-      "sitemap", "generate", "tests/fixtures/audit-v2/editorial", "-r",
-      "--output", tmpDir2, "--base-url", "https://example.com"
+      "sitemap",
+      "generate",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--output",
+      tmpDir2,
+      "--base-url",
+      "https://example.com",
     ]);
     assert.equal(status, 0);
     assert.ok(existsSync(join(tmpDir2, "sitemap.xml")), "sitemap.xml debe existir");
@@ -461,7 +563,12 @@ describe("CLI error paths", () => {
 
   it("audit v1 text with explicit --model v1", () => {
     const { status, stdout } = run([
-      "audit", "tests/fixtures/audit-v2/editorial/tech-blog.md", "--model", "v1", "--format", "text"
+      "audit",
+      "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "--model",
+      "v1",
+      "--format",
+      "text",
     ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("GEO"), "v1 debería mostrar output");
@@ -471,7 +578,13 @@ describe("CLI error paths", () => {
 
   it("audit with --recursive and explicit --ignore", () => {
     const { status } = run([
-      "audit", "tests/fixtures/audit-v2/editorial", "-r", "--ignore", "nonexistent-pattern", "--format", "text"
+      "audit",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--ignore",
+      "nonexistent-pattern",
+      "--format",
+      "text",
     ]);
     assert.equal(status, 0);
   });
@@ -480,12 +593,18 @@ describe("CLI error paths", () => {
     // Generate llms.txt first, then audit with coverage
     const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms-cov-"));
     run([
-      "llmstxt", "generate", "tests/fixtures/audit-v2/editorial", "-r",
-      "--output", tmpDir2, "--site-url", "https://example.com", "--title", "Test"
+      "llmstxt",
+      "generate",
+      "tests/fixtures/audit-v2/editorial",
+      "-r",
+      "--output",
+      tmpDir2,
+      "--site-url",
+      "https://example.com",
+      "--title",
+      "Test",
     ]);
-    const { status, stdout } = run([
-      "llmstxt", "audit", join(tmpDir2, "llms.txt"), "-r"
-    ]);
+    const { status, stdout } = run(["llmstxt", "audit", join(tmpDir2, "llms.txt"), "-r"]);
     // Exit code may be 0 or 1 depending on coverage (files outside CWD may be reported missing)
     assert.ok(status === 0 || status === 1, "audit --recursive no debería crashear");
     rmSync(tmpDir2, { recursive: true, force: true });
@@ -505,8 +624,12 @@ describe("CLI error paths", () => {
 
   it("sitemap generate with single file (not directory)", () => {
     const { status, stdout } = run([
-      "sitemap", "generate", "tests/fixtures/audit-v2/editorial/tech-blog.md",
-      "--dry-run", "--base-url", "https://example.com"
+      "sitemap",
+      "generate",
+      "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "--dry-run",
+      "--base-url",
+      "https://example.com",
     ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("sitemap.xml"), "Debería generar para archivo individual");
@@ -514,8 +637,14 @@ describe("CLI error paths", () => {
 
   it("llmstxt generate with single file (not directory)", () => {
     const { status, stdout } = run([
-      "llmstxt", "generate", "tests/fixtures/audit-v2/editorial/tech-blog.md",
-      "--dry-run", "--site-url", "https://example.com", "--title", "Test"
+      "llmstxt",
+      "generate",
+      "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "--dry-run",
+      "--site-url",
+      "https://example.com",
+      "--title",
+      "Test",
     ]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("llms.txt"), "Debería funcionar con archivo individual");
@@ -523,7 +652,10 @@ describe("CLI error paths", () => {
 
   it("audit --format json without --summary", () => {
     const { status, stdout } = run([
-      "audit", "tests/fixtures/audit-v2/editorial/tech-blog.md", "--format", "json"
+      "audit",
+      "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "--format",
+      "json",
     ]);
     assert.equal(status, 0);
     const parsed = JSON.parse(stdout);

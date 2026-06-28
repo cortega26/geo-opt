@@ -168,16 +168,16 @@ describe("validateSchemaFile — comportamiento de validación JSON-LD", () => {
   it("reporta JSON inválido dentro de un bloque como problema, no como crash", () => {
     const file = join(dir, "bad-json.md");
     // El regex de extracción requiere {} con @context. JSON inválido por trailing comma.
-    writeFileSync(file, '```json\n{ "@context": "https://schema.org", "@type": "Organization", "name": "Test", }\n```\n');
+    writeFileSync(
+      file,
+      '```json\n{ "@context": "https://schema.org", "@type": "Organization", "name": "Test", }\n```\n'
+    );
 
     const { logs } = captureConsole(() => {
       validateSchemaFile(file);
     });
     const output = logs.join("\n");
-    assert.ok(
-      output.includes("Invalid JSON"),
-      `Debería reportar JSON inválido, obtuvo: ${output}`
-    );
+    assert.ok(output.includes("Invalid JSON"), `Debería reportar JSON inválido, obtuvo: ${output}`);
   });
 
   it("reporta problema cuando @context no es https://schema.org", () => {
