@@ -1,8 +1,10 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-06-27 post T0 + direction shift (quality + Pro differentiation)  
+**Last reconciled:** 2026-06-28 post Q0 + P0 gates cleared  
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
+**Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
+**Pro gate:** P0 GO (038–040 done, 2026-06-28) ✓  
 **Business gate:** DEFERRED (018 S02–S07 parked by owner decision 2026-06-27)
 
 This file is the single source of truth for current execution order. Individual
@@ -40,10 +42,10 @@ remain gated; Pro features may ship incrementally as they stabilize.
 
 | Horizon   | Track              | Outcome                                              | Plans / slices                  | Gate      |
 | --------- | ------------------ | ---------------------------------------------------- | ------------------------------ | --------- |
-| Now       | Quality hardening  | Zero known bugs, full coverage on core paths, CI trust | 035–037 + C1–C4 evidence fixes | Q0        |
-| Now       | Pro differentiation | Compelling upgrade from Community → Pro              | 038–040                         | P0        |
-| Next      | Product correctness | Defensible structured data and `llms.txt` behavior  | refreshed 024–025               | T1        |
-| Later     | Technical expansion | Sitemap/remote audit, repository readiness           | split 023, rule-pack 026        | demand    |
+| ~~Now~~   | ~~Quality hardening~~  | ~~Zero known bugs, full coverage on core paths, CI trust~~ | ~~035–037~~ | Q0 ✓ |
+| ~~Now~~   | ~~Pro differentiation~~ | ~~Compelling upgrade from Community → Pro~~         | ~~038–040~~                     | P0 ✓      |
+| ~~Next~~  | ~~Product correctness~~ | ~~Defensible structured data and `llms.txt` behavior~~ | ~~024–025~~                  | T1 ✓      |
+| Now       | Technical expansion | Sitemap/remote audit, repository readiness           | split 023                       | demand    |
 | Deferred  | Business validation | Portfolio, offers, paid diagnostic evidence          | 018 S02–S07                     | owner     |
 | Deferred  | Pro product suite  | Reports, baselines, CI entitlements                  | 018 S10–S15                     | after Q0   |
 | Deferred  | Hosted product     | Workspace, history, monitoring                       | 018 S19+                        | after G4   |
@@ -55,17 +57,16 @@ remain gated; Pro features may ship incrementally as they stabilize.
 ```text
 T0 (029–034) COMPLETE ✓
         │
-        ├── Quality track (035 → 036 → 037)
+        ├── Quality track (035 → 036 → 037) COMPLETE ✓
         │       │
-        │       └── Evidence supplement fixes (E1–E4, C1–C4)
+        │       └── Evidence supplement fixes (E1–E4, C1–C4) DONE
         │
-        ├── Pro track (038 → 039 → 040)
+        ├── Pro track (038 → 039 → 040) COMPLETE ✓
         │       │
-        │       └── Refresh 024 (structured data) ── enables ── Pro schema features
-        │               │
-        │               └── 025 (llms artifacts) DONE
+        │       └── 024 (structured data) DONE ── 025 (llms artifacts) DONE
         │
-        └── Deferred: 018 S02–S15, 023 remote, 026–028
+        └── Deferred: 018 S02–S15, 023 remote, 027–028
+                (026 SUPERSEDED)
 ```
 
 ## Technical execution queue
@@ -75,13 +76,13 @@ T0 (029–034) COMPLETE ✓
 | Plan | Outcome | Status |
 |---|---|---|
 | [029](archive/029-stabilize-audit-contracts.md) | Valid v2 findings and unambiguous report/model versions | DONE |
-| [030](030-unify-audit-core-and-cli-boundaries.md) | One audit flow; core no longer owns process exits | DONE |
+| [030](archive/030-unify-audit-core-and-cli-boundaries.md) | One audit flow; core no longer owns process exits | DONE |
 | [031](archive/031-verify-public-api-and-types.md) | Runtime exports and declarations stay synchronized | DONE |
 | [032](032-build-reproducible-package.md) | Publishable artifact without tracked-source mutation | DONE |
 | [033](archive/033-modernize-runtimes-and-quality-gates.md) | Supported runtimes and risk-focused CI gates | DONE |
 | [034](archive/034-define-python-compatibility-tier.md) | Explicit, tested Node/Python capability contract | DONE |
 
-### Active — Quality hardening (Q0 gate)
+### Completed — Quality hardening (Q0 gate GO ✓ 2026-06-28)
 
 Quality means the tool does real, valuable work for the user. Test coverage,
 correctness, usability, and concrete deliverables are all part of it. The free
@@ -94,23 +95,23 @@ AI discoverability — not just a score, but fixes.
 | 036 | Execution | `llms.txt` and `llms-full.txt` generation is optimal: intelligent section extraction, smart scoring-based prioritization, efficient handling of large sites. `sitemap.xml` generation from content tree (new capability). `robots.txt` generation that actually improves crawler access patterns — purpose-aware, registry-aligned, with per-agent reasoning. All three artifacts validated for spec compliance. | P0 | M–L | 035 | DONE |
 | 037 | Execution + UX | End-to-end polish: a user with a directory of content walks away with a complete GEO package (audit report + llms.txt + llms-full.txt + sitemap.xml + robots.txt + structured data). CLI UX: progress indicators, helpful errors, clear --help, dry-run everywhere. Text report readable by non-technical users. JSON output self-documenting. CLI branch coverage ≥80% (C4). | P1 | M | 036 | DONE |
 
-### Active — Pro differentiation (P0 gate)
+### Completed — Pro differentiation (P0 gate GO ✓ 2026-06-28)
 
 | Plan | Type | Outcome | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
 | 038 | Decision + execution | Pro-only structured data: advanced schema types (Course, Event, Recipe, HowTo), multi-type pages, schema validation with Pro-only rules | P0 | M | T0 | DONE |
 | 039 | Execution | Pro audit reports: HTML/PDF export, branded Pro reports with charts, comparison mode (before/after), shareable report links | P0 | M–L | 038 | DONE |
-| 040 | Execution | Pro CI/CD integration: native GitHub Actions action, GitLab CI template, status badges, threshold-based PR checks | P1 | M | 039 | DONE |
+| [040](archive/040-pro-ci-cd-integration.md) | Execution | Pro CI/CD integration: native GitHub Actions action, GitLab CI template, status badges, threshold-based PR checks | P1 | M | 039 | DONE |
 
 ### Maintained (post-Q0)
 
 | Plan | Type | Outcome | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
 | [022](022-calibrate-profiled-audit-v2.md) | Program slice | Profile-aware v2 model | P1 | L | T0 done | PARTIAL |
-| [024](024-align-structured-data-semantics.md) | Execution | Accurate structured-data semantics | P1 | M | 030, 031, 034 | DONE |
+| [024](archive/024-align-structured-data-semantics.md) | Execution | Accurate structured-data semantics | P1 | M | 030, 031, 034 | DONE |
 | [025](archive/025-harden-llms-artifacts.md) | Execution | Proposal-correct, curated artifacts | P2 | M | 024 | DONE |
 | [023](023-add-technical-discovery-audit.md) | Program slice | Local technical audit landed; remote/sitemap undecided | P2 | L | T0 | PARTIAL |
-| [026](026-add-open-source-readiness.md) | Direction | Rule-pack readiness, not another engine | P3 | M | Q0, demand | SUPERSEDED |
+| [026](archive/026-add-open-source-readiness.md) | Direction | Rule-pack readiness, not another engine | P3 | M | Q0, demand | SUPERSEDED |
 
 ### Deferred (by owner decision 2026-06-27)
 
@@ -122,7 +123,7 @@ AI discoverability — not just a score, but fixes.
 | [027](027-add-engine-adapters-and-freshness.md) | No provider demand yet |
 | [028](028-spike-citation-evaluation-loop.md) | Research budget not approved |
 
-### Gate Q0 — quality hardening
+### Gate Q0 — quality hardening — GO ✓ 2026-06-28
 
 Q0 is `GO` when a free Community user with a directory of Markdown/HTML files
 can run the tool and receive a complete, polished GEO optimization package that
@@ -149,7 +150,7 @@ Concrete deliverables:
 - **Internal foundation:** 3 evidence sources re-verified (E1). `npm run check`
   passes clean with all new quality gates.
 
-### Gate P0 — Pro differentiation
+### Gate P0 — Pro differentiation — GO ✓ 2026-06-28
 
 P0 is `GO` when:
 
@@ -175,18 +176,16 @@ Pro differentiation (P0) establish a solid free→Pro upgrade story.
 - **023:** pure local HTML observations and findings landed. Sitemap, remote URL
   fetching, CLI integration and Python support did not. The old all-in-one scope
   is split; remote work requires demand plus a threat model.
-- **024:** refresh after quality track delivers structured-data correctness.
-  Overlaps with Pro schema features (plan 038).
-- **025:** keep behind 024 or direct user demand. Not on critical path.
-- **026:** must become a rule pack on the common engine, not a parallel audit
-  architecture. Low priority.
+- **024:** DONE (Q0+P0 delivered structured-data correctness; archived).
+- **025:** DONE (artifact hardening completed after 024; archived).
+- **026:** SUPERSEDED — became rule-pack direction but low demand; archived.
 - **027:** crawler metadata and evidence freshness partially landed elsewhere.
   Deferred until provider demand materializes.
 - **028:** research spike, not production backlog.
 
 ## Completed history
 
-Plans 001–017, 019–021 are completed and stored under
+Plans 001–017, 019–021, 024–026, 029–040 are completed and stored under
 [`archive/`](archive/). The prior audit register is
 [`archive/audit-findings-2026-06-25.md`](archive/audit-findings-2026-06-25.md).
 Historical pre-current-roadmap plans live under
