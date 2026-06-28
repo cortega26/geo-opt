@@ -3,6 +3,7 @@ import fs from "fs";
 // Required fields per Schema.org type as specified by Google's structured
 // data guidelines. Types not listed here still pass basic structure checks.
 const REQUIRED_FIELDS = {
+  Article: ["headline"],
   NewsArticle: ["headline", "datePublished"],
   FAQPage: ["mainEntity"],
   Product: ["name"],
@@ -14,6 +15,51 @@ const REQUIRED_FIELDS = {
   Recipe: ["name", "recipeIngredient", "recipeInstructions"],
   HowTo: ["name", "step"],
 };
+
+/**
+ * Validate a parsed JSON-LD object. Pure function — no I/O, no process.exit.
+ *
+ * @param {object} parsed - already-parsed JSON-LD object
+ * @returns {{ errors: string[], warnings: string[], notes: string[], nodes: object[] }}
+ */
+export function validateSchema(parsed) {
+  const errors = [];
+  const warnings = [];
+  const notes = [];
+
+  if (parsed["@context"] !== "https://schema.org") {
+    errors.push(`@context should be "https://schema.org", got "${parsed["@context"]}"`);
+  }
+
+  const nodes = Array.isArray(parsed["@graph"]) ? parsed["@graph"] : [parsed].filter(Boolean);
+  if (nodes.length === 0) {
+    errors.push("No @graph array or root type found");
+    return { errors, warnings, notes, nodes };
+  }
+
+  for (const node of nodes) {
+    const type = node["@type"];
+    if (!type) {
+      errors.push("Node without @type found — all schema.org nodes require @type");
+      continue;
+    }
+
+    const required = REQUIRED_FIELDS[type];
+    if (required) {
+      for (const field of required) {
+        if (node[field] === undefined || node[field] === null || node[field] === "") {
+          errors.push(`${type} is missing required field "${field}"`);
+        }
+      }
+    } else {
+      notes.push(
+        `"${type}" is not in the known-types list (${Object.keys(REQUIRED_FIELDS).join(", ")})`
+      );
+    }
+  }
+
+  return { errors, warnings, notes, nodes };
+}
 
 export function validateSchemaFile(filepath) {
   if (!fs.existsSync(filepath)) {
@@ -63,53 +109,37 @@ export function validateSchemaFile(filepath) {
       continue;
     }
 
-    // Basic structure checks
-    const issues = [];
+    const { errors, warnings, notes, nodes } = validateSchema(parsed);
 
-    if (parsed["@context"] !== "https://schema.org") {
-      issues.push(`@context should be "https://schema.org", got "${parsed["@context"]}"`);
-    }
-
-    const graph = Array.isArray(parsed["@graph"]) ? parsed["@graph"] : [parsed].filter(Boolean);
-    if (graph.length === 0) {
-      issues.push("No @graph array or root type found");
-    }
-
-    for (const node of graph) {
-      const type = node["@type"];
-      if (!type) {
-        issues.push("Node without @type found — all schema.org nodes require @type");
-        continue;
-      }
-
-      const required = REQUIRED_FIELDS[type];
-      if (required) {
-        for (const field of required) {
-          if (node[field] === undefined || node[field] === null || node[field] === "") {
-            issues.push(`${type} is missing required field "${field}"`);
-          }
-        }
-      } else {
-        // Unknown type — not an error, just note it
-        issues.push(
-          `Note: "${type}" is not in the known-types list (${Object.keys(REQUIRED_FIELDS).join(", ")})`
-        );
-      }
-    }
-
-    if (issues.length === 0) {
-      console.log(`  ✅ Valid JSON-LD with ${graph.length} node(s):`);
-      for (const node of graph) {
+    if (errors.length === 0 && warnings.length === 0) {
+      console.log(`  ✅ Valid JSON-LD with ${nodes.length} node(s):`);
+      for (const node of nodes) {
         const type = node["@type"] || "UnknownType";
         const label = node.headline || node.name || node["@id"] || "(unnamed)";
         console.log(`     • ${type}: ${label}`);
       }
     } else {
-      console.log("  ⚠️  Issues found:");
-      for (const issue of issues) {
-        console.log(`     • ${issue}`);
+      if (errors.length > 0) {
+        console.log("  ❌ Errors:");
+        for (const err of errors) {
+          console.log(`     • ${err}`);
+        }
+      }
+      if (warnings.length > 0) {
+        console.log("  ⚠️  Warnings:");
+        for (const w of warnings) {
+          console.log(`     • ${w}`);
+        }
       }
     }
+
+    if (notes.length > 0) {
+      console.log("  ℹ️  Notes:");
+      for (const n of notes) {
+        console.log(`     • ${n}`);
+      }
+    }
+
     console.log();
   }
 }

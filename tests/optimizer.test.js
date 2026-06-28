@@ -45,6 +45,7 @@ import {
   scoreContentV2,
   setRemindersEnabled,
   staleEvidenceWarnings,
+  validateSchema,
   validateSourceRefs,
   renderV1ReportHtml,
   renderV2ReportHtml,
@@ -117,7 +118,7 @@ Body of heading 2.
   assert.strictEqual(sections[1].body, "Body of heading 2.");
 });
 
-test("generateSchemaData generates stacked graph schema with FAQ nodes", () => {
+test("generateSchemaData generates Article schema without implicit FAQ nodes", () => {
   const tempFile = path.join(__dirname, "temp_article.md");
   fs.writeFileSync(
     tempFile,
@@ -137,17 +138,13 @@ This is the body answer containing more details.
     assert.strictEqual(schema["@context"], "https://schema.org");
     assert.ok(Array.isArray(schema["@graph"]));
 
-    const article = schema["@graph"].find((x) => x["@type"] === "NewsArticle");
+    const article = schema["@graph"].find((x) => x["@type"] === "Article");
+    assert.ok(article, "article type should be Article");
     assert.strictEqual(article.headline, "Test Headline");
     assert.strictEqual(article.author["@id"], "https://www.tooltician.com/#author");
 
     const faq = schema["@graph"].find((x) => x["@type"] === "FAQPage");
-    assert.strictEqual(faq.mainEntity.length, 1);
-    assert.strictEqual(faq.mainEntity[0].name, "Key Benefits of Hybrid Cloud");
-    assert.strictEqual(
-      faq.mainEntity[0].acceptedAnswer.text,
-      "This is the body answer containing more details."
-    );
+    assert.strictEqual(faq, undefined, "article type should not produce implicit FAQ nodes");
   } finally {
     if (fs.existsSync(tempFile)) {
       fs.unlinkSync(tempFile);
@@ -437,6 +434,104 @@ Some links here.
   }
 });
 
+test("generateSchemaData generates NewsArticle for news-article type with datePublished", () => {
+  const tempFile = path.join(__dirname, "temp_news_article.md");
+  fs.writeFileSync(tempFile, "# Breaking News\n\nSomething important happened today.", {
+    encoding: "utf8",
+  });
+  try {
+    const schema = generateSchemaData(tempFile, "news-article", {
+      datePublished: "2026-06-27",
+    });
+    const news = schema["@graph"].find((x) => x["@type"] === "NewsArticle");
+    assert.ok(news, "news-article type should emit NewsArticle");
+    assert.strictEqual(news.headline, "Breaking News");
+    assert.strictEqual(news.datePublished, "2026-06-27");
+    const plain = schema["@graph"].find((x) => x["@type"] === "Article");
+    assert.strictEqual(plain, undefined, "news-article should not emit Article");
+  } finally {
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData throws for news-article without datePublished", () => {
+  const tempFile = path.join(__dirname, "temp_news_no_date.md");
+  fs.writeFileSync(tempFile, "# Dateless News\n\nBody.", { encoding: "utf8" });
+  try {
+    assert.throws(
+      () => generateSchemaData(tempFile, "news-article", {}),
+      /news-article.*datePublished/i
+    );
+  } finally {
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+  }
+});
+
+test("generateSchemaData faq mode filters non-question headings", () => {
+  const tempFile = path.join(__dirname, "temp_faq_filter.md");
+  fs.writeFileSync(
+    tempFile,
+    `# Docs
+
+## Installation
+Follow these steps to install.
+
+## How do I install?
+Run npm install in your project directory to get started.
+
+## Limitations
+This tool has some limitations worth knowing.
+  `,
+    { encoding: "utf8" }
+  );
+  try {
+    const schema = generateSchemaData(tempFile, "faq", {});
+    const faq = schema["@graph"].find((x) => x["@type"] === "FAQPage");
+    assert.ok(faq);
+    assert.strictEqual(
+      faq.mainEntity.length,
+      1,
+      "only question-shaped headings should be included"
+    );
+    assert.strictEqual(faq.mainEntity[0].name, "How do I install?");
+  } finally {
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+  }
+});
+
+test("validateSchema separates errors, warnings, and notes", () => {
+  // Valid Article
+  const validResult = validateSchema({
+    "@context": "https://schema.org",
+    "@graph": [{ "@type": "Article", headline: "Test" }],
+  });
+  assert.deepStrictEqual(validResult.errors, []);
+  assert.deepStrictEqual(validResult.warnings, []);
+  assert.strictEqual(validResult.nodes.length, 1);
+
+  // Missing required field → error
+  const missingField = validateSchema({
+    "@context": "https://schema.org",
+    "@graph": [{ "@type": "Article" }],
+  });
+  assert.ok(missingField.errors.some((e) => e.includes("headline")));
+
+  // Unknown type → note, not error
+  const unknownType = validateSchema({
+    "@context": "https://schema.org",
+    "@graph": [{ "@type": "UnknownThing", name: "x" }],
+  });
+  assert.deepStrictEqual(unknownType.errors, []);
+  assert.ok(unknownType.notes.some((n) => n.includes("UnknownThing")));
+
+  // Wrong @context → error
+  const badContext = validateSchema({
+    "@context": "http://schema.org",
+    "@graph": [{ "@type": "Article", headline: "x" }],
+  });
+  assert.ok(badContext.errors.some((e) => e.includes("@context")));
+});
+
 test("generateSchemaData generates valid Product schema", () => {
   const tempFile = path.join(__dirname, "temp_product.md");
   fs.writeFileSync(
@@ -477,11 +572,11 @@ test("generateSchemaData omits identity and commerce claims when unconfigured", 
 
   try {
     const articleSchema = generateSchemaData(tempFile, "article", {});
-    const article = articleSchema["@graph"].find((node) => node["@type"] === "NewsArticle");
+    const article = articleSchema["@graph"].find((node) => node["@type"] === "Article");
 
     assert.deepStrictEqual(
       articleSchema["@graph"].map((node) => node["@type"]),
-      ["NewsArticle"]
+      ["Article"]
     );
     assert.strictEqual(article.author, undefined);
     assert.strictEqual(article.publisher, undefined);
@@ -895,7 +990,7 @@ test("cleanHtmlText decodes all standard HTML entities via cheerio", () => {
   );
   try {
     const schema = generateSchemaData(tempFile, "article", {});
-    const article = schema["@graph"].find((x) => x["@type"] === "NewsArticle");
+    const article = schema["@graph"].find((x) => x["@type"] === "Article");
     assert.ok(article.description.includes("Cost: €50"));
     assert.ok(!article.description.includes("&euro;"));
     assert.ok(!article.description.includes("&mdash;"));
@@ -918,7 +1013,7 @@ test("generateSchemaData extracts meta description regardless of attribute order
   );
   try {
     const schema = generateSchemaData(tempFile, "article", {});
-    const article = schema["@graph"].find((x) => x["@type"] === "NewsArticle");
+    const article = schema["@graph"].find((x) => x["@type"] === "Article");
     assert.strictEqual(article.description, "Description first");
   } finally {
     if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
@@ -2049,7 +2144,12 @@ test("COMMUNITY_SCHEMA_TYPES and PRO_SCHEMA_TYPES are disjoint sets", () => {
   for (const type of COMMUNITY_SCHEMA_TYPES) {
     assert.ok(!PRO_SCHEMA_TYPES.has(type), `"${type}" must not appear in PRO_SCHEMA_TYPES`);
   }
-  assert.deepStrictEqual([...COMMUNITY_SCHEMA_TYPES].sort(), ["article", "faq", "product"]);
+  assert.deepStrictEqual([...COMMUNITY_SCHEMA_TYPES].sort(), [
+    "article",
+    "faq",
+    "news-article",
+    "product",
+  ]);
   assert.deepStrictEqual([...PRO_SCHEMA_TYPES].sort(), ["course", "event", "howto", "recipe"]);
 });
 

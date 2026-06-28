@@ -7,6 +7,31 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** `geo-opt schema <file> article` and `geo-opt inject <file> article` now emit
+  `Article` instead of `NewsArticle`. Use the new `news-article` type for time-sensitive news
+  content (requires `datePublished` in config).
+- **Breaking:** `article` mode no longer stacks a `FAQPage` node automatically. FAQ markup is
+  only generated when the user explicitly selects the `faq` type.
+- `faq` mode now filters out section headings that are not phrased as questions (i.e. do not
+  end with `?`). Headings like "Installation" or "Limitations" are skipped; headings like
+  "How do I install?" are included.
+- `validateSchemaFile` output now separates `❌ Errors`, `⚠️ Warnings`, and `ℹ️ Notes`
+  into distinct sections instead of a single flat issues list.
+- `COMMUNITY_SCHEMA_TYPES` now includes `"news-article"`.
+
+### Added
+
+- New schema type `news-article` (JS and Python): emits `NewsArticle` with a required
+  `datePublished` field. Throws an error if `datePublished` is absent, preventing accidental
+  `NewsArticle` markup without the required factual metadata.
+- `validateSchema(parsed)`: new pure function exported from `src/validate.js` and
+  `src/index.js` that validates a parsed JSON-LD object and returns
+  `{ errors, warnings, notes, nodes }` without any I/O or side effects.
+- `index.d.ts`: `SchemaValidationResult` interface and `validateSchema` export.
+- `REQUIRED_FIELDS` in `validate.js` now includes `Article: ["headline"]`.
+
 ### Docs
 
 - Rewrote `README.md` with an improved structure, compelling problem statement, CI/CD integration example, expanded command reference, and clarified evidence vocabulary.

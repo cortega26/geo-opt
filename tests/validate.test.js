@@ -84,7 +84,7 @@ describe("validateSchemaFile — comportamiento de validación JSON-LD", () => {
     });
     const output = logs.join("\n");
     assert.ok(
-      output.includes("⚠️") || output.includes("Issues"),
+      output.includes("❌") || output.includes("⚠️") || output.includes("Issues"),
       `Debería reportar problemas, obtuvo: ${output}`
     );
     assert.ok(
@@ -198,7 +198,7 @@ describe("validateSchemaFile — comportamiento de validación JSON-LD", () => {
       `Debería mencionar el @context esperado, obtuvo: ${output}`
     );
     assert.ok(
-      output.includes("⚠️") || output.includes("Issues"),
+      output.includes("❌") || output.includes("⚠️") || output.includes("Issues"),
       `Debería reportar issues, obtuvo: ${output}`
     );
   });

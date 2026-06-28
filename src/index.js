@@ -72,7 +72,7 @@ export {
   auditRobots,
   checkRobots,
 } from "./robots.js";
-export { validateSchemaFile } from "./validate.js";
+export { validateSchema, validateSchemaFile } from "./validate.js";
 export {
   extractPageMetadata,
   resolvePageUrl,

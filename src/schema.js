@@ -14,7 +14,7 @@ export const TOOLTICIAN_BRANDING_MARKDOWN =
   "Optimized with [Tooltician](https://www.tooltician.com)";
 export const TOOLTICIAN_BRANDING_HTML =
   '<div class="geo-signature"><p>Optimized with <a href="https://www.tooltician.com">Tooltician</a></p></div>';
-export const COMMUNITY_SCHEMA_TYPES = new Set(["article", "faq", "product"]);
+export const COMMUNITY_SCHEMA_TYPES = new Set(["article", "news-article", "faq", "product"]);
 export const PRO_SCHEMA_TYPES = new Set(["course", "event", "recipe", "howto"]);
 const SUPPORTED_SCHEMA_TYPES = new Set([...COMMUNITY_SCHEMA_TYPES, ...PRO_SCHEMA_TYPES]);
 
@@ -281,14 +281,14 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
 
   if (types.length === 0) {
     throw new Error(
-      "Schema type is required. Community types: article, faq, product. Pro types: course, event, recipe, howto."
+      "Schema type is required. Community types: article, news-article, faq, product. Pro types: course, event, recipe, howto."
     );
   }
 
   for (const type of types) {
     if (!SUPPORTED_SCHEMA_TYPES.has(type)) {
       throw new Error(
-        `Unsupported schema type "${type}". Community types: article, faq, product. Pro types: course, event, recipe, howto.`
+        `Unsupported schema type "${type}". Community types: article, news-article, faq, product. Pro types: course, event, recipe, howto.`
       );
     }
     if (PRO_SCHEMA_TYPES.has(type) && !hasProEntitlement(config)) {
@@ -383,7 +383,7 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
   for (const type of types) {
     if (type === "article") {
       const articleNode = {
-        "@type": "NewsArticle",
+        "@type": "Article",
         headline: title,
       };
       const articleId = optionalId(pubUrl, "article");
@@ -393,54 +393,40 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
       if (authorNode) articleNode.author = referenceOrInline(authorNode, authorId);
       if (orgNode) articleNode.publisher = referenceOrInline(orgNode, orgId);
       graphNodes.push(articleNode);
-
-      // FAQ extraction
-      const sections = extractSections(content);
-      if (sections.length > 0) {
-        const qaList = [];
-        for (const section of sections.slice(0, 5)) {
-          if (
-            section.body.length < 15 ||
-            ["sources", "references", "citations", "bibliography"].includes(
-              section.header.toLowerCase()
-            )
-          ) {
-            continue;
-          }
-          qaList.push({
-            "@type": "Question",
-            name: section.header,
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: cleanMarkdownToPlainText(section.body),
-            },
-          });
-        }
-        if (qaList.length > 0) {
-          const faqNode = {
-            "@type": "FAQPage",
-            mainEntity: qaList,
-          };
-          const faqId = optionalId(pubUrl, "faq");
-          if (faqId) faqNode["@id"] = faqId;
-          graphNodes.push(faqNode);
-        }
+    } else if (type === "news-article") {
+      if (!config.datePublished) {
+        throw new Error(
+          'Schema type "news-article" requires config.datePublished (ISO 8601 date, e.g. "2026-06-27"). ' +
+            'Use "article" for general content that is not time-sensitive news.'
+        );
       }
+      const newsNode = {
+        "@type": "NewsArticle",
+        headline: title,
+        datePublished: config.datePublished,
+      };
+      const newsId = optionalId(pubUrl, "article");
+      if (newsId) newsNode["@id"] = newsId;
+      if (description) newsNode.description = description;
+      if (config.dateModified) newsNode.dateModified = config.dateModified;
+      if (authorNode) newsNode.author = referenceOrInline(authorNode, authorId);
+      if (orgNode) newsNode.publisher = referenceOrInline(orgNode, orgId);
+      graphNodes.push(newsNode);
     } else if (type === "faq") {
       const sections = extractSections(content);
       const qaList = [];
       for (const section of sections.slice(0, 5)) {
+        const header = section.header.trim();
         if (
           section.body.length < 15 ||
-          ["sources", "references", "citations", "bibliography"].includes(
-            section.header.toLowerCase()
-          )
+          ["sources", "references", "citations", "bibliography"].includes(header.toLowerCase()) ||
+          !header.endsWith("?")
         ) {
           continue;
         }
         qaList.push({
           "@type": "Question",
-          name: section.header,
+          name: header,
           acceptedAnswer: {
             "@type": "Answer",
             text: cleanMarkdownToPlainText(section.body),

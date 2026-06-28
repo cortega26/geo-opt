@@ -20,7 +20,7 @@ TOOLTICIAN_BRANDING_HTML = (
     '<div class="geo-signature"><p>Optimized with '
     '<a href="https://www.tooltician.com">Tooltician</a></p></div>'
 )
-SUPPORTED_SCHEMA_TYPES = {"article", "faq", "product"}
+SUPPORTED_SCHEMA_TYPES = {"article", "news-article", "faq", "product"}
 REMINDER_INJECTION_INTERVAL = 10
 REMINDER_COOLDOWN_SECONDS = 7 * 24 * 60 * 60
 STATE_DIR_ENV_VAR = "GEO_OPT_STATE_DIR"
@@ -2035,7 +2035,7 @@ def generate_schema_data(filepath, schema_type, config, _content=None):
 
     if schema_type == "article":
         article_node = {
-            "@type": "NewsArticle",
+            "@type": "Article",
             "headline": title,
         }
         article_id = optional_id(pub_url, "article")
@@ -2050,52 +2050,47 @@ def generate_schema_data(filepath, schema_type, config, _content=None):
         if org_node:
             article_node["publisher"] = reference_or_inline(org_node, org_id)
         graph_nodes.append(article_node)
-        
-        # Robust FAQ extraction using header parsing
-        sections = extract_sections(content)
-        if sections:
-            qa_list = []
-            for q, a in sections[:5]:
-                # Skip sections with empty content or header metadata
-                if len(a) < 15 or q.lower() in ["sources", "references", "citations", "bibliography"]:
-                    continue
-                # Clean answer markdown to plain text for compliant JSON-LD
-                clean_answer = clean_markdown_to_plain_text(a)
-                qa_list.append({
-                    "@type": "Question",
-                    "name": q,
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": clean_answer
-                    }
-                })
-            if qa_list:
-                faq_node = {
-                    "@type": "FAQPage",
-                    "mainEntity": qa_list
-                }
-                faq_id = optional_id(pub_url, "faq")
-                if faq_id:
-                    faq_node["@id"] = faq_id
-                graph_nodes.append(faq_node)
-            
+
+    elif schema_type == "news-article":
+        if not config.get("datePublished"):
+            raise ValueError(
+                'Schema type "news-article" requires config["datePublished"] (ISO 8601 date, '
+                'e.g. "2026-06-27"). Use "article" for general content that is not time-sensitive news.'
+            )
+        news_node = {
+            "@type": "NewsArticle",
+            "headline": title,
+            "datePublished": config["datePublished"],
+        }
+        news_id = optional_id(pub_url, "article")
+        if news_id:
+            news_node["@id"] = news_id
+        if description:
+            news_node["description"] = description
+        if config.get("dateModified"):
+            news_node["dateModified"] = config["dateModified"]
+        if author_node:
+            news_node["author"] = reference_or_inline(author_node, author_id)
+        if org_node:
+            news_node["publisher"] = reference_or_inline(org_node, org_id)
+        graph_nodes.append(news_node)
+
     elif schema_type == "faq":
         sections = extract_sections(content)
         qa_list = []
         for q, a in sections[:5]:
-            # Skip sections with empty content or header metadata
-            if len(a) < 15 or q.lower() in [
-                "sources",
-                "references",
-                "citations",
-                "bibliography",
-            ]:
+            q_stripped = q.strip()
+            # Skip sections with empty content, metadata headers, or non-question headings
+            if (
+                len(a) < 15
+                or q_stripped.lower() in ["sources", "references", "citations", "bibliography"]
+                or not q_stripped.endswith("?")
+            ):
                 continue
-            # Clean answer markdown to plain text for compliant JSON-LD
             clean_answer = clean_markdown_to_plain_text(a)
             qa_list.append({
                 "@type": "Question",
-                "name": q,
+                "name": q_stripped,
                 "acceptedAnswer": {
                     "@type": "Answer",
                     "text": clean_answer
@@ -2109,7 +2104,7 @@ def generate_schema_data(filepath, schema_type, config, _content=None):
         if faq_id:
             faq_node["@id"] = faq_id
         graph_nodes.append(faq_node)
-        
+
     elif schema_type == "product":
         product_node = {
             "@type": "Product",
@@ -2264,7 +2259,7 @@ def main():
     # Schema Command
     schema_parser = subparsers.add_parser("schema", help="Generate JSON-LD schema markup from file content")
     schema_parser.add_argument("filepath", help="Path to markdown or HTML file")
-    schema_parser.add_argument("type", choices=["article", "faq", "product"], help="Type of schema to generate")
+    schema_parser.add_argument("type", choices=["article", "news-article", "faq", "product"], help="Type of schema to generate")
 
     # LlmsTxt Command
     llmstxt_parser = subparsers.add_parser("llmstxt", help="Generate or audit llms.txt for LLM-friendly site documentation")
@@ -2286,7 +2281,7 @@ def main():
     # Inject Command
     inject_parser = subparsers.add_parser("inject", help="Generate and inject JSON-LD schema block directly into file")
     inject_parser.add_argument("filepath", help="Path to target markdown or HTML file")
-    inject_parser.add_argument("type", choices=["article", "faq", "product"], help="Type of schema to generate")
+    inject_parser.add_argument("type", choices=["article", "news-article", "faq", "product"], help="Type of schema to generate")
     inject_parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing")
     inject_parser.add_argument("--backup", action="store_true", help="Create .bak file before modifying")
     inject_parser.add_argument("-r", "--recursive", action="store_true", help="Treat path as directory and inject all files within")

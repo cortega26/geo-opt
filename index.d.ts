@@ -680,10 +680,10 @@ declare module "geo-opt" {
     filepath: string
   ): { valid: true; targetRealPath: string; cwdRealPath: string } | { valid: false; error: string };
 
-  export const COMMUNITY_SCHEMA_TYPES: ReadonlySet<"article" | "faq" | "product">;
+  export const COMMUNITY_SCHEMA_TYPES: ReadonlySet<"article" | "news-article" | "faq" | "product">;
   export const PRO_SCHEMA_TYPES: ReadonlySet<"course" | "event" | "recipe" | "howto">;
 
-  export type CommunitySchemaType = "article" | "faq" | "product";
+  export type CommunitySchemaType = "article" | "news-article" | "faq" | "product";
   export type ProSchemaType = "course" | "event" | "recipe" | "howto";
   export type SchemaType = CommunitySchemaType | ProSchemaType;
 
@@ -746,6 +746,13 @@ declare module "geo-opt" {
   ): RobotsAuditReport | void;
 
   // ═══ JSON-LD validation ═══
+  export interface SchemaValidationResult {
+    errors: string[];
+    warnings: string[];
+    notes: string[];
+    nodes: object[];
+  }
+  export function validateSchema(parsed: object): SchemaValidationResult;
   export function validateSchemaFile(filepath: string): void;
 
   // ═══ LLMs.txt ═══

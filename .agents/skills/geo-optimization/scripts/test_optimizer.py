@@ -122,20 +122,65 @@ class TestGeoOptimizer(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as temp:
             temp.write("# Test Headline\n\nThis is the introductory paragraph that acts as the description.")
             temp_path = temp.name
-            
+
         try:
             schema = generate_schema_data(temp_path, "article", self.config)
             self.assertEqual(schema["@context"], "https://schema.org")
             self.assertIn("@graph", schema)
-            
-            # Find NewsArticle in graph
-            article = next(x for x in schema["@graph"] if x["@type"] == "NewsArticle")
+
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
             self.assertEqual(article["headline"], "Test Headline")
             self.assertEqual(article["author"]["@id"], "https://www.tooltician.com/#author")
-            
-            # Find Person in graph
+
+            # No implicit FAQPage node from article mode
+            faq = next((x for x in schema["@graph"] if x["@type"] == "FAQPage"), None)
+            self.assertIsNone(faq)
+
+            # Person node still present when configured
             person = next(x for x in schema["@graph"] if x["@type"] == "Person")
             self.assertEqual(person["name"], "Carlos Ortega González")
+        finally:
+            os.remove(temp_path)
+
+    def test_generate_schema_data_news_article(self):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as temp:
+            temp.write("# Breaking News\n\nSomething important happened today.")
+            temp_path = temp.name
+
+        try:
+            schema = generate_schema_data(temp_path, "news-article", {"datePublished": "2026-06-27"})
+            news = next(x for x in schema["@graph"] if x["@type"] == "NewsArticle")
+            self.assertEqual(news["headline"], "Breaking News")
+            self.assertEqual(news["datePublished"], "2026-06-27")
+        finally:
+            os.remove(temp_path)
+
+    def test_generate_schema_data_news_article_requires_date(self):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as temp:
+            temp.write("# Dateless\n\nBody.")
+            temp_path = temp.name
+
+        try:
+            with self.assertRaises(ValueError, msg="news-article without datePublished should raise"):
+                generate_schema_data(temp_path, "news-article", {})
+        finally:
+            os.remove(temp_path)
+
+    def test_faq_mode_filters_non_question_headings(self):
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as temp:
+            temp.write(
+                "# Docs\n\n"
+                "## Installation\nFollow these steps to install.\n\n"
+                "## How do I install?\nRun pip install to get started with this package.\n\n"
+                "## Limitations\nThis tool has some limitations worth knowing.\n"
+            )
+            temp_path = temp.name
+
+        try:
+            schema = generate_schema_data(temp_path, "faq", {})
+            faq = next(x for x in schema["@graph"] if x["@type"] == "FAQPage")
+            self.assertEqual(len(faq["mainEntity"]), 1)
+            self.assertEqual(faq["mainEntity"][0]["name"], "How do I install?")
         finally:
             os.remove(temp_path)
 
@@ -348,7 +393,7 @@ class TestGeoOptimizer(unittest.TestCase):
             article_schema = generate_schema_data(temp_path, "article", {})
             self.assertEqual(
                 [node["@type"] for node in article_schema["@graph"]],
-                ["NewsArticle"],
+                ["Article"],
             )
             article = article_schema["@graph"][0]
             self.assertNotIn("author", article)
