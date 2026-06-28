@@ -41,8 +41,12 @@ describe("integrity — verificación de hash en staging", () => {
     const buildResult = build();
     assert.strictEqual(buildResult.status, 0, `Build falló:\n${buildResult.stderr}`);
 
+    // Copiar dist/ a staging para aislar la importación de builds concurrentes
+    cpSync(join(repoRoot, "dist"), stagingDir, { recursive: true });
+    const integrityPath = join(stagingDir, "integrity.js");
+
     const driver = `
-import { hasProEntitlement } from "${join(repoRoot, "dist", "integrity.js")}";
+import { hasProEntitlement } from "${integrityPath}";
 const isFallback = hasProEntitlement.toString().includes("() => false") ||
                    hasProEntitlement.toString() === "() => false";
 console.log(isFallback ? "TAMPERED" : "OK");

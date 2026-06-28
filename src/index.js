@@ -96,3 +96,9 @@ export {
   renderAggregateReportHtml,
   renderComparisonHtml,
 } from "./html-report.js";
+export {
+  scoreToBadgeColor,
+  scoreToBadgeGrade,
+  generateBadgeUrl,
+  generateBadgeMarkdown,
+} from "./badge.js";

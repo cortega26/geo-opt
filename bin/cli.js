@@ -43,6 +43,7 @@ import {
   renderAggregateReportHtml,
   renderComparisonHtml,
 } from "../src/html-report.js";
+import { generateBadgeUrl, generateBadgeMarkdown, scoreToBadgeGrade } from "../src/badge.js";
 import { CONSENT_GRANTED, resolveTelemetryStatus, setTelemetryConsent } from "../src/telemetry.js";
 
 // --- Global --config option ---
@@ -1118,6 +1119,63 @@ program
           console.log(`   • ${issue.message} (${issue.fileCount} files)`);
         }
       }
+    }
+  });
+
+// --- Badge: generate a shields.io badge for a file's GEO score ---
+program
+  .command("badge <file>")
+  .description("Generate a GEO score badge for a content file")
+  .option("-f, --format <type>", "Output format: markdown, url, or json", "markdown")
+  .option("-m, --model <version>", "Scoring model: v1 (default) or v2", "v1")
+  .option("--label <text>", "Badge label text", "GEO Score")
+  .option("--style <style>", "Badge style: flat, flat-square, plastic, social", "flat")
+  .action((file, options, cmd) => {
+    const config = resolveConfig(cmd);
+    const model = options.model || "v1";
+    if (!["v1", "v2"].includes(model)) {
+      console.error(`Error: --model must be "v1" or "v2", got "${model}".`);
+      process.exit(1);
+    }
+    const validFormats = ["markdown", "url", "json"];
+    if (!validFormats.includes(options.format)) {
+      console.error(`Error: --format must be one of: ${validFormats.join(", ")}, got "${options.format}".`);
+      process.exit(1);
+    }
+    const validStyles = ["flat", "flat-square", "plastic", "social"];
+    if (!validStyles.includes(options.style)) {
+      console.error(`Error: --style must be one of: ${validStyles.join(", ")}, got "${options.style}".`);
+      process.exit(1);
+    }
+
+    let score;
+    try {
+      const results = auditFiles([file], config, model);
+      const result = results[0];
+      if (result.status === "error") {
+        console.error(`Error: ${result.error}`);
+        process.exit(1);
+      }
+      score = result.score ?? 0;
+    } catch (e) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+    const badgeUrl = generateBadgeUrl(score, { label: options.label, style: options.style });
+    const grade = scoreToBadgeGrade(score);
+
+    if (options.format === "url") {
+      console.log(badgeUrl);
+    } else if (options.format === "json") {
+      console.log(
+        JSON.stringify(
+          { score, grade, badge_url: badgeUrl, badge_markdown: generateBadgeMarkdown(score, { label: options.label, style: options.style }) },
+          null,
+          2
+        )
+      );
+    } else {
+      console.log(generateBadgeMarkdown(score, { label: options.label, style: options.style }));
     }
   });
 

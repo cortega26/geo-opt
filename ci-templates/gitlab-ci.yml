@@ -1,0 +1,90 @@
+# geo-opt GitLab CI template
+#
+# Include this template in your .gitlab-ci.yml:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/tooltician-ai/geo-opt/main/ci-templates/gitlab-ci.yml'
+#
+# Then customize via CI/CD variables in your project settings:
+#
+#   GEO_OPT_PATH       — file or directory to audit (default: ".")
+#   GEO_OPT_THRESHOLD  — fail if score is below this value (e.g. "70")
+#   GEO_OPT_RECURSIVE  — set to "true" to scan directories recursively (Pro)
+#   GEO_OPT_MODEL      — scoring model: "v1" (default) or "v2"
+#   GEO_OPT_LABEL      — badge label text (default: "GEO Score")
+#   TOOLTICIAN_LICENSE_KEY — Pro license key (for recursive + no-branding features)
+
+.geo-opt-audit:
+  image: node:22-alpine
+  variables:
+    GEO_OPT_PATH: "."
+    GEO_OPT_THRESHOLD: ""
+    GEO_OPT_RECURSIVE: "false"
+    GEO_OPT_MODEL: "v1"
+    GEO_OPT_LABEL: "GEO Score"
+    TOOLTICIAN_LICENSE_KEY: ""
+  before_script:
+    - npm install -g geo-opt
+  script:
+    - |
+      ARGS="audit \"$GEO_OPT_PATH\" --model $GEO_OPT_MODEL"
+
+      if [ "$GEO_OPT_RECURSIVE" = "true" ]; then
+        ARGS="$ARGS --recursive"
+      fi
+
+      if [ -n "$GEO_OPT_THRESHOLD" ]; then
+        ARGS="$ARGS --threshold $GEO_OPT_THRESHOLD"
+      fi
+
+      eval "geo-opt $ARGS"
+  artifacts:
+    when: always
+    reports:
+      # Produce a JSON audit report as a CI artifact for download/inspection
+      dotenv: geo-opt-env.env
+    paths:
+      - geo-opt-audit.json
+    expire_in: 30 days
+
+geo-opt-audit:
+  extends: .geo-opt-audit
+  stage: test
+  script:
+    - |
+      ARGS="audit \"$GEO_OPT_PATH\" --format json --model $GEO_OPT_MODEL"
+
+      if [ "$GEO_OPT_RECURSIVE" = "true" ]; then
+        ARGS="$ARGS --recursive"
+      fi
+
+      if [ -n "$GEO_OPT_THRESHOLD" ]; then
+        ARGS="$ARGS --threshold $GEO_OPT_THRESHOLD"
+      fi
+
+      eval "geo-opt $ARGS" | tee geo-opt-audit.json
+
+      # Extract score and generate badge URL for job annotation
+      SCORE=$(node -e "
+        const fs = require('fs');
+        try {
+          const d = JSON.parse(fs.readFileSync('geo-opt-audit.json','utf8'));
+          const s = Array.isArray(d) ? (d[0]?.score ?? 0) : (d.score ?? 0);
+          process.stdout.write(String(Math.round(s)));
+        } catch { process.stdout.write('0'); }
+      ")
+
+      COLOR=red
+      [ "$SCORE" -ge 41 ] && COLOR=orange
+      [ "$SCORE" -ge 61 ] && COLOR=yellow
+      [ "$SCORE" -ge 76 ] && COLOR=green
+      [ "$SCORE" -ge 90 ] && COLOR=brightgreen
+
+      LABEL_ENC=$(echo "$GEO_OPT_LABEL" | sed 's/ /_/g')
+      BADGE_URL="https://img.shields.io/badge/${LABEL_ENC}-${SCORE}%2F100-${COLOR}"
+
+      echo "GEO_SCORE=$SCORE" >> geo-opt-env.env
+      echo "GEO_BADGE_URL=$BADGE_URL" >> geo-opt-env.env
+
+      echo "GEO score: ${SCORE}/100"
+      echo "Badge URL: ${BADGE_URL}"

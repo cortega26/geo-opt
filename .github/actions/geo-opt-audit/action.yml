@@ -1,0 +1,117 @@
+name: "geo-opt GEO Audit"
+description: "Audit content files for AI discoverability with geo-opt. Outputs score, pass/fail status, and a shields.io badge URL."
+
+inputs:
+  path:
+    description: "File or directory to audit"
+    required: true
+    default: "."
+  threshold:
+    description: "Exit with code 1 if the score is below this value (Pro: combine with --recursive for site-wide gates)"
+    required: false
+    default: ""
+  recursive:
+    description: "Recursively scan directories (requires Pro license for site-wide auditing)"
+    required: false
+    default: "false"
+  model:
+    description: "Scoring model: v1 (default) or v2 (profile-aware)"
+    required: false
+    default: "v1"
+  format:
+    description: "Output format: text or json"
+    required: false
+    default: "text"
+  label:
+    description: "Badge label text"
+    required: false
+    default: "GEO Score"
+  license-key:
+    description: "Tooltician Pro license key (required for Pro features: recursive site audits, --no-branding)"
+    required: false
+    default: ""
+
+outputs:
+  score:
+    description: "GEO audit score (0–100)"
+    value: ${{ steps.run-audit.outputs.score }}
+  passed:
+    description: "Whether the threshold was met (true/false)"
+    value: ${{ steps.run-audit.outputs.passed }}
+  badge-url:
+    description: "shields.io badge URL for embedding in README or PR comments"
+    value: ${{ steps.run-audit.outputs.badge-url }}
+  badge-markdown:
+    description: "Ready-to-embed Markdown badge"
+    value: ${{ steps.run-audit.outputs.badge-markdown }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js dependencies
+      shell: bash
+      run: npm ci
+      working-directory: ${{ github.action_path }}/../../..
+
+    - name: Run geo-opt audit
+      id: run-audit
+      shell: bash
+      env:
+        TOOLTICIAN_LICENSE_KEY: ${{ inputs.license-key }}
+      run: |
+        CLI="node ${{ github.action_path }}/../../../bin/cli.js"
+
+        # Build audit command
+        ARGS="audit \"${{ inputs.path }}\" --format json --model ${{ inputs.model }}"
+
+        if [[ "${{ inputs.recursive }}" == "true" ]]; then
+          ARGS="$ARGS --recursive"
+        fi
+
+        if [[ -n "${{ inputs.threshold }}" ]]; then
+          ARGS="$ARGS --threshold ${{ inputs.threshold }}"
+        fi
+
+        # Run audit; capture output and exit code separately
+        OUTPUT=$($CLI $ARGS 2>&1) || AUDIT_EXIT=$?
+        AUDIT_EXIT=${AUDIT_EXIT:-0}
+
+        # Parse score from JSON (handles single-file and multi-file output)
+        SCORE=$(echo "$OUTPUT" | node -e "
+          const chunks = [];
+          process.stdin.on('data', c => chunks.push(c));
+          process.stdin.on('end', () => {
+            try {
+              const d = JSON.parse(chunks.join(''));
+              const s = Array.isArray(d) ? (d[0]?.score ?? 0) : (d.score ?? 0);
+              process.stdout.write(String(Math.round(s)));
+            } catch { process.stdout.write('0'); }
+          });
+        ")
+
+        # Compute badge color
+        COLOR="red"
+        if   [ "$SCORE" -ge 90 ]; then COLOR="brightgreen"
+        elif [ "$SCORE" -ge 76 ]; then COLOR="green"
+        elif [ "$SCORE" -ge 61 ]; then COLOR="yellow"
+        elif [ "$SCORE" -ge 41 ]; then COLOR="orange"
+        fi
+
+        LABEL_ENC=$(echo "${{ inputs.label }}" | sed 's/ /_/g')
+        BADGE_URL="https://img.shields.io/badge/${LABEL_ENC}-${SCORE}%2F100-${COLOR}"
+        BADGE_MD="![${{ inputs.label }}](${BADGE_URL})"
+
+        echo "score=${SCORE}"        >> "$GITHUB_OUTPUT"
+        echo "badge-url=${BADGE_URL}" >> "$GITHUB_OUTPUT"
+        echo "badge-markdown=${BADGE_MD}" >> "$GITHUB_OUTPUT"
+
+        if [ "$AUDIT_EXIT" -eq 0 ]; then
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "passed=false" >> "$GITHUB_OUTPUT"
+        fi
+
+        # Re-print human-readable output (already in text form from stderr mix)
+        echo "$OUTPUT"
+
+        exit $AUDIT_EXIT

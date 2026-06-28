@@ -7,7 +7,34 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts/build.js` now reads `src/integrity.js` as the integrity template instead of
+  `dist/integrity.js`, eliminating a race condition where concurrent test builds could
+  corrupt the second placeholder occurrence. `dist/` is no longer deleted before each build
+  (overwrite-in-place is safe since the build is deterministic).
+- `tests/integrity.test.js` happy-path test now copies `dist/` to an isolated staging
+  directory before importing, matching the pattern used by the other integrity tests.
+
 ### Added
+
+- `geo-opt badge <file>` command: audits a content file and outputs a shields.io
+  badge URL, Markdown image, or JSON with score, grade, and badge fields. Options:
+  `--format` (markdown|url|json), `--label`, `--style`, `--model`.
+- `src/badge.js`: pure functions `generateBadgeUrl`, `generateBadgeMarkdown`,
+  `scoreToBadgeColor`, `scoreToBadgeGrade`. Exported from `src/index.js` and typed
+  in `index.d.ts` (`BadgeColor`, `BadgeGrade`, `BadgeStyle`, `BadgeOptions`,
+  `BadgeMarkdownOptions` interfaces).
+- `.github/actions/geo-opt-audit/action.yml`: GitHub Actions composite action.
+  Inputs: `path`, `threshold`, `recursive`, `model`, `format`, `label`, `license-key`.
+  Outputs: `score`, `passed`, `badge-url`, `badge-markdown`. Installs dependencies from
+  the action path and runs the CLI; exits non-zero when threshold is not met.
+- `ci-templates/gitlab-ci.yml`: GitLab CI template with a `geo-opt-audit` job.
+  Include remotely and configure via CI variables (`GEO_OPT_PATH`, `GEO_OPT_THRESHOLD`,
+  `GEO_OPT_RECURSIVE`, `GEO_OPT_MODEL`, `TOOLTICIAN_LICENSE_KEY`). Produces
+  `geo-opt-audit.json` artifact and `GEO_SCORE` / `GEO_BADGE_URL` dotenv variables.
+- 25 tests in `tests/badge.test.js` covering pure badge functions and all CLI badge
+  command formats, validation, and error paths.
 
 - `geo-opt report` command (Pro): generates standalone HTML audit reports with SVG score
   gauges, dimension bar charts, and print-ready styling (open in browser, use File > Print >

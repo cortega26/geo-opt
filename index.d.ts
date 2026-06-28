@@ -844,4 +844,23 @@ declare module "geo-opt" {
     entries: SitemapEntry[],
     options?: { baseUrl?: string }
   ): Array<{ name: string; content: string }>;
+
+  // ═══ Badge ═══
+  export type BadgeColor = "brightgreen" | "green" | "yellow" | "orange" | "red";
+  export type BadgeGrade = "A" | "B" | "C" | "D" | "F";
+  export type BadgeStyle = "flat" | "flat-square" | "plastic" | "social";
+
+  export interface BadgeOptions {
+    label?: string;
+    style?: BadgeStyle;
+  }
+
+  export interface BadgeMarkdownOptions extends BadgeOptions {
+    alt?: string;
+  }
+
+  export function scoreToBadgeColor(score: number): BadgeColor;
+  export function scoreToBadgeGrade(score: number): BadgeGrade;
+  export function generateBadgeUrl(score: number, options?: BadgeOptions): string;
+  export function generateBadgeMarkdown(score: number, options?: BadgeMarkdownOptions): string;
 }

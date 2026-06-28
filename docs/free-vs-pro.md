@@ -29,6 +29,7 @@ Si puedes leerlo, es Free. Si lo escribes o lo escalas, es Pro.
 | `llmstxt generate` | ❌ | ✅ Genera `llms.txt` |
 | `init` | ✅ | ✅ |
 | `config get/set` | ✅ | ✅ |
+| `badge <file>` | ✅ Single file GEO badge | ✅ |
 
 ### API de librería JavaScript
 
