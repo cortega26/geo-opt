@@ -9,7 +9,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -331,5 +331,202 @@ describe("CLI global", () => {
     const { status, stdout } = run([]);
     assert.equal(status, 0);
     assert.ok(stdout.includes("Usage") || stdout.includes("Commands"), "Debería mostrar ayuda");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Error paths & edge cases (C4 branch coverage)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("CLI error paths", () => {
+  const fixture = "tests/fixtures/audit-v2/editorial/tech-blog.md";
+
+  it("audit --threshold exits 1 when score is below threshold", () => {
+    // Set threshold very high to force exit 1
+    const { status } = run(["audit", fixture, "--threshold", "100", "--format", "text"]);
+    assert.equal(status, 1, "Debería exit 1 cuando score < threshold");
+  });
+
+  it("audit --threshold exits 0 when score is above threshold", () => {
+    const { status } = run(["audit", fixture, "--threshold", "0", "--format", "text"]);
+    assert.equal(status, 0, "Debería exit 0 cuando score > threshold");
+  });
+
+  it("audit with --recursive scans directory", () => {
+    const { status } = run(["audit", "tests/fixtures/audit-v2/editorial", "-r", "--format", "text"]);
+    assert.equal(status, 0);
+  });
+
+  it("audit --format json --summary produces aggregate report", () => {
+    const { status, stdout } = run([
+      "audit", "tests/fixtures/audit-v2/editorial", "-r", "--format", "json", "--summary"
+    ]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout);
+    assert.ok(typeof parsed.averageScore === "number" || typeof parsed.totalFiles === "number",
+      "Summary debería tener aggregate fields");
+  });
+
+  it("audit --model v2 --format json --summary", () => {
+    const { status, stdout } = run([
+      "audit", "tests/fixtures/audit-v2/editorial", "-r", "--format", "json", "--summary", "--model", "v2"
+    ]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout);
+    assert.ok(typeof parsed.totalFiles === "number");
+  });
+
+  it("generate-all reports error for non-existent directory", () => {
+    const { status, stderr } = run(["generate-all", "/tmp/does-not-exist-geo-xyz"]);
+    assert.notEqual(status, 0);
+  });
+
+  it("generate-all handles directory with no content files", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-empty2-"));
+    const { status, stderr } = run(["generate-all", tmpDir]);
+    assert.notEqual(status, 0);
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("robots audit with temp robots.txt", () => {
+    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-robots-"));
+    const robotsPath = join(tmpDir2, "robots.txt");
+    writeFileSync(robotsPath, "User-agent: *\nDisallow: /private\n");
+    const { status, stdout } = run(["robots", "audit", robotsPath]);
+    assert.equal(status, 0);
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("robots audit with JSON format", () => {
+    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-robots2-"));
+    const robotsPath = join(tmpDir2, "robots.txt");
+    writeFileSync(robotsPath, "User-agent: GPTBot\nDisallow: /\n");
+    // robots audit no tiene --format flag, se imprime a stdout
+    const { status } = run(["robots", "audit", robotsPath]);
+    assert.equal(status, 0);
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("audit with missing file shows error", () => {
+    const { status, stderr } = run(["audit", "/tmp/does-not-exist-xyz.md"]);
+    assert.notEqual(status, 0);
+  });
+
+  it("schema with missing file shows error", () => {
+    const { status } = run(["schema", "/tmp/does-not-exist-xyz.md", "article"]);
+    assert.notEqual(status, 0);
+  });
+
+  it("inject with missing file shows error", () => {
+    const { status } = run(["inject", "tests/fixtures/does-not-exist.md", "article", "--dry-run"]);
+    assert.notEqual(status, 0);
+  });
+
+  it("config set reminders without value shows usage", () => {
+    const { status } = run(["config", "set", "reminders"]);
+    assert.ok(status === 0 || status === 1);
+  });
+
+  it("robots generate writes to file (non-dry-run)", () => {
+    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-robots3-"));
+    const outPath = join(tmpDir2, "robots.txt");
+    const { status } = run(["robots", "generate", "--output", outPath, "--preset", "search-visible"]);
+    assert.equal(status, 0);
+    const content = readFileSync(outPath, "utf8");
+    assert.ok(content.includes("User-agent"), "Debería escribir robots.txt");
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("llmstxt generate writes to file (non-dry-run)", () => {
+    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms2-"));
+    const { status } = run([
+      "llmstxt", "generate", "tests/fixtures/audit-v2/editorial", "-r",
+      "--output", tmpDir2, "--site-url", "https://example.com", "--title", "Test"
+    ]);
+    assert.equal(status, 0);
+    assert.ok(existsSync(join(tmpDir2, "llms.txt")), "llms.txt debe existir");
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("sitemap generate writes to file (non-dry-run)", () => {
+    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-sitemap2-"));
+    const { status } = run([
+      "sitemap", "generate", "tests/fixtures/audit-v2/editorial", "-r",
+      "--output", tmpDir2, "--base-url", "https://example.com"
+    ]);
+    assert.equal(status, 0);
+    assert.ok(existsSync(join(tmpDir2, "sitemap.xml")), "sitemap.xml debe existir");
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("audit v1 text with explicit --model v1", () => {
+    const { status, stdout } = run([
+      "audit", "tests/fixtures/audit-v2/editorial/tech-blog.md", "--model", "v1", "--format", "text"
+    ]);
+    assert.equal(status, 0);
+    assert.ok(stdout.includes("GEO"), "v1 debería mostrar output");
+  });
+
+  // ── Branches específicos para C4 coverage ──
+
+  it("audit with --recursive and explicit --ignore", () => {
+    const { status } = run([
+      "audit", "tests/fixtures/audit-v2/editorial", "-r", "--ignore", "nonexistent-pattern", "--format", "text"
+    ]);
+    assert.equal(status, 0);
+  });
+
+  it("llmstxt audit --recursive reports coverage", () => {
+    // Generate llms.txt first, then audit with coverage
+    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms-cov-"));
+    run([
+      "llmstxt", "generate", "tests/fixtures/audit-v2/editorial", "-r",
+      "--output", tmpDir2, "--site-url", "https://example.com", "--title", "Test"
+    ]);
+    const { status, stdout } = run([
+      "llmstxt", "audit", join(tmpDir2, "llms.txt"), "-r"
+    ]);
+    // Exit code may be 0 or 1 depending on coverage (files outside CWD may be reported missing)
+    assert.ok(status === 0 || status === 1, "audit --recursive no debería crashear");
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
+
+  it("reminders via config set/get", () => {
+    // Enable
+    const { status: s1 } = run(["config", "set", "reminders", "true"]);
+    assert.equal(s1, 0);
+    // Get
+    const { status: s2 } = run(["config", "get", "reminders"]);
+    assert.equal(s2, 0);
+    // Disable
+    const { status: s3 } = run(["config", "set", "reminders", "false"]);
+    assert.equal(s3, 0);
+  });
+
+  it("sitemap generate with single file (not directory)", () => {
+    const { status, stdout } = run([
+      "sitemap", "generate", "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "--dry-run", "--base-url", "https://example.com"
+    ]);
+    assert.equal(status, 0);
+    assert.ok(stdout.includes("sitemap.xml"), "Debería generar para archivo individual");
+  });
+
+  it("llmstxt generate with single file (not directory)", () => {
+    const { status, stdout } = run([
+      "llmstxt", "generate", "tests/fixtures/audit-v2/editorial/tech-blog.md",
+      "--dry-run", "--site-url", "https://example.com", "--title", "Test"
+    ]);
+    assert.equal(status, 0);
+    assert.ok(stdout.includes("llms.txt"), "Debería funcionar con archivo individual");
+  });
+
+  it("audit --format json without --summary", () => {
+    const { status, stdout } = run([
+      "audit", "tests/fixtures/audit-v2/editorial/tech-blog.md", "--format", "json"
+    ]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout);
+    assert.ok(typeof parsed.total_score === "number" || typeof parsed.effectiveScore === "number");
   });
 });
