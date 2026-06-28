@@ -38,7 +38,8 @@
     "build": "node scripts/build.js",
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm run lint && npm run format:check && npm test && npm run test:python && npm run test:conformance && npm run typecheck && npm run changelog:check",
-    "prepack": "node scripts/build.js"
+    "prepack": "node scripts/build.js",
+    "prepare": "cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
   },
   "engines": {
     "node": ">=22.0.0"
