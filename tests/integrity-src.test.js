@@ -18,9 +18,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
 const __dirname = new URL(".", import.meta.url).pathname;
 
 // ═══════════════════════════════════════════════════════════════════════════

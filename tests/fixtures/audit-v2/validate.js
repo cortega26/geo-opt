@@ -43,30 +43,6 @@ const EXPECTED_PROFILES = [
   "regulated",
 ];
 
-const EXPECTED_ADVERSARIAL_FLAGS = [
-  "fabricated_stats",
-  "unattributed_quotes",
-  "implausible_precision",
-  "vague_claims",
-  "link_farm",
-  "thin_content",
-  "excessive_links",
-  "generic_content",
-  "no_specific_data",
-  "vague_sources",
-  "platitudes",
-  "keyword_stuffing",
-  "circular_content",
-  "empty_sections",
-  "no_body_content",
-  "heading_shell",
-  "auto_generated",
-  "generic_patterns",
-  "no_specifics",
-  "filler_content",
-  "hedging_language",
-];
-
 /**
  * @typedef {Object} ValidationError
  * @property {string} file

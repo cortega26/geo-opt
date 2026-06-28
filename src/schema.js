@@ -1,13 +1,7 @@
 import fs from "fs";
 import path from "path";
-import * as cheerio from "cheerio";
-import {
-  preprocessContent,
-  cleanMarkdownToPlainText,
-  extractSections,
-  cleanHtmlText,
-  truncateDescription,
-} from "./text.js";
+import { cleanMarkdownToPlainText, cleanHtmlText, extractSections } from "./text.js";
+import { extractPageMetadata } from "./llms-txt.js";
 import { getNoBrandingError, hasProEntitlement, LICENSE_ENV_VAR } from "./integrity.js";
 
 export const TOOLTICIAN_BRANDING_MARKDOWN =
@@ -111,6 +105,48 @@ export function assertNewFileParentInsideCwd(filepath) {
     throw new Error(result.error);
   }
   return { parentRealPath: result.parentRealPath, cwdRealPath: result.cwdRealPath };
+}
+
+/**
+ * Validate that an output directory (which may not exist yet) resolves inside
+ * the current working directory. Realpath-resolves the nearest existing
+ * ancestor so symlinked parents cannot escape. Batch-safe: returns a result.
+ *
+ * @param {string} dirPath
+ * @returns {{ valid: true } | { valid: false, error: string }}
+ */
+export function validateOutputDirInsideCwd(dirPath) {
+  const resolved = path.resolve(dirPath);
+  let probe = resolved;
+  while (!fs.existsSync(probe)) {
+    const parent = path.dirname(probe);
+    if (parent === probe) break;
+    probe = parent;
+  }
+  let ancestorRealPath;
+  let cwdRealPath;
+  try {
+    ancestorRealPath = fs.realpathSync(probe);
+    cwdRealPath = fs.realpathSync(process.cwd());
+  } catch (e) {
+    return { valid: false, error: `Failed to resolve real path for ${dirPath}: ${e.message}` };
+  }
+  const suffix = path.relative(probe, resolved);
+  const target = suffix ? path.join(ancestorRealPath, suffix) : ancestorRealPath;
+  if (!isInsideDirectory(target, cwdRealPath)) {
+    return {
+      valid: false,
+      error: `Security restriction — output directory ${dirPath} resolves outside the current working directory.`,
+    };
+  }
+  return { valid: true };
+}
+
+export function assertOutputDirInsideCwd(dirPath) {
+  const result = validateOutputDirInsideCwd(dirPath);
+  if (!result.valid) {
+    throw new Error(result.error);
+  }
 }
 
 function extractListItems(rawText) {
@@ -312,33 +348,8 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
     }
   }
 
-  const cleanText = preprocessContent(content);
-
-  // Try markdown H1 first, then HTML <h1>
-  let titleMatch = cleanText.match(/^#\s+(.+)$/m);
-  if (!titleMatch) {
-    titleMatch = cleanText.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i);
-  }
-  const title = titleMatch ? cleanHtmlText(titleMatch[1]) : "Untitled Document";
-
-  const introMatch = cleanText.match(/^#\s+.+?\n\n([^#\n]+)/s);
-  let description = introMatch ? cleanMarkdownToPlainText(introMatch[1].trim()) : "";
-  if (!description && (filepath.endsWith(".html") || cleanText.toLowerCase().includes("<html"))) {
-    // Use cheerio for reliable <meta name="description"> extraction
-    // regardless of attribute order, and fall back to the first <p>.
-    const $desc = cheerio.load(content);
-    const metaDesc = $desc('meta[name="description"]').attr("content");
-    if (metaDesc) {
-      description = cleanHtmlText(metaDesc);
-    }
-    if (!description) {
-      const firstParagraph = $desc("p").first().text();
-      if (firstParagraph) {
-        description = cleanHtmlText(firstParagraph);
-      }
-    }
-  }
-  description = truncateDescription(description);
+  const { title: rawTitle, description } = extractPageMetadata(content, filepath);
+  const title = cleanHtmlText(rawTitle) || rawTitle;
 
   const authorInfo = config.author || {};
   const pubInfo = config.publisher || {};

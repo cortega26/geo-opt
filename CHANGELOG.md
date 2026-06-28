@@ -24,6 +24,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - `LlmsAuditReport` TypeScript interface gains `notes: string[]` and `warnings: string[]` fields.
 - `LlmsEntry` TypeScript interface gains `optional?: boolean` field.
 - `optionalThreshold` in `generateLlmsTxt` options is marked `@deprecated` in types.
+- The v2 pronoun-density ceiling is now the named constant `MAX_PRONOUN_DENSITY_V2`
+  (value unchanged at 0.05) to make its intentional divergence from v1 explicit.
+- ESLint config now allows template literals (removing ~20 false-positive quote
+  errors in test files) and recognizes `structuredClone` as a Node 17+ global.
+- Pre-commit hook now runs `npm run lint` and `npm run format:check` before the
+  changelog check.
 
 - **Breaking:** `geo-opt schema <file> article` and `geo-opt inject <file> article` now emit
   `Article` instead of `NewsArticle`. Use the new `news-article` type for time-sensitive news
@@ -52,9 +58,38 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - Rewrote `README.md` with an improved structure, compelling problem statement, CI/CD integration example, expanded command reference, and clarified evidence vocabulary.
 - Added `README.es.md`: full Spanish translation of the README, linked bidirectionally with the English version.
+- CI now runs `npm run typecheck`, so regressions in the public `index.d.ts`
+  type surface fail the build instead of only the local `npm run check`.
+
+### Security
+
+- `robots generate`, `sitemap generate`, `llmstxt generate`, and `generate-all`
+  now reject `--output` paths that resolve outside the current working
+  directory, matching the existing boundary enforced by `inject` and `report`.
+- The Pro HTML report now escapes single quotes (`'`) in addition to `& < > "`.
+
+### Tests
+
+- Added coverage for sitemap index/splitting (>50k URLs) and `validateSitemapXml`
+  spec checks, and XSS-escaping regression tests for the HTML report renderers.
 
 ### Fixed
 
+- Removed dead imports and unused variables in test files (`optimizer.test.js`,
+  `conformance.test.js`, `cli-smoke.test.js`, `scoring.test.js`).
+- `generateSchemaData` now derives the page title from the filename when no
+  H1 heading is present (previously used the literal string "Untitled Document",
+  mismatching `llms.txt` which already used the filename). Consolidates
+  duplicate metadata-extraction logic.
+- v2 audit now shows the correct "Add a single H1" remediation when a document's
+  first heading is not an H1 (previously always showed the generic
+  skipped-levels remediation).
+- `detectProfile` now returns confidence 0.2 for content with no profile signals
+  (previously unreachable; always returned 0.4).
+- `discoverFiles` now correctly translates `**`, `*`, and `?` glob patterns in
+  `.gitignore`, `--ignore`, and `config.ignore`. Previously a `**` pattern
+  produced an invalid regex that silently discarded all `.gitignore` rules (or
+  crashed `--ignore`), causing recursive audits to scan ignored directories.
 - `tests/changelog-policy.test.js`: version assertion now matches any `actions/checkout@vN`
   instead of hardcoding `@v4`, preventing breakage when the workflow action version is bumped.
 - Pre-commit hook installed via `npm run prepare` (`hooks/pre-commit`) runs the changelog

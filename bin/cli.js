@@ -31,6 +31,7 @@ import {
   validateSchemaFile,
   generateSitemapXml,
 } from "../src/index.js";
+import { assertOutputDirInsideCwd } from "../src/schema.js";
 import {
   renderV1Report,
   renderV2Report,
@@ -262,8 +263,15 @@ robotsCmd
       console.log(content);
       console.log("[dry-run] Would write to:", options.output);
     } else {
-      fs.writeFileSync(options.output, content, { encoding: "utf8" });
-      console.log(`robots.txt written to ${options.output}`);
+      const outPath = path.resolve(options.output);
+      try {
+        assertNewFileParentInsideCwd(outPath);
+        fs.writeFileSync(outPath, content, { encoding: "utf8" });
+      } catch (e) {
+        console.error(`Error: ${e.message}`);
+        process.exit(1);
+      }
+      console.log(`robots.txt written to ${outPath}`);
     }
   });
 
@@ -359,6 +367,12 @@ sitemapCmd
       );
     } else {
       const outDir = path.resolve(options.output);
+      try {
+        assertOutputDirInsideCwd(outDir);
+      } catch (e) {
+        console.error(`Error: ${e.message}`);
+        process.exit(1);
+      }
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(path.join(outDir, "sitemap.xml"), sitemapXml, {
         encoding: "utf8",
@@ -528,6 +542,12 @@ llmstxtCmd
       );
     } else {
       const outDir = path.resolve(options.output);
+      try {
+        assertOutputDirInsideCwd(outDir);
+      } catch (e) {
+        console.error(`Error: ${e.message}`);
+        process.exit(1);
+      }
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(path.join(outDir, "llms.txt"), llmsContent, {
         encoding: "utf8",
@@ -1101,6 +1121,12 @@ program
       console.log(llmsContent.substring(0, 500));
       console.log("...");
     } else {
+      try {
+        assertOutputDirInsideCwd(outDir);
+      } catch (e) {
+        console.error(`Error: ${e.message}`);
+        process.exit(1);
+      }
       fs.mkdirSync(outDir, { recursive: true });
       fs.writeFileSync(path.join(outDir, "audit-report.json"), reportJson, { encoding: "utf8" });
       fs.writeFileSync(path.join(outDir, "llms.txt"), llmsContent, { encoding: "utf8" });

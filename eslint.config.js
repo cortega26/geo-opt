@@ -20,13 +20,14 @@ export default [
         Headers: "readonly",
         Request: "readonly",
         Response: "readonly",
+        structuredClone: "readonly",
       }
     },
     rules: {
-      "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+      "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
       "no-console": "off",
       "semi": ["error", "always"],
-      "quotes": ["error", "double", { "avoidEscape": true }],
+      "quotes": ["error", "double", { "avoidEscape": true, "allowTemplateLiterals": true }],
       "no-undef": "error",
       "no-useless-escape": "off",
       "no-useless-assignment": "off"

@@ -5,6 +5,11 @@ import { z } from "zod";
 
 export const MAX_PRONOUN_DENSITY = 0.02;
 
+// v2 intentionally uses a looser pronoun-density ceiling than v1 (0.02).
+// Changing this value alters v2 ranking and is a model-version decision
+// (see docs/architecture.md "Recalibration policy"); do not retune casually.
+export const MAX_PRONOUN_DENSITY_V2 = 0.05;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

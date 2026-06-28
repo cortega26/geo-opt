@@ -123,15 +123,15 @@ Plans 048–050 cover the remaining positive-tradeoff findings from the same aud
 
 | Plan | Title | Cat | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
-| [041](041-fix-glob-ignore-translation.md) | Glob `**`/`*`/`?` ignore patterns translate correctly; no silent `.gitignore` discard | bug | P1 | S | — | TODO |
-| [042](042-add-typecheck-to-ci.md) | CI runs `npm run typecheck` (protect public `index.d.ts`) | dx | P1 | S | — | TODO |
-| [043](043-guard-all-artifact-writers.md) | CWD write-guard on robots/sitemap/llmstxt/generate-all writers | security | P2 | S | — | TODO |
-| [044](044-v2-safe-correctness-fixes.md) | Score-neutral v2 fixes: missing-h1 remediation, named v2 pronoun limit, reachable low confidence | bug | P2 | S | — | TODO |
+| [041](041-fix-glob-ignore-translation.md) | Glob `**`/`*`/`?` ignore patterns translate correctly; no silent `.gitignore` discard | bug | P1 | S | — | DONE |
+| [042](042-add-typecheck-to-ci.md) | CI runs `npm run typecheck` (protect public `index.d.ts`) | dx | P1 | S | — | DONE |
+| [043](043-guard-all-artifact-writers.md) | CWD write-guard on robots/sitemap/llmstxt/generate-all writers | security | P2 | S | — | DONE |
+| [044](044-v2-safe-correctness-fixes.md) | Score-neutral v2 fixes: missing-h1 remediation, named v2 pronoun limit, reachable low confidence | bug | P2 | S | — | DONE |
 | [045](045-v2-quote-heading-detection-accuracy.md) | v2 quote/heading detection (mid-line + curly quotes, HTML DOM order, per-occurrence attribution) — **changes v2 scores** | bug | P2 | M | — | TODO |
-| [046](046-cover-sitemap-and-report-escaping.md) | Cover sitemap split/`validateSitemapXml` + HTML-report XSS-escaping regression tests | tests | P2 | S | — | TODO |
+| [046](046-cover-sitemap-and-report-escaping.md) | Cover sitemap split/`validateSitemapXml` + HTML-report XSS-escaping regression tests | tests | P2 | S | — | DONE |
 | [047](047-fix-generate-all-sitemap-and-reread.md) | Fix `generate-all` sitemap `lastmod`; reuse audited content instead of re-reading | bug | P3 | M | — | TODO |
-| [048](048-consolidate-extract-page-metadata.md) | Consolidate `extractPageMetadata` — eliminate title divergence between JSON-LD and llms.txt for H1-less files | bug | P2 | S | — | TODO |
-| [049](049-tooling-hygiene.md) | Lint `tests/` (template-literal false positives, dead vars), expand pre-commit hook to lint + format | dx | P2 | S | — | TODO |
+| [048](048-consolidate-extract-page-metadata.md) | Consolidate `extractPageMetadata` — eliminate title divergence between JSON-LD and llms.txt for H1-less files | bug | P2 | S | — | DONE |
+| [049](049-tooling-hygiene.md) | Lint `tests/` (template-literal false positives, dead vars), expand pre-commit hook to lint + format | dx | P2 | S | — | DONE |
 | [050](050-core-layering-and-deduplication.md) | Extract `buildExplainLines` helper (scoring.js + renderer.js duplication); `injectSchema` returns result instead of printing | tech-debt | P3 | M | — | TODO |
 
 Recommended execution order and dependency notes:

@@ -53,6 +53,9 @@ jobs:
       - name: JS tests
         run: npm test
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Python compatibility tests
         run: python3 .agents/skills/geo-optimization/scripts/test_optimizer.py
 

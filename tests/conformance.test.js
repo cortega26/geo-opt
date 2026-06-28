@@ -49,20 +49,6 @@ function pythonAudit(fixtureName, args = []) {
   return JSON.parse(result);
 }
 
-/** Normalize nondeterministic fields for comparison. */
-function normalizeReport(report) {
-  const normalized = structuredClone(report);
-  // Timestamps are nondeterministic
-  if (normalized.generatedAt) {
-    normalized.generatedAt = "<TIMESTAMP>";
-  }
-  // Node reports "file" as absolute path, Python may differ
-  if (normalized.file) {
-    normalized.file = path.basename(normalized.file);
-  }
-  return normalized;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // Tier: equivalent — V1 audit
 // ═══════════════════════════════════════════════════════════════════════════

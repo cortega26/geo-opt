@@ -210,6 +210,22 @@ describe("readiness bands", () => {
       `News article (${credResult.report.effectiveScore}) must outrank platitudes (${platResult.report.effectiveScore})`
     );
   });
+
+  it("missing-h1 shows correct remediation instead of generic skipped-levels", () => {
+    const content =
+      "## Getting Started\n\nThis document starts with an H2 instead of an H1.\n\nSome paragraph text here for the audit to analyze content.";
+    const { report } = scoreContentV2(content, "no-h1.md", {});
+    const headingFindings = report.findings.filter(
+      (f) => f.ruleId === "v2.observations.heading_hierarchy"
+    );
+    assert.ok(headingFindings.length > 0, "Should have heading hierarchy finding");
+    for (const f of headingFindings) {
+      assert.ok(
+        f.remediation.includes("Add a single H1"),
+        `Remediation should mention adding H1, got: ${f.remediation}`
+      );
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

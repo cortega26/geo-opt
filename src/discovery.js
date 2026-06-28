@@ -37,17 +37,19 @@ function patternToRegex(pattern) {
   const dirOnly = p.endsWith("/");
   if (dirOnly) p = p.slice(0, -1);
 
-  // Escape regex specials, then convert glob tokens
+  // Escape regex specials (including * and ?), then convert glob tokens.
   let r = p
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    // ** matches any number of directories
-    .replace(/\\\*\\\*/g, ".__DOUBLESTAR__.")
-    // * matches anything except /
+    .replace(/[.+^${}()|[\]\\*?]/g, "\\$&")
+    // "**/" matches zero or more directories
+    .replace(/\\\*\\\*\//g, "__GLOBSTAR_SLASH__")
+    // standalone "**" matches across path separators
+    .replace(/\\\*\\\*/g, "__GLOBSTAR__")
+    // "*" matches anything except /
     .replace(/\\\*/g, "[^/]*")
-    // ? matches single char except /
+    // "?" matches a single char except /
     .replace(/\\\?/g, "[^/]")
-    // Restore ** placeholder
-    .replace(/\.__DOUBLESTAR__\./g, ".*");
+    .replace(/__GLOBSTAR_SLASH__/g, "(?:.*/)?")
+    .replace(/__GLOBSTAR__/g, ".*");
 
   if (dirOnly) {
     // Match directory entries: pattern or pattern/**
@@ -154,12 +156,15 @@ export function discoverFiles(inputPaths, options = {}) {
   // Compile ignore rules from .gitignore + config + CLI
   const rules = [];
   const gitignorePath = path.join(cwd, ".gitignore");
+  let gitignoreContent = null;
   try {
-    const content = fs.readFileSync(gitignorePath, "utf8");
-    const raw = content.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#"));
-    rules.push(...compileGitignorePatterns(raw));
+    gitignoreContent = fs.readFileSync(gitignorePath, "utf8");
   } catch {
-    // No .gitignore found — that's fine
+    // No readable .gitignore — proceed without it.
+  }
+  if (gitignoreContent !== null) {
+    const raw = gitignoreContent.split("\n").filter((l) => l.trim() && !l.trim().startsWith("#"));
+    rules.push(...compileGitignorePatterns(raw));
   }
 
   if (Array.isArray(config.ignore)) {

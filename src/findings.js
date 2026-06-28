@@ -529,7 +529,7 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
         observedFacts: {
           issues: observations.headingHierarchy.issues,
         },
-        remediation: observations.headingHierarchy.issues.includes("missing_h1")
+        remediation: observations.headingHierarchy.issues.some((i) => i.includes("instead of h1"))
           ? "Add a single H1 heading as the page title."
           : "Fix heading hierarchy issues: " +
             (observations.headingHierarchy.issues || []).join(", ") +

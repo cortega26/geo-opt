@@ -1,4 +1,4 @@
-import test, { mock } from "node:test";
+import test from "node:test";
 import assert from "node:assert";
 import fs from "fs";
 import os from "os";
@@ -21,7 +21,6 @@ import {
   COMMUNITY_SCHEMA_TYPES,
   createFinding,
   discoverFiles,
-  EVIDENCE_REGISTRY,
   extractPageMetadata,
   extractSections,
   generateLlmsTxt,
@@ -2582,6 +2581,79 @@ test("renderComparisonHtml shows before/after scores and delta", () => {
     assert.ok(html.includes("After"), "Should show After label");
     assert.ok(html.includes("Net change"), "Should show net change");
     assert.ok(html.includes("Dimension Changes"), "Should show dimension comparison table");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HTML-report XSS escaping (plan 046, F8)
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("renderV1ReportHtml escapes hostile input in filepath and findings", () => {
+  const tempFile = path.join(os.tmpdir(), "xss-v1.md");
+  const xssContent = "# Test\n\nSome content.";
+  fs.writeFileSync(tempFile, xssContent);
+  try {
+    const { report } = scoreContent(xssContent, tempFile, {});
+    // Inject hostile strings into filepath and findings
+    const xssPath = '/tmp/<script>alert("xss")</script>.md';
+    // Give a finding a hostile message
+    if (report.findings.length > 0) {
+      report.findings[0].message = "<img src=x onerror=alert(1)>";
+    }
+    if (report.recommendations.length > 0) {
+      report.recommendations[0] = "<script>alert('xss')</script>";
+    }
+    const html = renderV1ReportHtml(report, xssPath);
+    assert.ok(!html.includes("<script>alert("), "Should not contain unescaped script tag");
+    assert.ok(html.includes("&lt;script&gt;"), "Should contain escaped script tag");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("renderAggregateReportHtml escapes hostile input", () => {
+  const tempFile = path.join(os.tmpdir(), "xss-agg.md");
+  fs.writeFileSync(tempFile, "# Aggregate test\n\nContent.");
+  try {
+    const { report } = scoreContent("# Aggregate test\n\nContent.", tempFile, {});
+    const results = [{ report, filepath: tempFile }];
+    const summary = {
+      totalFiles: 1,
+      averageScore: 50,
+      medianScore: 50,
+      minScore: 50,
+      maxScore: 50,
+      succeeded: 1,
+      scores: [50],
+      topFindings: [
+        {
+          message: "<img src=x onerror=alert(1)>",
+          category: "test",
+          fileCount: 1,
+          evidenceLabel: "heuristic",
+        },
+      ],
+      worstFiles: [{ file: "<script>alert('xss')</script>", score: 30 }],
+    };
+    const html = renderAggregateReportHtml(results, summary);
+    assert.ok(!html.includes("<img src=x onerror="), "Should not contain unescaped img tag");
+    assert.ok(html.includes("&lt;img"), "Should contain escaped img tag");
+    assert.ok(!html.includes("<script>alert("), "Should not contain unescaped script");
+  } finally {
+    fs.unlinkSync(tempFile);
+  }
+});
+
+test("esc function escapes single quotes", () => {
+  const tempFile = path.join(os.tmpdir(), "xss-quote.md");
+  fs.writeFileSync(tempFile, "# Quote test\n\nContent with 'quotes'.");
+  try {
+    const { report } = scoreContent("# Quote test\n\nContent with 'quotes'.", tempFile, {});
+    // Use a filepath containing both single and double quotes
+    const html = renderV1ReportHtml(report, "/tmp/test's file.md");
+    assert.ok(html.includes("&#39;"), "Should escape single quotes");
   } finally {
     fs.unlinkSync(tempFile);
   }

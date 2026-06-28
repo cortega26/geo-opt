@@ -13,6 +13,7 @@
  *  - Adversarial fixtures must rank below credible counterparts.
  */
 
+import { MAX_PRONOUN_DENSITY_V2 } from "./config.js";
 import { preprocessContent } from "./text.js";
 import { PROFILES, isApplicable, notApplicableDimensions, resolveProfile } from "./profiles.js";
 import { observeContent } from "./observations.js";
@@ -70,7 +71,7 @@ function scoreStructure(obs, profile) {
         evidenceLabel: "heuristic",
         applicability: profile,
         observedFacts: { issues: obs.headingHierarchy.issues },
-        remediation: obs.headingHierarchy.issues.includes("missing_h1")
+        remediation: obs.headingHierarchy.issues.some((i) => i.includes("instead of h1"))
           ? "Add a single H1 heading as the page title so parsers can identify the main topic."
           : "Fix skipped heading levels: " +
             obs.headingHierarchy.issues.join(", ") +
@@ -546,7 +547,7 @@ function scoreClarity(obs, textContent, config, profile) {
     const pronouns = ["it", "they", "them", "this", "these", "those"];
     const pronounCount = words.filter((w) => pronouns.includes(w)).length;
     const pronounDensity = pronounCount / totalWordCount;
-    const pronounLimit = config?.limits?.max_pronoun_density ?? 0.05;
+    const pronounLimit = config?.limits?.max_pronoun_density ?? MAX_PRONOUN_DENSITY_V2;
 
     if (pronounDensity > pronounLimit) {
       const deduct = Math.min(5, Math.floor((pronounDensity - pronounLimit) * 100));

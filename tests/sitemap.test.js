@@ -21,6 +21,7 @@ import {
   generateSitemapFiles,
   scoreToPriority,
   determineChangefreq,
+  validateSitemapXml,
 } from "../src/sitemap.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -263,5 +264,134 @@ describe("sitemap — integración de prioridades con scoring", () => {
   it("entradas sin score obtienen prioridad 0.5 (default)", () => {
     const xml = generateSitemapXml([{ url: "https://example.com/unknown" }]);
     assert.ok(xml.includes("<priority>0.5</priority>"));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// generateSitemapFiles — splitting para sitios grandes (>50k URLs)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("generateSitemapFiles split", () => {
+  it("genera sitemap index + archivos divididos para >50k URLs", () => {
+    const entries = Array.from({ length: 51000 }, (_, i) => ({
+      url: "/p" + i,
+      score: 50,
+    }));
+    const files = generateSitemapFiles(entries, {
+      baseUrl: "https://example.com",
+    });
+
+    assert.equal(files[0].name, "sitemap.xml");
+    assert.ok(files[0].content.includes("<sitemapindex"), "El índice debe contener sitemapindex");
+
+    // 51000 / 50000 = 1.02 → 2 chunks
+    const splitFiles = files.filter((f) => f.name !== "sitemap.xml");
+    assert.equal(splitFiles.length, 2, "Debe haber 2 archivos divididos");
+    assert.ok(
+      splitFiles.some((f) => f.name === "sitemap-1.xml"),
+      "Debe existir sitemap-1.xml"
+    );
+    assert.ok(
+      splitFiles.some((f) => f.name === "sitemap-2.xml"),
+      "Debe existir sitemap-2.xml"
+    );
+
+    for (const f of splitFiles) {
+      assert.ok(f.content.includes("<urlset"), "Cada split debe contener urlset");
+    }
+  });
+
+  it("generateSitemapXml retorna sitemapindex para >50k entradas", () => {
+    const entries = Array.from({ length: 51000 }, (_, i) => ({
+      url: "/p" + i,
+      score: 50,
+    }));
+    const xml = generateSitemapXml(entries, { baseUrl: "https://example.com" });
+    assert.ok(xml.includes("<sitemapindex"), "Debe usar sitemapindex para >50k");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// validateSitemapXml
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("validateSitemapXml", () => {
+  it("valida un sitemap URL set correcto", () => {
+    const xml = generateSitemapXml([{ url: "/a", score: 80 }], {
+      baseUrl: "https://example.com",
+    });
+    const result = validateSitemapXml(xml);
+    assert.equal(result.valid, true);
+    assert.equal(result.issues.length, 0);
+  });
+
+  it("rechaza protocolo inválido en <loc>", () => {
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<url><loc>ftp://example.com/x</loc></url>\n" +
+      "</urlset>";
+    const result = validateSitemapXml(xml);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.issues.some((i) => i.toLowerCase().includes("protocol")),
+      `Expected protocol issue, got: ${result.issues.join(", ")}`
+    );
+  });
+
+  it("rechaza changefreq inválido", () => {
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<url><loc>https://example.com/</loc><changefreq>often</changefreq></url>\n" +
+      "</urlset>";
+    const result = validateSitemapXml(xml);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.issues.some((i) => i.toLowerCase().includes("changefreq")),
+      `Expected changefreq issue, got: ${result.issues.join(", ")}`
+    );
+  });
+
+  it("rechaza priority fuera de rango", () => {
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<url><loc>https://example.com/</loc><priority>2.0</priority></url>\n" +
+      "</urlset>";
+    const result = validateSitemapXml(xml);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.issues.some((i) => i.toLowerCase().includes("priority")),
+      `Expected priority issue, got: ${result.issues.join(", ")}`
+    );
+  });
+
+  it("rechaza lastmod inválido", () => {
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<url><loc>https://example.com/</loc><lastmod>not-a-date</lastmod></url>\n" +
+      "</urlset>";
+    const result = validateSitemapXml(xml);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.issues.some((i) => i.toLowerCase().includes("lastmod")),
+      `Expected lastmod issue, got: ${result.issues.join(", ")}`
+    );
+  });
+
+  it("rechaza namespace faltante", () => {
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      "<urlset>\n" +
+      "<url><loc>https://example.com/</loc></url>\n" +
+      "</urlset>";
+    const result = validateSitemapXml(xml);
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.issues.some((i) => i.toLowerCase().includes("namespace")),
+      `Expected namespace issue, got: ${result.issues.join(", ")}`
+    );
   });
 });

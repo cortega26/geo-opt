@@ -222,10 +222,10 @@ describe("detectProfile", () => {
     assert.ok(result.confidence >= 0.7);
   });
 
-  it("defaults to editorial with low confidence when no signals match", () => {
+  it("defaults to editorial with confidence 0.2 when no signals match", () => {
     const result = detectProfile("Just a simple paragraph with no special signals.", "note.md");
     assert.equal(result.profile, "editorial");
-    assert.ok(result.confidence <= 0.5, `confidence ${result.confidence} should be low`);
+    assert.equal(result.confidence, 0.2, "No-signal content should have confidence 0.2");
   });
 
   it("returns reasons array explaining the detection", () => {

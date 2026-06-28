@@ -280,10 +280,11 @@ export function detectProfile(content, filepath = "") {
   // ── Weak signals → default to editorial ──
   // Editorial is the broadest profile — it applies all dimensions, so it's
   // the safe default when nothing specific is detected.
-  if (reasons.length === 0) {
+  const hadSignal = reasons.length > 0;
+  if (!hadSignal) {
     reasons.push("no specific profile signals detected; defaulting to editorial");
   }
-  return { profile: "editorial", confidence: reasons.length > 0 ? 0.4 : 0.2, reasons };
+  return { profile: "editorial", confidence: hadSignal ? 0.4 : 0.2, reasons };
 }
 
 /**

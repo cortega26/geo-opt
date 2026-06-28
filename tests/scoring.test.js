@@ -183,7 +183,7 @@ Source: Internal Analytics Dashboard, accessed 2024-10-01
  * @param {object} report
  * @param {string} file
  */
-function assertReportContract(report, file) {
+function assertReportContract(report, _file) {
   // Top-level fields
   assert.ok(
     typeof report.file === "string",

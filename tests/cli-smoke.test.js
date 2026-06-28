@@ -12,8 +12,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 const __dirname = new URL(".", import.meta.url).pathname;
 const cliPath = join(__dirname, "..", "bin", "cli.js");
 const repoRoot = join(__dirname, "..");
@@ -81,7 +79,7 @@ describe("CLI audit", () => {
   });
 
   it("handles non-existent file gracefully", () => {
-    const { status, stderr } = run(["audit", "/tmp/does-not-exist-xyz.md"]);
+    const { status, stderr: _stderr } = run(["audit", "/tmp/does-not-exist-xyz.md"]);
     assert.notEqual(status, 0);
   });
 });
@@ -151,7 +149,13 @@ describe("CLI inject", () => {
     const fp = join(tmpDir, "test2.md");
     writeFileSync(fp, "# Test\n");
     // Sin licencia, --no-branding debería causar error
-    const { status, stderr } = run(["inject", fp, "article", "--no-branding", "--dry-run"]);
+    const { status: _status, stderr: _stderr } = run([
+      "inject",
+      fp,
+      "article",
+      "--no-branding",
+      "--dry-run",
+    ]);
     // Puede exit 0 o 1 dependiendo de si tiene licencia
     // La prueba solo verifica que no crashea
   });
@@ -187,7 +191,7 @@ describe("CLI llmstxt", () => {
 
   it("audit reports valid structure for generated content", () => {
     // Generate first, then audit
-    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms-"));
+    const tmpDir2 = mkdtempSync(join(repoRoot, "tmp-cli-llms-"));
     const { status: genStatus } = run([
       "llmstxt",
       "generate",
@@ -325,7 +329,7 @@ describe("CLI generate-all", () => {
   it(
     "generates complete package to output directory",
     () => {
-      const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-pkg-"));
+      const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-pkg-"));
       const { status, stdout } = run([
         "generate-all",
         dir,
@@ -458,13 +462,13 @@ describe("CLI error paths", () => {
   });
 
   it("generate-all reports error for non-existent directory", () => {
-    const { status, stderr } = run(["generate-all", "/tmp/does-not-exist-geo-xyz"]);
+    const { status, stderr: _stderr } = run(["generate-all", "/tmp/does-not-exist-geo-xyz"]);
     assert.notEqual(status, 0);
   });
 
   it("generate-all handles directory with no content files", () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-empty2-"));
-    const { status, stderr } = run(["generate-all", tmpDir]);
+    const { status, stderr: _stderr } = run(["generate-all", tmpDir]);
     assert.notEqual(status, 0);
     rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -473,7 +477,7 @@ describe("CLI error paths", () => {
     const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-robots-"));
     const robotsPath = join(tmpDir2, "robots.txt");
     writeFileSync(robotsPath, "User-agent: *\nDisallow: /private\n");
-    const { status, stdout } = run(["robots", "audit", robotsPath]);
+    const { status, stdout: _stdout } = run(["robots", "audit", robotsPath]);
     assert.equal(status, 0);
     rmSync(tmpDir2, { recursive: true, force: true });
   });
@@ -489,7 +493,7 @@ describe("CLI error paths", () => {
   });
 
   it("audit with missing file shows error", () => {
-    const { status, stderr } = run(["audit", "/tmp/does-not-exist-xyz.md"]);
+    const { status, stderr: _stderr } = run(["audit", "/tmp/does-not-exist-xyz.md"]);
     assert.notEqual(status, 0);
   });
 
@@ -509,7 +513,7 @@ describe("CLI error paths", () => {
   });
 
   it("robots generate writes to file (non-dry-run)", () => {
-    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-robots3-"));
+    const tmpDir2 = mkdtempSync(join(repoRoot, "tmp-cli-robots3-"));
     const outPath = join(tmpDir2, "robots.txt");
     const { status } = run([
       "robots",
@@ -526,7 +530,7 @@ describe("CLI error paths", () => {
   });
 
   it("llmstxt generate writes to file (non-dry-run)", () => {
-    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-llms2-"));
+    const tmpDir2 = mkdtempSync(join(repoRoot, "tmp-cli-llms2-"));
     const { status } = run([
       "llmstxt",
       "generate",
@@ -545,7 +549,7 @@ describe("CLI error paths", () => {
   });
 
   it("sitemap generate writes to file (non-dry-run)", () => {
-    const tmpDir2 = mkdtempSync(join(tmpdir(), "geo-cli-sitemap2-"));
+    const tmpDir2 = mkdtempSync(join(repoRoot, "tmp-cli-sitemap2-"));
     const { status } = run([
       "sitemap",
       "generate",
@@ -604,7 +608,7 @@ describe("CLI error paths", () => {
       "--title",
       "Test",
     ]);
-    const { status, stdout } = run(["llmstxt", "audit", join(tmpDir2, "llms.txt"), "-r"]);
+    const { status, stdout: _stdout } = run(["llmstxt", "audit", join(tmpDir2, "llms.txt"), "-r"]);
     // Exit code may be 0 or 1 depending on coverage (files outside CWD may be reported missing)
     assert.ok(status === 0 || status === 1, "audit --recursive no debería crashear");
     rmSync(tmpDir2, { recursive: true, force: true });
