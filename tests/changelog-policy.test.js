@@ -64,7 +64,7 @@ test("CI fetches the base branch required by the changelog policy", () => {
   const workflow = fs.readFileSync(ciWorkflowPath, "utf8");
   assert.match(
     workflow,
-    /uses: actions\/checkout@v4\s+with:\s+fetch-depth: 0/,
+    /uses: actions\/checkout@v\d+\s+with:\s+fetch-depth: 0/,
     "The pull-request checkout must include origin/<base> for three-dot changelog diffs"
   );
 });
