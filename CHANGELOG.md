@@ -21,6 +21,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
+- Added a release publishing workflow that publishes `geo-opt` to npm through
+  Trusted Publishing/OIDC and to GitHub Packages with `GITHUB_TOKEN`.
 - `geo-opt technical` now supports remote URL auditing via `--url` and `--sitemap` flags
   (Phase 2 of plan 023). Remote fetching includes DNS rebinding mitigation, private-IP
   blocking (with `--allow-private` and `--allow-localhost` overrides), configurable
