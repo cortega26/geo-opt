@@ -1200,10 +1200,8 @@ program
   .option("--source-url <url>", "Base URL for resolving relative links in local HTML")
   .option("-f, --format <type>", "Output format: text or json", "text")
   .option("-o, --output <file>", "Write JSON report to file (json format only)")
-  .option(
-    "--url <url>",
-    "Audit a remote URL (repeatable; https: required)",
-    (val, prev) => (prev ? [].concat(prev, val) : [val])
+  .option("--url <url>", "Audit a remote URL (repeatable; https: required)", (val, prev) =>
+    prev ? [].concat(prev, val) : [val]
   )
   .option("--sitemap <url>", "Audit pages discovered from a remote sitemap.xml (https: required)")
   .option("--max-urls <n>", "Max URLs to fetch in sitemap mode", "50")
@@ -1592,9 +1590,7 @@ async function handleRemoteTechnical(options) {
           const subParsed = parseSitemapXml(subResult.html);
 
           if (subParsed.issues.length > 0 && format !== "json") {
-            console.warn(
-              chalk.yellow(`    Sub-sitemap issues: ${subParsed.issues.join("; ")}`)
-            );
+            console.warn(chalk.yellow(`    Sub-sitemap issues: ${subParsed.issues.join("; ")}`));
           }
 
           // Un sub-sitemap podría ser a su vez otro índice (anidación de 2 niveles)
@@ -1629,17 +1625,13 @@ async function handleRemoteTechnical(options) {
           }
         } catch (e) {
           if (format !== "json") {
-            console.warn(
-              chalk.yellow(`    Failed to fetch sub-sitemap ${sub.loc}: ${e.message}`)
-            );
+            console.warn(chalk.yellow(`    Failed to fetch sub-sitemap ${sub.loc}: ${e.message}`));
           }
         }
       }
 
       if (format !== "json") {
-        console.log(
-          chalk.dim(`  Extracted ${pageUrls.length} page URLs from sub-sitemaps.`)
-        );
+        console.log(chalk.dim(`  Extracted ${pageUrls.length} page URLs from sub-sitemaps.`));
       }
 
       // Incluir tanto las URLs directas del índice como las extraídas de sub-sitemaps

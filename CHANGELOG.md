@@ -89,6 +89,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   existing sitemap XML string (urlset or sitemapindex) into a structured
   `{ urls, sitemapUrls, valid, issues }` result. Exported from `src/index.js`
   and typed in `index.d.ts`. No network access — parsing only.
+- `parseFrontmatter(content)`: new public function in `src/text.js` that splits
+  leading YAML frontmatter from a document. Returns `{ data, body }` with parsed
+  YAML metadata. Tolerant: missing or invalid YAML yields `{ data: {}, body: content }`.
 
 ### Docs
 
@@ -127,6 +130,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   produced an invalid regex that silently discarded all `.gitignore` rules (or
   crashed `--ignore`), causing recursive audits to scan ignored directories.
 - `tests/changelog-policy.test.js`: version assertion now matches any `actions/checkout@vN`
+- Frontmatter is now parsed with the `yaml` library instead of a regex, so YAML
+  metadata no longer leaks into statistics, quotation, or heading detection
+  (`src/text.js`). Fixes false positives on Markdown files with `---` blocks.
   instead of hardcoding `@v4`, preventing breakage when the workflow action version is bumped.
 - Pre-commit hook installed via `npm run prepare` (`hooks/pre-commit`) runs the changelog
   policy check locally before each commit, catching missing entries before CI does.

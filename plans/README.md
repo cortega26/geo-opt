@@ -1,11 +1,11 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-06-28 post Q0 + P0 gates cleared; advisor audit 041–050 queued  
+**Last reconciled:** 2026-06-29 — advisor audit 041–050 DONE; library/dependency adoption cluster 051–056 filed (short-term 051–053, medium 054–055, long-term/DEFERRED 056)  
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
 **Pro gate:** P0 GO (038–040 done, 2026-06-28) ✓  
-**Business gate:** DEFERRED (018 S02–S07 parked by owner decision 2026-06-27)
+**Business gate:** ACTIVE (018 S02 done 2026-06-29; S03–S07 superseded by DEC-003; next: S02.5 LinkedIn launch)
 
 This file is the single source of truth for current execution order. Individual
 plan files are self-contained handoffs; `plans/archive/` is historical evidence
@@ -32,13 +32,12 @@ Statuses: `READY`, `TODO`, `IN PROGRESS`, `PARTIAL`, `BLOCKED`, `DEFERRED`,
 
 ## Roadmap
 
-Direction decision (2026-06-27): commercial validation, monetization proposals
-and medium/long-term business plans are DEFERRED. The project now focuses on two
-parallel tracks — **quality hardening** (actionable audits, optimal artifact
-generation, end-to-end polish that measurably improves the user's AI
-discoverability) and **Pro differentiation** (advanced features that make the
-paid product compelling). Public release, v2 default switch and hosted product
-remain gated; Pro features may ship incrementally as they stabilize.
+Direction decision (2026-06-29): business validation reactivated via organic
+launch (LinkedIn + Community hook replacing traditional customer discovery).
+Monetization proposals adapt to observable metrics instead of interviews.
+Technical tracks (quality hardening, Pro differentiation) are complete.
+The project now focuses on **go-to-market execution** — launch the free
+Community edition, drive adoption, and convert power users to Pro.
 
 | Horizon   | Track              | Outcome                                              | Plans / slices                  | Gate      |
 | --------- | ------------------ | ---------------------------------------------------- | ------------------------------ | --------- |
@@ -46,7 +45,7 @@ remain gated; Pro features may ship incrementally as they stabilize.
 | ~~Now~~   | ~~Pro differentiation~~ | ~~Compelling upgrade from Community → Pro~~         | ~~038–040~~                     | P0 ✓      |
 | ~~Next~~  | ~~Product correctness~~ | ~~Defensible structured data and `llms.txt` behavior~~ | ~~024–025~~                  | T1 ✓      |
 | Now       | Technical expansion | Sitemap/remote audit, repository readiness           | split 023                       | demand    |
-| Deferred  | Business validation | Portfolio, offers, paid diagnostic evidence          | 018 S02–S07                     | owner     |
+| Now       | Business validation | LinkedIn launch, Community as hook, site content     | 018 S02.5–S04 (adapted)        | G1        |
 | Deferred  | Pro product suite  | Reports, baselines, CI entitlements                  | 018 S10–S15                     | after Q0   |
 | Deferred  | Hosted product     | Workspace, history, monitoring                       | 018 S19+                        | after G4   |
 | Deferred  | Evaluation         | Reproducible citation evaluation                     | 028                             | budget     |
@@ -65,7 +64,11 @@ T0 (029–034) COMPLETE ✓
         │       │
         │       └── 024 (structured data) DONE ── 025 (llms artifacts) DONE
         │
-        └── Deferred: 018 S02–S15, 023 remote, 027–028
+        ├── Business track (018 S02.5 → S03 → S04) IN PROGRESS
+        │       │
+        │       └── DEC-003: LinkedIn + Community hook (2026-06-29)
+        │
+        └── Deferred: 018 S08–S15 (post-G1), 023 remote, 027–028
                 (026 SUPERSEDED)
 ```
 
@@ -170,6 +173,69 @@ Considered and rejected during this audit (do not re-file):
   "core prints directly" item, not removed.
 - **`report --compare` reads an arbitrary JSON path**: by design (the user
   points it at their own baseline report). Not worth a guard.
+
+### Library / dependency adoption — advisor recommendations (2026-06-29)
+
+Positive-tradeoff library adoptions identified while reviewing the dependency
+surface at commit `13fb3bf`. The project's posture is deliberate: minimal
+dependencies, Node built-ins, security-first (the `src/fetcher.js` zero-dep
+SSRF/DNS-rebinding design stays). Each plan below pays its supply-chain cost;
+the rejected candidates are listed underneath. Not all will be implemented
+immediately — medium/long-term items are reevaluated when the situation
+warrants. Short-term items also close monedario.cl audit findings
+(`geo-opt-bug-report-2026-06-29.md`).
+
+| Plan | Title | Dep (tier) | Cat | Priority | Effort | Horizon | Depends on | Status |
+|---|---|---|---|---|---|---|---|---|
+| [051](051-yaml-frontmatter-parsing.md) | Parse YAML frontmatter with `yaml` (fixes stats/quotes/heading leakage #4/#5) | `yaml` (runtime) | bug+feature | P1 | M | short | — | DONE |
+| [052](052-fast-xml-parser-sitemap.md) | Parse sitemaps with `fast-xml-parser` (robust index/namespace/CDATA; relates to #2) | `fast-xml-parser` (runtime) | reliability+bug | P2 | M | short | — | TODO |
+| [053](053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | TODO |
+| [054](054-knip-dead-code-detection.md) | Add `knip` for unused file/export/dependency detection (non-blocking first) | `knip` (dev) | dx/tech-debt | P3 | S | medium | — | TODO |
+| [055](055-readability-metrics.md) | Language-gated reading-grade metrics via `text-readability` (decision gate) | `text-readability` (runtime) | feature | P3 | M | medium | — | TODO |
+| [056](056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | long | TS migration | DEFERRED |
+
+Recommended execution order:
+
+**Short term (do first; close real audit findings):**
+- **051** `yaml` (P1, M) — highest impact; permanently fixes the frontmatter
+  leakage class and unlocks structured-metadata reuse.
+- **052** `fast-xml-parser` (P2, M) — robust sitemap reading; pairs with the
+  remote technical audit (plan 023). Optional CLI step resolves finding #2.
+- **053** `publint` + `attw` (P2, S) — near-zero-cost release-quality gate;
+  dev-only; protects the hand-maintained export surface.
+
+**Medium term (reevaluate on demand):**
+- **054** `knip` (P3, S) — added non-blocking; promote to a CI gate later once
+  the baseline is clean. Triage findings against the "Considered and rejected"
+  note above (`auditFile` is NOT dead).
+- **055** `text-readability` (P3, M) — has a mandatory language decision gate;
+  English-tuned indices must not be emitted for the Spanish content the tool
+  audits. May stay DEFERRED if neither demand nor a language strategy exists.
+
+**Long term (gated):**
+- **056** `schema-dts` (P3, M) — DEFERRED until the TypeScript migration opens
+  (memory `project-ts-migration.md`, reevaluate ~2026-07-27); type-only, zero
+  runtime cost. Pairs with 053's `attw`.
+
+Considered and intentionally NOT planned (do not re-file without new evidence):
+
+- **`axios` / `got` / `undici` in the fetcher**: REJECTED. `src/fetcher.js`'s
+  IP-pinning, per-redirect SSRF re-validation, and DNS-rebinding mitigation are
+  not provided out-of-the-box by these clients; swapping would weaken the
+  project's strongest security asset. Keep it on Node built-ins.
+- **NLP library (`compromise` / `retext`) for acronym/quote/statistic
+  detection**: NOT a clear positive tradeoff. `compromise` is English-centric
+  while the tool audits Spanish content; the false positives (findings #3/#4)
+  are better fixed by improving the detectors directly (acronym/expansion split)
+  than by adopting a heavy, language-mismatched dependency. Revisit only if
+  multilingual linguistic analysis becomes a requested feature.
+- **Vitest/Jest replacing `node:test` + `c8`**: REJECTED. `node:test` is a
+  deliberate zero-runtime-test-dependency choice; the DX gain does not justify
+  the churn.
+- **Biome replacing ESLint + Prettier**: REJECTED. Just upgraded to ESLint 10 /
+  Prettier 3.8; no pain to fix.
+- **`remark`/`unified` replacing `marked`**: REJECTED for now. `marked` covers
+  current needs; revisit only if plugin extensibility becomes necessary.
 
 ### Deferred (by owner decision 2026-06-27)
 

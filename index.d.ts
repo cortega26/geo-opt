@@ -100,6 +100,10 @@ declare module "geo-opt" {
     wordCount: number;
     avgSentenceLen: number;
   };
+  export function parseFrontmatter(content: string): {
+    data: Record<string, unknown>;
+    body: string;
+  };
   export function preprocessContent(content: string): string;
   export function cleanMarkdownToPlainText(mdText: string): string;
 

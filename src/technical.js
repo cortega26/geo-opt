@@ -30,8 +30,11 @@ const ROBOTS_TOKENS = new Set([
 ]);
 
 const LANGUAGE_TAG_PATTERN = /^(?:[a-z]{2,3})(?:-[a-z0-9]{2,8})*$/i;
-const NON_CONTENT_ELEMENTS =
-  "script, style, template, noscript, svg, canvas, iframe, nav, footer, header";
+// Se excluyen nav, footer y header del listado porque contienen texto
+// visible relevante para la verificación de consistencia de datos
+// estructurados (ej. branding en .brand-mark dentro de <header>).
+// nav se mantiene porque su texto de navegación no representa claims de contenido.
+const NON_CONTENT_ELEMENTS = "script, style, template, noscript, svg, canvas, iframe, nav";
 
 function normalizeSpace(value) {
   return String(value ?? "")
@@ -127,7 +130,22 @@ function flattenJsonLdNodes(value) {
   return [value, ...graph];
 }
 
-function observeStructuredDataConsistency(blocks, title, visibleText) {
+// Propiedades de schema que son inherentemente metadatos para máquinas,
+// no claims destinados a aparecer como texto visible para usuarios.
+// Excluirlas del checker de consistencia evita falsos positivos.
+const NON_USER_FACING_PROPERTIES = new Set([
+  "url",
+  "@id",
+  "sameAs",
+  "potentialAction",
+  "foundingDate",
+  "areaServed",
+  "inLanguage",
+  "logo",
+  "inDefinedTermSet",
+]);
+
+function observeStructuredDataConsistency(blocks, title, visibleText, brandingText = "") {
   const nodes = blocks
     .filter((block) => block.valid)
     .flatMap((block) => flattenJsonLdNodes(block.value));
@@ -135,18 +153,25 @@ function observeStructuredDataConsistency(blocks, title, visibleText) {
   const mismatches = [];
   const normalizedTitle = title.toLocaleLowerCase();
   const normalizedText = visibleText.toLocaleLowerCase();
+  const normalizedBranding = brandingText.toLocaleLowerCase();
 
   for (const node of nodes) {
     for (const property of ["headline", "name", "description"]) {
+      if (NON_USER_FACING_PROPERTIES.has(property)) continue;
       if (typeof node[property] !== "string") continue;
       const value = normalizeSpace(node[property]);
       if (!value) continue;
       claims.push({ property, value });
       const normalizedValue = value.toLocaleLowerCase();
-      const present =
+      // Buscar en título, texto visible del body, y texto de branding
+      // (alt de logos, aria-labels, .brand-mark, etc.)
+      const inTitle =
         (property === "headline" || property === "name") && normalizedTitle
           ? normalizedTitle.includes(normalizedValue) || normalizedValue.includes(normalizedTitle)
-          : normalizedText.includes(normalizedValue);
+          : false;
+      const inBody = normalizedText.includes(normalizedValue);
+      const inBranding = normalizedBranding.includes(normalizedValue);
+      const present = inTitle || inBody || inBranding;
       if (!present) mismatches.push({ property, value });
     }
   }
@@ -177,14 +202,34 @@ export function observeTechnicalHtml(html, options = {}) {
     .map((_, element) => normalizeSpace($(element).text()))
     .get();
 
-  const visibleRoot = $("main").first().length
-    ? $("main").first()
-    : $("article").first().length
-      ? $("article").first()
-      : $("body").first();
+  // Usar <body> completo como raíz para que el texto visible incluya
+  // header, footer y contenido principal. Esto evita falsos positivos
+  // en la verificación de consistencia de datos estructurados cuando
+  // claims como Organization.name aparecen solo en el branding del header.
+  const visibleRoot = $("body").first().length ? $("body").first() : $.root();
   const visibleClone = visibleRoot.clone();
   visibleClone.find(NON_CONTENT_ELEMENTS).remove();
   const visibleText = normalizeSpace(visibleClone.text());
+
+  // Extraer texto de branding que puede no ser capturado por .text():
+  // - alt de imágenes de logo
+  // - aria-label en header/nav
+  // - title del documento (ya capturado, pero incluido aquí para claridad)
+  const brandingParts = [];
+  $("img[alt]").each((_, el) => {
+    const alt = normalizeSpace($(el).attr("alt"));
+    if (alt) brandingParts.push(alt);
+  });
+  $("[aria-label]").each((_, el) => {
+    const label = normalizeSpace($(el).attr("aria-label"));
+    if (label) brandingParts.push(label);
+  });
+  // Elementos con clases típicas de branding
+  $('.brand-mark, .logo, .site-title, [class*="brand"], [class*="logo"]').each((_, el) => {
+    const text = normalizeSpace($(el).text());
+    if (text) brandingParts.push(text);
+  });
+  const brandingText = brandingParts.join(" ");
 
   const canonicals = $('link[rel~="canonical" i]')
     .map((_, element) => normalizeSpace($(element).attr("href")))
@@ -266,7 +311,12 @@ export function observeTechnicalHtml(html, options = {}) {
 
   const robots = extractRobotsDirectives($);
   const jsonLd = extractJsonLd($);
-  const structuredData = observeStructuredDataConsistency(jsonLd, titles[0] ?? "", visibleText);
+  const structuredData = observeStructuredDataConsistency(
+    jsonLd,
+    titles[0] ?? "",
+    visibleText,
+    brandingText
+  );
   const visibleWords = wordCount(visibleText);
   const appRoots = $("#root, #app, [data-reactroot], [data-react-root], [data-v-app], #__next");
   const scriptCount = $("script[src]").length + $("script:not([src])").length;

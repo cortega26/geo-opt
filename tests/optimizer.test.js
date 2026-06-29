@@ -32,6 +32,7 @@ import {
   injectSchema,
   loadConfig,
   MODEL_VERSION,
+  parseFrontmatter,
   preprocessContent,
   isHtmlContent,
   extractHtmlVisibleText,
@@ -200,6 +201,119 @@ Final text.
   assert.ok(result.includes("Some text"));
   assert.ok(result.includes("More text"));
   assert.ok(result.includes("Final text"));
+});
+
+// ═══ Plan 051 — YAML frontmatter edge cases ═══
+
+test("parseFrontmatter: missing frontmatter returns body=content and data={}", () => {
+  const input = "# Plain heading\n\nSome body text.\n";
+  const { data, body } = parseFrontmatter(input);
+  assert.deepStrictEqual(data, {});
+  assert.strictEqual(body, input);
+});
+
+test("preprocessContent strips YAML frontmatter and does not leak values into body (bug #4)", () => {
+  const input = `---
+title: "Guía de inversiones (acciones, bonos y ETFs)"
+description: El mercado financiero chileno ofrece más de 300 instrumentos.
+statistics:
+  - value: "42%"
+    source: CMF 2025
+---
+
+# Introducción
+
+Este es el contenido real que debe quedar.
+`;
+  const result = preprocessContent(input);
+  // La salida no debe contener nada del frontmatter
+  assert.ok(!result.includes("Guía de inversiones"), "no debe contener title del frontmatter");
+  assert.ok(!result.includes("acciones, bonos"), "no debe contener description del frontmatter");
+  assert.ok(!result.includes("300 instrumentos"), "no debe contener números del frontmatter");
+  assert.ok(!result.includes("42%"), 'no debe contener "42%" del frontmatter');
+  assert.ok(!result.includes("CMF 2025"), "no debe contener source del frontmatter");
+  // La salida debe contener el cuerpo real
+  assert.ok(result.includes("Introducción"), "debe contener el heading del body");
+  assert.ok(result.includes("contenido real"), "debe contener el texto del body");
+});
+
+test("extractSections does not emit frontmatter values as headings (bug #5)", () => {
+  const input = `---
+term: "préstamo hipotecario"
+rate: "4.5%"
+---
+
+## Tasas actuales
+
+Texto del body.
+`;
+  const sections = extractSections(input);
+  // No debe haber una sección con header que venga del frontmatter
+  const frontmatterHeaders = sections.filter(
+    (s) => s.header === "term:" || s.header === 'term: "préstamo hipotecario"' || s.header === "---"
+  );
+  assert.strictEqual(
+    frontmatterHeaders.length,
+    0,
+    "ningún valor del frontmatter debe aparecer como heading"
+  );
+  // Debe tener la sección real
+  assert.ok(
+    sections.some((s) => s.header === "Tasas actuales"),
+    "debe incluir la sección real"
+  );
+});
+
+test("parseFrontmatter: --- inside a quoted string does not truncate early", () => {
+  const input = `---
+title: "Usa --- como separador visual"
+---
+
+# Cuerpo
+
+Texto post-frontmatter.
+`;
+  const { data, body } = parseFrontmatter(input);
+  assert.strictEqual(data.title, "Usa --- como separador visual");
+  assert.ok(body.includes("# Cuerpo"), "el body debe contener el heading real");
+  assert.ok(!body.includes("separador visual"), "el body no debe contener texto del frontmatter");
+});
+
+test("parseFrontmatter: CRLF endings and no trailing blank line strip correctly", () => {
+  // Construir con CRLF explícito
+  const input = "---\r\ntitle: Hola\r\ndate: 2025-01-01\r\n---\r\n# Cuerpo\r\n\r\nTexto.";
+  const { data, body } = parseFrontmatter(input);
+  assert.strictEqual(data.title, "Hola");
+  assert.strictEqual(
+    data.date instanceof Date ? data.date.toISOString().slice(0, 10) : "2025-01-01",
+    "2025-01-01"
+  );
+  assert.ok(body.startsWith("# Cuerpo"), "el body debe empezar con el heading");
+});
+
+test("parseFrontmatter: invalid YAML in block returns data={}, body with block removed, no throw", () => {
+  const input = `---
+title: Good
+invalid: {{unclosed
+  - dangling
+---
+
+# Body content
+`;
+  let threw = false;
+  let result;
+  try {
+    result = parseFrontmatter(input);
+  } catch {
+    threw = true;
+  }
+  assert.strictEqual(threw, false, "no debe lanzar excepción con YAML inválido");
+  assert.deepStrictEqual(result.data, {}, "data debe ser {} con YAML inválido");
+  assert.ok(
+    result.body.includes("# Body content"),
+    "body debe contener el contenido post-frontmatter"
+  );
+  assert.ok(!result.body.includes("dangling"), "body no debe contener texto del frontmatter");
 });
 
 test("isHtmlContent detects HTML by doctype, html tag, or structural elements", () => {

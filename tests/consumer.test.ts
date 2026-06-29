@@ -367,11 +367,7 @@ const _auditReport: AuditReport = {
   modelVersion: "2.0.0",
   generatedAt: "2026-01-01T00:00:00.000Z",
 };
-const _scoreV1: { score: number; report: AuditReport } = scoreContent(
-  "content",
-  fileMd,
-  _config
-);
+const _scoreV1: { score: number; report: AuditReport } = scoreContent("content", fileMd, _config);
 const _auditFileResult: number = auditFile(fileMd, _config, "json");
 
 // --- Engine (unified) ---

@@ -1,3 +1,4 @@
+import { parse as parseYaml } from "yaml";
 import { marked } from "marked";
 import * as cheerio from "cheerio";
 
@@ -96,9 +97,52 @@ export function calculateReadability(text) {
 }
 
 /**
+ * Split leading YAML frontmatter from a document.
+ *
+ * Tolerant: missing or invalid YAML yields { data: {}, body: content }
+ * without throwing. Supports the `...` closing delimiter and multi-document
+ * YAML (only the first document is parsed for metadata).
+ *
+ * @param {string} content — raw file content
+ * @returns {{ data: object, body: string }}
+ */
+export function parseFrontmatter(content) {
+  // Normalize a leading BOM only for detection; keep body bytes intact.
+  const text = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+
+  // Frontmatter must be the very first thing in the file.
+  if (!/^---[\t ]*\r?\n/.test(text)) {
+    return { data: {}, body: content };
+  }
+
+  // Find the closing delimiter line: a line that is exactly --- or ...
+  const close = text.search(/\r?\n(?:---|\.\.\.)[\t ]*(?:\r?\n|$)/);
+  if (close === -1) {
+    return { data: {}, body: content };
+  }
+
+  // Extract the raw YAML block (text between opening --- and closing delimiter)
+  const rawBlock = text.slice(text.indexOf("\n") + 1, close);
+  const afterMatch = text.slice(close).match(/\r?\n(?:---|\.\.\.)[\t ]*(?:\r?\n|$)/);
+  const body = text.slice(close + afterMatch[0].length);
+
+  let data = {};
+  try {
+    const parsed = parseYaml(rawBlock);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      data = parsed;
+    }
+  } catch {
+    // Invalid YAML — treat as no usable metadata, but still strip the block.
+  }
+
+  return { data, body };
+}
+
+/**
  * Preprocess content for scoring and analysis.
  *
- * Strips YAML frontmatter (delimited by ---), fenced code blocks,
+ * Strips YAML frontmatter (via parseFrontmatter), fenced code blocks,
  * HTML script/style tags, and HTML comments so they do not inflate
  * word counts, quote/statistic detection, or heading parsing.
  *
@@ -106,15 +150,7 @@ export function calculateReadability(text) {
  * @returns {string} cleaned content
  */
 export function preprocessContent(content) {
-  let text = content;
-
-  // Strip YAML frontmatter (--- delimiters at the start of the file).
-  // Matches: optional BOM, optional whitespace, ---, any content, ---.
-  const frontmatterRegex = /^(?:﻿)?\s*---[\t ]*\r?\n([\s\S]*?)\r?\n---[\t ]*\r?\n/;
-  const fmMatch = text.match(frontmatterRegex);
-  if (fmMatch) {
-    text = text.slice(fmMatch[0].length);
-  }
+  let { body: text } = parseFrontmatter(content);
 
   // Strip markdown code blocks
   text = text.replace(/```[\s\S]*?```/g, "");

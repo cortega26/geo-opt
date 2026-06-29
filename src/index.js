@@ -17,6 +17,7 @@ export {
 } from "./engagement.js";
 export {
   calculateReadability,
+  parseFrontmatter,
   preprocessContent,
   cleanMarkdownToPlainText,
   extractSections,
