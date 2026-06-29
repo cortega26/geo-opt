@@ -28,7 +28,7 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
   <a href="https://arxiv.org/abs/2311.09735"><img src="https://img.shields.io/badge/grounded_in-GEO_·_KDD_2024-8A2BE2" alt="Grounded in GEO, KDD 2024"></a>
   <img src="https://img.shields.io/badge/100%25_local-zero_telemetry-0a7d33" alt="100% local, zero telemetry">
   <img src="https://img.shields.io/badge/runtime-Node_+_Python-5a67d8" alt="Cross-runtime: Node and Python">
-  <a href="https://tooltician.com"><img src="https://img.shields.io/badge/part_of-Tooltician-ff6b00" alt="Part of the Tooltician ecosystem"></a>
+  <a href="https://tooltician.com"><img src="https://tooltician.com/badge.svg" alt="Part of the Tooltician ecosystem"></a>
 </p>
 
 </div>
