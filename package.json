@@ -72,6 +72,7 @@
   "homepage": "https://github.com/cortega26/GEO-skill#readme",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^26.0.1",
     "c8": "^11.0.0",
     "eslint": "^10.5.0",
     "prettier": "^3.8.4",

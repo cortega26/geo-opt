@@ -133,6 +133,9 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Frontmatter is now parsed with the `yaml` library instead of a regex, so YAML
   metadata no longer leaks into statistics, quotation, or heading detection
   (`src/text.js`). Fixes false positives on Markdown files with `---` blocks.
+- `npm run typecheck` now passes: added `@types/node` as a dev dependency so
+  the consumer type fixture (`tests/consumer.test.ts`) can resolve `node:test`,
+  `node:fs`, `node:path`, and `node:url` module types.
   instead of hardcoding `@v4`, preventing breakage when the workflow action version is bumped.
 - Pre-commit hook installed via `npm run prepare` (`hooks/pre-commit`) runs the changelog
   policy check locally before each commit, catching missing entries before CI does.
