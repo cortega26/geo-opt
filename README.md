@@ -36,23 +36,35 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
 ```
 $ node bin/cli.js audit content/article.md
 
-  Score  76 / 100
-  Model  v2 · default
+══════════════════════════════════════════════════
+       GEO OPTIMIZATION AUDIT REPORT (v2)        
+══════════════════════════════════════════════════
+File: docs/architecture.md
+Profile: Editorial / Blog / News (confidence: 20%)
+Readiness: At Risk
+  Content shows multiple quality issues.
+Effective score: 39 (5 applicable dimensions)
 
-  ┌──────────────────────────┬────────┬──────────────────────┐
-  │ Dimension                │  Score │ Evidence             │
-  ├──────────────────────────┼────────┼──────────────────────┤
-  │ Structure & organization │  17/25 │ experimental         │
-  │ Numerical evidence       │  13/20 │ project heuristic    │
-  │ Quotations & attribution │   7/15 │ experimental         │
-  │ Citations & links        │  17/20 │ probable             │
-  │ Semantic clarity         │  22/20 │ project heuristic    │
-  └──────────────────────────┴────────┴──────────────────────┘
-
-  Findings
-  ⚠  8  experimental · project heuristic
-  ✗  3  probable · experimental
-  ✔  14 passed
+──────────────────────────────────────────────────
+1. Structure: 12/20
+   Headings: Clean, no skipped levels (+7 pts)
+   Answer-First: Opening paragraph is 21 words (optimal 40–90) (+2 pts)
+2. Statistics: 2/20
+   Statistics: 2 stat(s) found (+2 pts)
+3. Quotations: 2/20
+   Quotations: 2 quotes with no attribution (+0 pts)
+4. Citations: 10/20
+   Citations: 1 external link(s) (+5 pts)
+   Sources/references section (+5 pts)
+5. Clarity: 13/20
+   Pronouns: High density (4.3%) (-2 pts)
+──────────────────────────────────────────────────
+Findings: 8 warnings, 0 failures
+  ⚠  2 of 2 quotes lack identifiable attribution. [strong]
+  ⚠  Ambiguous pronoun density of 4.3% exceeds limit. [heuristic]
+  ⚠  Opening paragraph is 21 words (optimal 40–90). [experimental]
+  ⚠  Only 1 external link(s). [strong]
+══════════════════════════════════════════════════
 ```
 
 Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/abs/2311.09735) and characterized against a 32-fixture regression corpus. It is a content-quality heuristic — not a statistical prediction or guarantee of ranking, retrieval, or citation by any AI system.

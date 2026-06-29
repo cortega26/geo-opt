@@ -36,23 +36,33 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
 ```
 $ node bin/cli.js audit contenido/articulo.md
 
-  Score  76 / 100
-  Model  v2 · default
+══════════════════════════════════════════════════
+       INFORME DE AUDITORÍA GEO (v2)        
+══════════════════════════════════════════════════
+Archivo: docs/architecture.md
+Perfil: Editorial / Blog / News (confianza: 20%)
+Madurez: En riesgo
+  El contenido presenta múltiples problemas de calidad.
+Puntuación efectiva: 39 (5 dimensiones aplicables)
 
-  ┌──────────────────────────┬────────┬──────────────────────┐
-  │ Dimensión                │  Score │ Evidencia            │
-  ├──────────────────────────┼────────┼──────────────────────┤
-  │ Estructura y organización│  17/25 │ experimental         │
-  │ Evidencia numérica       │  13/20 │ heurística propia    │
-  │ Citas y atribución       │   7/15 │ experimental         │
-  │ Referencias y enlaces    │  17/20 │ probable             │
-  │ Claridad semántica       │  22/20 │ heurística propia    │
-  └──────────────────────────┴────────┴──────────────────────┘
-
-  Hallazgos
-  ⚠  8  experimental · heurística propia
-  ✗  3  probable · experimental
-  ✔  14 correctos
+──────────────────────────────────────────────────
+1. Estructura: 12/20
+   Encabezados: limpios, sin niveles saltados (+7 pts)
+2. Estadísticas: 2/20
+   2 estadística(s) encontrada(s) (+2 pts)
+3. Citas: 2/20
+   2 citas sin atribución (+0 pts)
+4. Referencias: 10/20
+   1 enlace(s) externo(s) (+5 pts)
+   Sección de fuentes/referencias (+5 pts)
+5. Claridad: 13/20
+   Pronombres: densidad alta (4,3 %) (-2 pts)
+──────────────────────────────────────────────────
+Hallazgos: 8 advertencias, 0 errores
+  ⚠  2 de 2 citas sin atribución identificable. [strong]
+  ⚠  Densidad de pronombres 4,3 % supera el límite. [heuristic]
+  ⚠  Solo 1 enlace(s) externo(s). [strong]
+══════════════════════════════════════════════════
 ```
 
 El modelo de puntuación está fundamentado en el [artículo GEO aceptado en KDD 2024](https://arxiv.org/abs/2311.09735) y caracterizado contra un corpus de 32 casos de regresión. Es una heurística de calidad de contenido — no es una predicción estadística ni una garantía de posicionamiento, recuperación o citación por parte de ningún sistema de IA.
