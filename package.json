@@ -12,7 +12,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "geo-opt": "./dist/bin/cli.js"
+    "geo-opt": "dist/bin/cli.js"
   },
   "files": [
     "dist/",

@@ -76,6 +76,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   `publint` and `@arethetypeswrong/cli` (`npm run validate:package`).
 - Repository metadata, README badges, clone instructions, issue links and the
   technical-audit user agent now point to the `cortega26/geo-opt` repository.
+- Normalized npm `bin` metadata so `npm publish` preserves the `geo-opt` executable.
 
 ### Added
 
