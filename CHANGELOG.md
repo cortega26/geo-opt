@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [2.1.0](https://github.com/cortega26/geo-opt/compare/v2.0.0...v2.1.0) (2026-06-29)
+
+
+### Bug Fixes
+
+* **ci:** publish to npm via OIDC provenance instead of bundled semantic-release plugin ([8a1d14e](https://github.com/cortega26/geo-opt/commit/8a1d14e5f0003a7da483a1e784ac9c1bdb26fb1e))
+* update actions to latest versions, add workflow_dispatch trigger ([3402e35](https://github.com/cortega26/geo-opt/commit/3402e356dd800527199babca2c74064d1bc6b385))
+
+
+### Features
+
+* integrate semantic-release for automatic versioning ([d5dca89](https://github.com/cortega26/geo-opt/commit/d5dca89bf9f3b80bf1c935ded0fffe81593cd0d9))
+* v2 default switch, knip, and bilingual readability metrics ([e0e9ca8](https://github.com/cortega26/geo-opt/commit/e0e9ca8671b47080805fcead1a37d644f91b7401))
+
 ## [Unreleased]
 
 ### Changed
