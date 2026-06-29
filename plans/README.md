@@ -1,7 +1,7 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-06-29 — advisor audit 041–050 DONE; library/dependency adoption cluster 051–056 filed (short-term 051–053, medium 054–055, long-term/DEFERRED 056)  
+**Last reconciled:** 2026-06-29 — Community/Pro reauditoria filed; plan 023 reconciled DONE; advisor audit 041–050 DONE; library/dependency adoption cluster 051–056 filed (short-term 051–053, medium 054–055, long-term/DEFERRED 056)
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
 **Pro gate:** P0 GO (038–040 done, 2026-06-28) ✓  
@@ -16,8 +16,9 @@ Documentation ownership, status meanings and reconciliation rules live in
 
 ## Operating rules
 
-- Work in progress is limited to one active plan. Business plans are deferred;
-  technical plans execute sequentially unless explicitly parallelized.
+- Work in progress is limited to one active plan. Business plans follow their
+  explicit gates; technical plans execute sequentially unless explicitly
+  parallelized.
 - Dependencies, not plan numbers, determine execution order.
 - Run a plan's drift check before execution. Refresh stale evidence instead of
   improvising from old line references.
@@ -44,8 +45,8 @@ Community edition, drive adoption, and convert power users to Pro.
 | ~~Now~~   | ~~Quality hardening~~  | ~~Zero known bugs, full coverage on core paths, CI trust~~ | ~~035–037~~ | Q0 ✓ |
 | ~~Now~~   | ~~Pro differentiation~~ | ~~Compelling upgrade from Community → Pro~~         | ~~038–040~~                     | P0 ✓      |
 | ~~Next~~  | ~~Product correctness~~ | ~~Defensible structured data and `llms.txt` behavior~~ | ~~024–025~~                  | T1 ✓      |
-| Now       | Technical expansion | Sitemap/remote audit, repository readiness           | split 023                       | demand    |
-| Now       | Business validation | LinkedIn launch, Community as hook, site content     | 018 S02.5–S04 (adapted)        | G1        |
+| ~~Now~~   | ~~Technical expansion~~ | ~~Sitemap/remote audit, repository readiness~~    | ~~023~~                         | done ✓    |
+| Now       | Business validation | LinkedIn launch, Community as hook, site content     | 018 S02.5–S04 (adapted); [reaudit](business/pro-community-reaudit-2026-06-29.md) | G1 |
 | Deferred  | Pro product suite  | Reports, baselines, CI entitlements                  | 018 S10–S15                     | after Q0   |
 | Deferred  | Hosted product     | Workspace, history, monitoring                       | 018 S19+                        | after G4   |
 | Deferred  | Evaluation         | Reproducible citation evaluation                     | 028                             | budget     |
@@ -68,7 +69,7 @@ T0 (029–034) COMPLETE ✓
         │       │
         │       └── DEC-003: LinkedIn + Community hook (2026-06-29)
         │
-        └── Deferred: 018 S08–S15 (post-G1), 023 remote, 027–028
+        └── Deferred: 018 S08–S15 (post-G1), 027–028
                 (026 SUPERSEDED)
 ```
 
@@ -284,12 +285,17 @@ P0 is `GO` when:
 - Community edition shows clear upgrade prompts for Pro features;
 - README and docs describe the Community/Pro boundary explicitly.
 
-## Business program (DEFERRED)
+## Business program (ACTIVE)
 
 [018 Tooltician AI Discoverability](018-build-tooltician-ai-discoverability-business.md)
-is parked by owner decision (2026-06-27). Product, discovery, legal, and Pro
-implementation sessions (S02–S15) will resume after quality hardening (Q0) and
-Pro differentiation (P0) establish a solid free→Pro upgrade story.
+is active again after Q0 and P0. The current motion is DEC-003: organic launch
+through LinkedIn with Community as the hook, then G1 evaluation from observable
+adoption signals. The Community/Pro reauditoria is recorded in
+[`business/pro-community-reaudit-2026-06-29.md`](business/pro-community-reaudit-2026-06-29.md).
+
+Current recommendation: execute 018 S02.5, create
+`plans/business/funnel-and-metrics.md`, and do not build Workspace, prompt
+tracking or new Pro epics before G1/G4 gates justify them.
 
 ## Reconciliation of pre-T0 plans
 
@@ -297,9 +303,11 @@ Pro differentiation (P0) establish a solid free→Pro upgrade story.
   Contract normalization, type coverage, orchestration, conformance, and Python
   scope closed by plans 029–034 (T0 complete 2026-06-27). Remaining: optional
   v2 default switch decision.
-- **023:** pure local HTML observations and findings landed. Sitemap, remote URL
-  fetching, CLI integration and Python support did not. The old all-in-one scope
-  is split; remote work requires demand plus a threat model.
+- **023:** DONE. Pure local HTML observations, CLI `technical`, sitemap parsing,
+  remote URL/sitemap audit and `src/fetcher.js` SSRF-guarded network boundary
+  landed. Python intentionally has no `technical` subcommand per the capability
+  matrix. Remaining drift is public documentation: `docs/architecture.md` still
+  contains stale wording about no supported `technical` CLI command.
 - **024:** DONE (Q0+P0 delivered structured-data correctness; archived).
 - **025:** DONE (artifact hardening completed after 024; archived).
 - **026:** SUPERSEDED — became rule-pack direction but low demand; archived.

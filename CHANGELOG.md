@@ -74,6 +74,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   namespaced children, and CDATA (`src/sitemap.js`).
 - CI now validates the published package shape and type resolution with
   `publint` and `@arethetypeswrong/cli` (`npm run validate:package`).
+- Repository metadata, README badges, clone instructions, issue links and the
+  technical-audit user agent now point to the `cortega26/geo-opt` repository.
 
 ### Added
 
@@ -502,6 +504,6 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   robots.txt auditing.
 - JavaScript and Python implementations with baseline tests and tooling.
 
-[Unreleased]: https://github.com/cortega26/GEO-skill/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/cortega26/GEO-skill/compare/67f18be...v2.0.0
-[1.0.0]: https://github.com/cortega26/GEO-skill/commits/67f18be
+[Unreleased]: https://github.com/cortega26/geo-opt/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/cortega26/geo-opt/compare/67f18be...v2.0.0
+[1.0.0]: https://github.com/cortega26/geo-opt/commits/67f18be

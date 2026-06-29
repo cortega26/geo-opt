@@ -67,12 +67,12 @@
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cortega26/GEO-skill.git"
+    "url": "git+https://github.com/cortega26/geo-opt.git"
   },
   "bugs": {
-    "url": "https://github.com/cortega26/GEO-skill/issues"
+    "url": "https://github.com/cortega26/geo-opt/issues"
   },
-  "homepage": "https://github.com/cortega26/GEO-skill#readme",
+  "homepage": "https://github.com/cortega26/geo-opt#readme",
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.4",
     "@eslint/js": "^10.0.1",

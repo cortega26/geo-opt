@@ -31,7 +31,7 @@ $ node bin/cli.js audit contenido/articulo.md
 ```
 
 <p align="center">
-  <a href="https://github.com/cortega26/GEO-skill/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/GEO-skill/ci.yml?branch=main" alt="CI"></a>
+  <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main" alt="CI"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen" alt="Node.js >=22.0.0">
   <img src="https://img.shields.io/badge/tests-437_passed-16a34a" alt="437 tests pasados">
   <img src="https://img.shields.io/badge/license-source--available-lightgrey" alt="Source-available">
@@ -119,8 +119,8 @@ node bin/cli.js report contenido/ --compare base.json
 Requiere **Node.js 22 LTS** o **Node.js 24 LTS**.
 
 ```bash
-git clone https://github.com/cortega26/GEO-skill.git
-cd GEO-skill
+git clone https://github.com/cortega26/geo-opt.git
+cd geo-opt
 npm install
 node bin/cli.js audit ruta/al/contenido.md
 ```
@@ -302,7 +302,7 @@ npm run changelog:check  # aplica la política de actualización de CHANGELOG.md
 
 La implementación JavaScript en `src/` es la canónica. Un port de compatibilidad Python 3 viene incluido para flujos de trabajo impulsados por agentes; su alcance está definido por la matriz de capacidades en [`docs/architecture.md`](docs/architecture.md).
 
-La gobernanza de documentación y los disparadores de cambio están definidos en [`docs/documentation-governance.md`](docs/documentation-governance.md). Reporta bugs en [GitHub Issues](https://github.com/cortega26/GEO-skill/issues).
+La gobernanza de documentación y los disparadores de cambio están definidos en [`docs/documentation-governance.md`](docs/documentation-governance.md). Reporta bugs en [GitHub Issues](https://github.com/cortega26/geo-opt/issues).
 
 ---
 

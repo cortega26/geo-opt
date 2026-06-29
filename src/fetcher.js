@@ -22,7 +22,7 @@ import { parseRobotsGroups } from "./robots.js";
 // Constants
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const USER_AGENT = "geo-opt/2.0.0 (+https://github.com/cortega26/GEO-skill) Technical Audit";
+export const USER_AGENT = "geo-opt/2.0.0 (+https://github.com/cortega26/geo-opt) Technical Audit";
 
 export const RESPONSE_TIMEOUT_MS = 15_000;
 export const TOTAL_TIMEOUT_MS = 30_000;

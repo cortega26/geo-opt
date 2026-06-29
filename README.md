@@ -31,7 +31,7 @@ $ node bin/cli.js audit content/article.md
 ```
 
 <p align="center">
-  <a href="https://github.com/cortega26/GEO-skill/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/GEO-skill/ci.yml?branch=main" alt="CI"></a>
+  <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main" alt="CI"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen" alt="Node.js >=22.0.0">
   <img src="https://img.shields.io/badge/tests-437_passed-16a34a" alt="437 tests passed">
   <img src="https://img.shields.io/badge/license-source--available-lightgrey" alt="Source-available">
@@ -119,8 +119,8 @@ node bin/cli.js report content/ --compare baseline.json
 Requires **Node.js 22 LTS** or **Node.js 24 LTS**.
 
 ```bash
-git clone https://github.com/cortega26/GEO-skill.git
-cd GEO-skill
+git clone https://github.com/cortega26/geo-opt.git
+cd geo-opt
 npm install
 node bin/cli.js audit path/to/content.md
 ```
@@ -302,7 +302,7 @@ npm run changelog:check  # enforce CHANGELOG.md update policy
 
 The JavaScript implementation under `src/` is canonical. A Python 3 compatibility port is bundled for agent-driven workflows; its scope is defined by the capability matrix in [`docs/architecture.md`](docs/architecture.md).
 
-Documentation governance and change triggers are defined in [`docs/documentation-governance.md`](docs/documentation-governance.md). Report bugs via [GitHub Issues](https://github.com/cortega26/GEO-skill/issues).
+Documentation governance and change triggers are defined in [`docs/documentation-governance.md`](docs/documentation-governance.md). Report bugs via [GitHub Issues](https://github.com/cortega26/geo-opt/issues).
 
 ---
 
