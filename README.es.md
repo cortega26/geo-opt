@@ -19,7 +19,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
   <img src="https://img.shields.io/badge/cobertura_de_ramas-80%25-16a34a" alt="Cobertura de ramas 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-tipos_incluidos-3178C6?logo=typescript&logoColor=white" alt="Tipos TypeScript incluidos">
-  <img src="https://img.shields.io/badge/versión-2.0.0-blue" alt="Versión 2.0.0">
+  <a href="https://www.npmjs.com/package/geo-opt"><img src="https://img.shields.io/npm/v/geo-opt?logo=npm&color=cb3837" alt="Versión en npm"></a>
 </p>
 
 <!-- Positioning & ecosystem -->
@@ -178,7 +178,23 @@ node bin/cli.js generate-all contenido/ --site-url https://ejemplo.com  # Pro
 
 ## Inicio rápido
 
-Requiere **Node.js 22 LTS** o **Node.js 24 LTS**.
+Requiere **Node.js 22 LTS** o **Node.js 24 LTS**. Publicado en npm como [`geo-opt`](https://www.npmjs.com/package/geo-opt).
+
+Ejecútalo al instante con `npx` — sin instalación:
+
+```bash
+npx geo-opt audit ruta/al/contenido.md
+```
+
+O instálalo como CLI global o como dependencia del proyecto (el paquete también incluye la librería JavaScript tipada):
+
+```bash
+npm install -g geo-opt          # comando global `geo-opt`
+npm install --save-dev geo-opt  # dependencia del proyecto + librería
+```
+
+<details>
+<summary>Desde el código fuente (para desarrollo)</summary>
 
 ```bash
 git clone https://github.com/cortega26/geo-opt.git
@@ -186,8 +202,9 @@ cd geo-opt
 npm install
 node bin/cli.js audit ruta/al/contenido.md
 ```
+</details>
 
-Añade `--help` a cualquier comando para ver todos los argumentos y valores por defecto.
+Una vez instalado, ejecuta los ejemplos de abajo como `geo-opt <comando>` (o `npx geo-opt <comando>`); la forma `node bin/cli.js <comando>` que aparece en este README es la invocación equivalente desde una copia del código fuente. Añade `--help` a cualquier comando para ver todos los argumentos y valores por defecto.
 
 ### Integración con CI/CD
 

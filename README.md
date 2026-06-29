@@ -19,7 +19,7 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
   <img src="https://img.shields.io/badge/branch_coverage-80%25-16a34a" alt="Branch coverage 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-types_included-3178C6?logo=typescript&logoColor=white" alt="TypeScript types included">
-  <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version 2.0.0">
+  <a href="https://www.npmjs.com/package/geo-opt"><img src="https://img.shields.io/npm/v/geo-opt?logo=npm&color=cb3837" alt="npm version"></a>
 </p>
 
 <!-- Positioning & ecosystem -->
@@ -178,7 +178,23 @@ node bin/cli.js generate-all content/ --site-url https://example.com  # Pro
 
 ## Quick start
 
-Requires **Node.js 22 LTS** or **Node.js 24 LTS**.
+Requires **Node.js 22 LTS** or **Node.js 24 LTS**. Published on npm as [`geo-opt`](https://www.npmjs.com/package/geo-opt).
+
+Run it instantly with `npx` — no install required:
+
+```bash
+npx geo-opt audit path/to/content.md
+```
+
+Or install it as a global CLI or a project dependency (the package also ships the typed JavaScript library):
+
+```bash
+npm install -g geo-opt          # global `geo-opt` command
+npm install --save-dev geo-opt  # project dependency + library
+```
+
+<details>
+<summary>From source (for development)</summary>
 
 ```bash
 git clone https://github.com/cortega26/geo-opt.git
@@ -186,8 +202,9 @@ cd geo-opt
 npm install
 node bin/cli.js audit path/to/content.md
 ```
+</details>
 
-Append `--help` to any command for full argument details and defaults.
+Once installed, run the examples below as `geo-opt <command>` (or `npx geo-opt <command>`); the `node bin/cli.js <command>` form shown throughout this README is the equivalent invocation from a source checkout. Append `--help` to any command for full argument details and defaults.
 
 ### CI/CD integration
 
