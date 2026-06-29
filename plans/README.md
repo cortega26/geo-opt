@@ -189,7 +189,7 @@ warrants. Short-term items also close monedario.cl audit findings
 |---|---|---|---|---|---|---|---|---|
 | [051](051-yaml-frontmatter-parsing.md) | Parse YAML frontmatter with `yaml` (fixes stats/quotes/heading leakage #4/#5) | `yaml` (runtime) | bug+feature | P1 | M | short | — | DONE |
 | [052](052-fast-xml-parser-sitemap.md) | Parse sitemaps with `fast-xml-parser` (robust index/namespace/CDATA; relates to #2) | `fast-xml-parser` (runtime) | reliability+bug | P2 | M | short | — | DONE |
-| [053](053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | TODO |
+| [053](053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | DONE |
 | [054](054-knip-dead-code-detection.md) | Add `knip` for unused file/export/dependency detection (non-blocking first) | `knip` (dev) | dx/tech-debt | P3 | S | medium | — | TODO |
 | [055](055-readability-metrics.md) | Language-gated reading-grade metrics via `text-readability` (decision gate) | `text-readability` (runtime) | feature | P3 | M | medium | — | TODO |
 | [056](056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | long | TS migration | DEFERRED |

@@ -72,6 +72,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Sitemap parsing/validation now uses `fast-xml-parser` instead of regex,
   correctly handling sitemap indexes, attribute/element-order variation,
   namespaced children, and CDATA (`src/sitemap.js`).
+- CI now validates the published package shape and type resolution with
+  `publint` and `@arethetypeswrong/cli` (`npm run validate:package`).
 
 ### Added
 

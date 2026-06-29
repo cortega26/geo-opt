@@ -65,6 +65,9 @@ jobs:
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: node scripts/check-changelog.js
 
+      - name: Validate package
+        run: npm run validate:package
+
       - name: Dogfood — audit own documentation
         run: node bin/cli.js audit docs/ --recursive --threshold 50
 

@@ -37,7 +37,10 @@
     "changelog:check": "node scripts/check-changelog.js",
     "build": "node scripts/build.js",
     "typecheck": "tsc -p tsconfig.json",
-    "check": "npm run lint && npm run format:check && npm test && npm run test:python && npm run test:conformance && npm run typecheck && npm run changelog:check",
+    "check": "npm run lint && npm run format:check && npm test && npm run test:python && npm run test:conformance && npm run typecheck && npm run changelog:check && npm run validate:package",
+    "publint": "publint",
+    "attw": "attw --pack . --ignore-rules cjs-resolves-to-esm",
+    "validate:package": "npm run build && npm run publint && npm run attw",
     "prepack": "node scripts/build.js",
     "prepare": "cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit"
   },
@@ -71,11 +74,13 @@
   },
   "homepage": "https://github.com/cortega26/GEO-skill#readme",
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.4",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.1",
     "c8": "^11.0.0",
     "eslint": "^10.5.0",
     "prettier": "^3.8.4",
+    "publint": "^0.3.21",
     "typescript": "^5.9.3"
   },
   "dependencies": {
