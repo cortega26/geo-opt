@@ -49,6 +49,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Publish to npm (Trusted Publishing / OIDC)
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+
   publish-gpr:
     name: Publish to GitHub Packages
     runs-on: ubuntu-latest
