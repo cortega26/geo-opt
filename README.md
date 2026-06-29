@@ -37,7 +37,7 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
 $ node bin/cli.js audit content/article.md
 
   Score  76 / 100
-  Model  v1 · default
+  Model  v2 · default
 
   ┌──────────────────────────┬────────┬──────────────────────┐
   │ Dimension                │  Score │ Evidence             │

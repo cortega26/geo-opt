@@ -37,7 +37,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
 $ node bin/cli.js audit contenido/articulo.md
 
   Score  76 / 100
-  Model  v1 · default
+  Model  v2 · default
 
   ┌──────────────────────────┬────────┬──────────────────────┐
   │ Dimensión                │  Score │ Evidencia            │
