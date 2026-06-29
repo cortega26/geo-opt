@@ -61,29 +61,39 @@ Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/ab
 
 ## Highlights
 
-- 🔒 **100% local.** Every audit, schema generation, and validation runs in-process. Your content never leaves your machine — zero telemetry, no outbound calls.
-- 📚 **Research-grounded, honestly labeled.** Scoring derives from the GEO literature; every heuristic carries an explicit evidence label (`strong`, `probable`, `experimental`, `project heuristic`) so you always know how much confidence to place in it.
-- 🧩 **One toolkit, the whole surface.** Audit, Schema.org JSON-LD for 8 types, `robots.txt`, `llms.txt`, `sitemap.xml`, technical SEO checks, and HTML reports — from a single CLI and a typed JavaScript library.
-- 🚦 **CI-native.** Threshold-based quality gates with non-zero exit codes; machine-readable JSON on stdout, diagnostics on stderr. Drop it into GitHub Actions or GitLab CI in one step.
-- 🤖 **Cross-runtime.** Canonical Node.js implementation plus a bundled Python 3 port for agent-driven workflows, kept honest by a shared conformance suite.
-- ✅ **Engineered to ship.** 573 tests across 97 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
+- **100% local.** Every audit, schema generation, and validation runs in-process. Your content never leaves your machine — zero telemetry, no outbound calls.
+- **Research-grounded, honestly labeled.** Scoring derives from the GEO literature; every heuristic carries an explicit evidence label (`strong`, `probable`, `experimental`, `project heuristic`) so you always know how much confidence to place in it.
+- **One toolkit, the whole surface.** Audit, Schema.org JSON-LD for 8 types, `robots.txt`, `llms.txt`, `sitemap.xml`, technical SEO checks, and HTML reports — from a single CLI and a typed JavaScript library.
+- **CI-native.** Threshold-based quality gates with non-zero exit codes; machine-readable JSON on stdout, diagnostics on stderr. Drop it into GitHub Actions or GitLab CI in one step.
+- **Cross-runtime.** Canonical Node.js implementation plus a bundled Python 3 port for agent-driven workflows, kept honest by a shared conformance suite.
+- **Engineered to ship.** 573 tests across 97 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
 
 ---
 
 ## Table of contents
 
-- [Why your content needs GEO](#why-your-content-needs-geo)
-- [What geo-opt does](#what-geo-opt-does)
-- [Quick start](#quick-start)
-- [Command reference](#command-reference)
-- [Evidence vocabulary](#evidence-vocabulary)
-- [Free vs. Pro](#free-vs-pro)
-- [Configuration](#configuration)
-- [JavaScript library](#javascript-library)
-- [Privacy guarantees](#privacy-guarantees)
-- [Development](#development)
-- [Research](#research)
-- [License](#license)
+- [geo-opt](#geo-opt)
+  - [Highlights](#highlights)
+  - [Table of contents](#table-of-contents)
+  - [Why your content needs GEO](#why-your-content-needs-geo)
+  - [What geo-opt does](#what-geo-opt-does)
+    - [Audit](#audit)
+    - [Structure](#structure)
+    - [Control](#control)
+    - [Signal](#signal)
+    - [Inspect (technical)](#inspect-technical)
+    - [Report *(Pro)*](#report-pro)
+  - [Quick start](#quick-start)
+    - [CI/CD integration](#cicd-integration)
+  - [Command reference](#command-reference)
+  - [Evidence vocabulary](#evidence-vocabulary)
+  - [Free vs. Pro](#free-vs-pro)
+  - [Configuration](#configuration)
+  - [JavaScript library](#javascript-library)
+  - [Privacy guarantees](#privacy-guarantees)
+  - [Development](#development)
+  - [Research](#research)
+  - [License](#license)
 
 ---
 
