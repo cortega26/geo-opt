@@ -28,7 +28,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
   <a href="https://arxiv.org/abs/2311.09735"><img src="https://img.shields.io/badge/fundamentado_en-GEO_·_KDD_2024-8A2BE2" alt="Fundamentado en GEO, KDD 2024"></a>
   <img src="https://img.shields.io/badge/100%25_local-cero_telemetría-0a7d33" alt="100% local, cero telemetría">
   <img src="https://img.shields.io/badge/runtime-Node_+_Python-5a67d8" alt="Multirruntime: Node y Python">
-  <a href="https://tooltician.com"><img src="https://tooltician.com/badge.svg" alt="Parte del ecosistema Tooltician"></a>
+  <a href="https://tooltician.com"><img src="https://tooltician.com/badge.es.svg" alt="Parte del ecosistema Tooltician"></a>
 </p>
 
 </div>
