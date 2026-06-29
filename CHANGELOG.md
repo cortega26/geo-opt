@@ -140,6 +140,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- TypeScript configuration now explicitly includes Node types so dependency
+  updates continue to typecheck `node:*` imports and `import.meta.url`.
 - Removed dead imports and unused variables in test files (`optimizer.test.js`,
   `conformance.test.js`, `cli-smoke.test.js`, `scoring.test.js`).
 - `generateSchemaData` now derives the page title from the filename when no

@@ -472,11 +472,11 @@ const _assertNewFile: { parentRealPath: string; cwdRealPath: string } =
 const _assertWritable: { targetRealPath: string; cwdRealPath: string } =
   assertWritableTargetInsideCwd(testMd);
 const _validateNewFile:
-  | { valid: true; parentRealPath: string; cwdRealPath: string }
-  | { valid: false; error: string } = validateNewFileParentInsideCwd(testMd);
+  { valid: true; parentRealPath: string; cwdRealPath: string } | { valid: false; error: string } =
+  validateNewFileParentInsideCwd(testMd);
 const _validateWritable:
-  | { valid: true; targetRealPath: string; cwdRealPath: string }
-  | { valid: false; error: string } = validateWritableTargetInsideCwd(testMd);
+  { valid: true; targetRealPath: string; cwdRealPath: string } | { valid: false; error: string } =
+  validateWritableTargetInsideCwd(testMd);
 // injectSchema returns void (side-effect function)
 injectSchema(testMd, "article", _config, _injOpts);
 
