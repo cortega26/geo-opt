@@ -81,7 +81,7 @@
     "eslint": "^10.5.0",
     "prettier": "^3.8.4",
     "publint": "^0.3.21",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "chalk": "^5.6.2",
