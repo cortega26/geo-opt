@@ -7,6 +7,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Integrated semantic-release v25 for automatic version management using
+  conventional commits: auto-bumps version, generates changelog, publishes
+  to npm via OIDC/Trusted Publishing, creates GitHub release, and pushes git
+  tag. Replaced manual npm publish workflow. GitHub Packages publishing
+  continues as a dependent job when a new release is created.
+- Added `workflow_dispatch` trigger to publish workflow for manual releases.
+- Added `.releaserc.json` configuration and semantic-release dev dependencies.
+
 ### Security
 
 - Hardened temporary file names in engagement and telemetry state writes with

@@ -1,0 +1,23 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/changelog", {
+      "changelogFile": "CHANGELOG.md",
+      "changelogTitle": "# Changelog\n\nAll notable changes to this project are documented in this file.\n\nThe format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\nand this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)."
+    }],
+    ["@semantic-release/npm", {
+      "npmPublish": true
+    }],
+    ["@semantic-release/github", {
+      "assets": [
+        { "path": "geo-opt-*.tgz", "label": "Source tarball" }
+      ]
+    }],
+    ["@semantic-release/git", {
+      "assets": ["package.json", "package-lock.json", "CHANGELOG.md"],
+      "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+    }]
+  ]
+}
