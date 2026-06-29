@@ -1,7 +1,7 @@
 # Commercial licensing
 
 **Status:** implemented-behavior summary, not an offer
-**Last verified:** 2026-06-27 at commit `f91fae7`
+**Last verified:** 2026-06-29 at commit `5ee9c0c`
 
 `geo-opt` is currently distributed under the Tooltician Community License 1.0
 with a separate commercial path for customers that need batch and recursive
@@ -77,11 +77,6 @@ The optional support reminder:
 The state is stored in the operating system's user configuration directory.
 `GEO_OPT_STATE_DIR` may override the location for testing or managed
 environments.
-
-At commit `f91fae7`, the experimental v2 audit path also increments this
-injection counter. That is a known implementation defect, not part of the
-commercial contract, and is scheduled for removal in roadmap plan 029. It does
-not add analytics or a network request.
 
 ## Legal status
 
