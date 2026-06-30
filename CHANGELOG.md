@@ -26,8 +26,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **P1 — npm install desde GitHub roto.** El script `prepare` ahora tolera la
   ausencia de `.git/hooks/` (ocurre en instalaciones desde URL de GitHub que
   clonan sin `.git/`). Se agregó `scripts/` al campo `files` del `package.json`
-  para que `prepack` pueda ejecutar `build.js`. Se agregó un guardia `preinstall`
-  que verifica la existencia de `dist/bin/cli.js` y da un mensaje claro si falta.
+  para que `prepack` pueda ejecutar `build.js`.
+- **CI — `npm ci` bloqueado.** El guardia `preinstall` que verificaba `dist/`
+  fue removido porque bloqueaba `npm ci` en CI (el directorio `dist/` no existe
+  en un checkout limpio). El script `prepare` y el try/catch de P2 ya cubren
+  el caso de `dist/` faltante.
+- **CI — `discoverFiles` filtraba tests.** El patrón `tmp-cli-lastmod-*/` en
+  `.gitignore` fue removido porque `discoverFiles()` aplica los patrones de
+  `.gitignore` del CWD a todos los paths, filtrando directorios temporales
+  creados por los tests.
 - **P2 — --help sin output cuando falta dist/.** Se agregó un bloque try/catch
   alrededor de `program.parse()` que detecta errores `ENOENT`/`MODULE_NOT_FOUND`
   y muestra un mensaje amigable sugiriendo ejecutar `npm run build`.

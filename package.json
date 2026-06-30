@@ -44,8 +44,7 @@
     "attw": "attw --pack . --ignore-rules cjs-resolves-to-esm",
     "validate:package": "npm run build && npm run publint && npm run attw",
     "prepack": "node scripts/build.js",
-    "prepare": "node -e \"const{cpSync,chmodSync,existsSync,mkdirSync}=require('fs');const{join}=require('path');const src='hooks/pre-commit';const dest='.git/hooks/pre-commit';try{const d=join('.git','hooks');if(!existsSync(d)){console.warn('[geo-opt] .git/hooks/ not found — skipping pre-commit hook install');process.exit(0);}cpSync(src,dest);chmodSync(dest,0o755)}catch(e){if(e.code==='ENOENT'){console.warn('[geo-opt] .git/hooks/ not found — skipping pre-commit hook install')}else{throw e}}\"",
-    "preinstall": "node -e \"if(!require('fs').existsSync('dist/bin/cli.js')){console.error('ERROR: dist/ not found. This package must be built. Install from npm registry or run: npm run build');process.exit(1)}\""
+    "prepare": "node -e \"const{cpSync,chmodSync,existsSync,mkdirSync}=require('fs');const{join}=require('path');const src='hooks/pre-commit';const dest='.git/hooks/pre-commit';try{const d=join('.git','hooks');if(!existsSync(d)){console.warn('[geo-opt] .git/hooks/ not found — skipping pre-commit hook install');process.exit(0);}cpSync(src,dest);chmodSync(dest,0o755)}catch(e){if(e.code==='ENOENT'){console.warn('[geo-opt] .git/hooks/ not found — skipping pre-commit hook install')}else{throw e}}\""
   },
   "engines": {
     "node": ">=22.0.0"

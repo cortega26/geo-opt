@@ -43,7 +43,6 @@ npm-debug.log*
 
 # Project specific
 geo_config.json
-tmp-cli-lastmod-*/
 .claude/
 .continue/
 .codegraph/
