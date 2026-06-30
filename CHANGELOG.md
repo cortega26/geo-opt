@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1](https://github.com/cortega26/geo-opt/compare/v2.1.0...v2.1.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* 18 bugs from geo-opt v2.1.0 audit report ([e3f953e](https://github.com/cortega26/geo-opt/commit/e3f953ef455b898fe0c056cce3efab1d7d656b63))
+* remove preinstall hook and tmp-cli-lastmod gitignore pattern ([e3e1968](https://github.com/cortega26/geo-opt/commit/e3e1968ab2777cc9be175408071c67d678f770ce))
+
 # [2.1.0](https://github.com/cortega26/geo-opt/compare/v2.0.0...v2.1.0) (2026-06-29)
 
 
