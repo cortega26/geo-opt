@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.venv/
 
 # Python bytecache
 __pycache__/
@@ -43,6 +44,7 @@ npm-debug.log*
 
 # Project specific
 geo_config.json
+tmp-cli-*
 .claude/
 .continue/
 .codegraph/
