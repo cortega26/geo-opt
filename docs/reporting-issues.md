@@ -79,7 +79,7 @@ Do **not** open an issue for:
 6. **Submit only on explicit confirmation**, preferring the no-auth path:
    - **Default — prefilled URL** (the user reviews and submits on GitHub):
      ```
-     https://github.com/cortega26/geo-opt/issues/new?template=bug_report.yml&title=<title>&version=<v>&node-version=<n>&os=<os>&command=<cmd>&actual=<err>&labels=bug
+     https://github.com/cortega26/geo-opt/issues/new?template=bug_report.yml&title=<title>&version=<v>&node-version=<n>&os=<os>&command=<cmd>&expected=<exp>&actual=<err>&context=<ctx>&labels=bug
      ```
    - **If `gh` is installed and authenticated:**
      ```bash
@@ -100,3 +100,8 @@ field by its `id` (`version`, `node-version`, `os`, `command`, `expected`,
 `actual`, `context`); `labels=bug` preselects the label. Always URL-encode the
 values. Because the user reviews and submits on GitHub, this path requires no
 local authentication and keeps the human in control of what is sent.
+
+The `title` query parameter prefills the issue title (verified). The
+`Report origin` checkbox, however, cannot be prefilled — GitHub does not support
+prefilling `checkboxes` via URL — so the reporter ticks it manually after the
+form opens.
