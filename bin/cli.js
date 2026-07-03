@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
 import fs from "fs";
+import { createRequire } from "module";
 import chalk from "chalk";
 import path from "path";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 import {
   auditFiles,
   aggregateReport,
@@ -96,7 +100,7 @@ program
   .name("geo-opt")
   .description("AI-discoverability CLI: GEO, structured data, and technical SEO")
   .option("--config <path>", "Path to geo_config.json")
-  .version("2.0.0");
+  .version(version);
 
 // --- Audit ---
 program

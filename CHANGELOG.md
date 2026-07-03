@@ -14,6 +14,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- `geo-opt -V` / `--version` now reads the version dynamically from
+  `package.json` instead of returning a hardcoded string (closes #20)
+
 ### Added
 
 - `llmstxt generate --frontmatter-fields <fields...>` option: extract named YAML
