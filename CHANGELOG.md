@@ -14,6 +14,20 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- `llmstxt generate --frontmatter-fields <fields...>` option: extract named YAML
+  frontmatter fields (e.g. `body`, `excerpt`) as page content for
+  `llms-full.txt`, fixing empty content blocks for schema-driven collections
+  (Astro and similar frameworks) where the markdown body is empty and all
+  content lives in structured frontmatter (closes #18)
+- `extractFrontmatterContent(content, fields)` exported API function that
+  concatenates specified frontmatter field values and the markdown body into a
+  single content string for use in full-text generation
+- `extractPageMetadata` now falls back to frontmatter `title` and `description`
+  fields when the markdown body contains no H1 or opening paragraph, improving
+  `llms.txt` entries for frontmatter-only source files
+
 ### Docs
 
 - Reposition the project as a three-pillar AI-discoverability toolkit (GEO +

@@ -784,6 +784,7 @@ declare module "geo-opt" {
   }
 
   export function extractPageMetadata(content: string, filepath: string): PageMetadata;
+  export function extractFrontmatterContent(content: string, fields: string[]): string;
   export function resolvePageUrl(filepath: string, baseDir: string, siteUrl: string, opts?: { stripPrefix?: string }): string;
 
   export interface LlmsEntry {

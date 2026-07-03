@@ -248,6 +248,91 @@ describe("CLI llmstxt", () => {
     const { status } = run(["llmstxt", "audit", "/tmp/nonexistent-llms.txt"]);
     assert.notEqual(status, 0);
   });
+
+  it("generate uses frontmatter title/description when body is empty", () => {
+    const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-llms-fm-"));
+    try {
+      const mdFile = join(tmpDir, "page.md");
+      writeFileSync(
+        mdFile,
+        "---\ntitle: Frontmatter Title\ndescription: Frontmatter description text\n---\n",
+        "utf8"
+      );
+      const { status, stdout } = run([
+        "llmstxt",
+        "generate",
+        mdFile,
+        "--dry-run",
+        "--base-url",
+        "https://example.com",
+      ]);
+      assert.equal(status, 0);
+      assert.ok(stdout.includes("Frontmatter Title"), "Should use frontmatter title");
+      assert.ok(
+        stdout.includes("Frontmatter description text"),
+        "Should use frontmatter description"
+      );
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("generate --frontmatter-fields populates llms-full.txt content", () => {
+    const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-llms-fm-"));
+    try {
+      const mdFile = join(tmpDir, "page.md");
+      writeFileSync(
+        mdFile,
+        "---\ntitle: My Page\nbody: Full page body content here.\nexcerpt: Short excerpt.\n---\n",
+        "utf8"
+      );
+      const { status, stdout } = run([
+        "llmstxt",
+        "generate",
+        mdFile,
+        "--full",
+        "--dry-run",
+        "--base-url",
+        "https://example.com",
+        "--frontmatter-fields",
+        "body",
+        "excerpt",
+      ]);
+      assert.equal(status, 0);
+      assert.ok(stdout.includes("Full page body content here."), "Should include body field");
+      assert.ok(stdout.includes("Short excerpt."), "Should include excerpt field");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("generate --full without --frontmatter-fields shows empty content for frontmatter-only files", () => {
+    const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-llms-fm-"));
+    try {
+      const mdFile = join(tmpDir, "page.md");
+      writeFileSync(
+        mdFile,
+        "---\ntitle: My Page\nbody: Should not appear without flag.\n---\n",
+        "utf8"
+      );
+      const { status, stdout } = run([
+        "llmstxt",
+        "generate",
+        mdFile,
+        "--full",
+        "--dry-run",
+        "--base-url",
+        "https://example.com",
+      ]);
+      assert.equal(status, 0);
+      assert.ok(
+        !stdout.includes("Should not appear without flag."),
+        "Should not extract body field without --frontmatter-fields"
+      );
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

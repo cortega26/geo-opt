@@ -15,6 +15,7 @@ import {
   checkRobots,
   discoverFiles,
   extractPageMetadata,
+  extractFrontmatterContent,
   generateLlmsTxt,
   generateLlmsFullTxtFiles,
   suggestSection,
@@ -515,6 +516,10 @@ llmstxtCmd
   .option("--full", "Also generate llms-full.txt with complete page content")
   .option("--max-chars <number>", "Max characters per llms-full file before splitting", "500000")
   .option("--strip-prefix <prefix>", "Remove this prefix from generated URLs (e.g. 'src/data')")
+  .option(
+    "--frontmatter-fields <fields...>",
+    "YAML frontmatter fields to use as page content for llms-full.txt (e.g. body excerpt)"
+  )
   .option("--dry-run", "Preview without writing files")
   .action((files, options, cmd) => {
     const config = resolveConfig(cmd);
@@ -559,6 +564,7 @@ llmstxtCmd
 
     const entries = [];
     const errors = [];
+    const frontmatterFields = options.frontmatterFields || [];
     for (const fp of discovered) {
       try {
         const content = fs.readFileSync(fp, { encoding: "utf8" });
@@ -577,13 +583,24 @@ llmstxtCmd
           url = resolvePageUrl(fp, commonBase, "", { stripPrefix });
         }
 
+        // Build content for llms-full.txt. When --frontmatter-fields is
+        // specified, extract those YAML fields (plus the markdown body) so
+        // that schema-driven collections with empty bodies are represented.
+        let entryContent;
+        if (options.full) {
+          entryContent =
+            frontmatterFields.length > 0
+              ? extractFrontmatterContent(content, frontmatterFields) || content
+              : content;
+        }
+
         entries.push({
           path: fp,
           url,
           title,
           description,
           section,
-          content: options.full ? content : undefined,
+          content: options.full ? entryContent : undefined,
         });
       } catch (err) {
         errors.push({ file: fp, error: err.message });
