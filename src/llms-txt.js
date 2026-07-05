@@ -89,7 +89,7 @@ export function extractPageMetadata(content, filepath) {
  *
  * @param {string} content - raw file content (with YAML frontmatter)
  * @param {string[]} fields - ordered list of frontmatter field names to extract
- * @returns {string} combined content string, or empty string if no matching fields
+ * @returns {string} combined content string, or empty string if selected fields and body are empty
  */
 export function extractFrontmatterContent(content, fields) {
   if (!fields || fields.length === 0) return "";

@@ -157,6 +157,9 @@ Genera archivos `llms.txt` y `llms-full.txt` siguiendo la propuesta de la comuni
 ```bash
 node bin/cli.js llmstxt audit public/llms.txt
 node bin/cli.js llmstxt generate contenido/ --recursive --site-url https://ejemplo.com  # Pro
+# Solo Node: extrae campos YAML cuando una colección guarda el contenido en el frontmatter
+node bin/cli.js llmstxt generate contenido/ --recursive --site-url https://ejemplo.com \
+  --full --frontmatter-fields body excerpt
 node bin/cli.js sitemap generate contenido/ --base-url https://ejemplo.com               # Pro
 ```
 
@@ -246,7 +249,7 @@ El comando sale con código de error cuando algún archivo está por debajo del 
 | `robots audit <archivo>` | Free + Pro | Evalúa la política de crawlers; `--format json` para salida de máquina |
 | `robots generate` | Pro | Genera `robots.txt` con preset `search-visible` u `open` |
 | `llmstxt audit <archivo>` | Free + Pro | Valida la estructura y comprueba la cobertura del contenido |
-| `llmstxt generate [archivos...]` | Pro | Crea `llms.txt` y opcionalmente `llms-full.txt` |
+| `llmstxt generate [archivos...]` | Pro | Crea `llms.txt` y opcionalmente `llms-full.txt`; Node también admite `--frontmatter-fields` |
 | `sitemap generate [archivos...]` | Pro | Genera `sitemap.xml` con prioridades derivadas de GEO |
 | `report [archivos...]` | Pro | Reporte HTML independiente; `--compare <base.json>` para comparar antes/después |
 | `generate-all [dir]` | Pro | Paquete en un solo paso: reporte de auditoría, schema, `llms.txt` y `sitemap.xml` |
@@ -359,6 +362,10 @@ console.log(score);
 console.log(report.dimensionScores);
 // { structure: 17, evidence: 13, quotations: 7, citations: 17, clarity: 22 }
 ```
+
+Para colecciones Markdown dirigidas por esquema,
+`extractFrontmatterContent(markdown, ["body", "excerpt"])` expone la misma
+extracción exclusiva de Node que usa `llmstxt generate --frontmatter-fields`.
 
 Los usuarios de **TypeScript** tienen cobertura de tipos completa desde el primer momento:
 

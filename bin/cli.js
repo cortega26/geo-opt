@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 import { Command, Option } from "commander";
 import fs from "fs";
-import { createRequire } from "module";
 import chalk from "chalk";
 import path from "path";
 
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json");
 import {
   auditFiles,
   aggregateReport,
@@ -62,6 +59,26 @@ import {
 import { generateBadgeUrl, generateBadgeMarkdown, scoreToBadgeGrade } from "../src/badge.js";
 import { CONSENT_GRANTED, resolveTelemetryStatus, setTelemetryConsent } from "../src/telemetry.js";
 
+function resolvePackageVersion() {
+  for (const relativePath of ["../package.json", "../../package.json"]) {
+    try {
+      const packageJson = JSON.parse(
+        fs.readFileSync(new URL(relativePath, import.meta.url), { encoding: "utf8" })
+      );
+      if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+        throw new Error(`Missing package version in ${relativePath}`);
+      }
+      return packageJson.version;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+
+  throw new Error("Unable to locate geo-opt package.json");
+}
+
+const packageVersion = resolvePackageVersion();
+
 // --- Global --config option ---
 function resolveConfig(cmd) {
   try {
@@ -100,7 +117,7 @@ program
   .name("geo-opt")
   .description("AI-discoverability CLI: GEO, structured data, and technical SEO")
   .option("--config <path>", "Path to geo_config.json")
-  .version(version);
+  .version(packageVersion);
 
 // --- Audit ---
 program

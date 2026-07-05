@@ -81,6 +81,7 @@ Every public capability is assigned one of four formal tiers:
 | JSON-LD validation                                       | CLI + API | No     | `Node-only`   | Not implemented in Python; no port requested                              |
 | robots audit and generation                              | CLI + API | CLI    | `compatible`  | Shared registry; Python path resolution differs; purpose-aware semantics align |
 | `llms.txt` generation and audit                          | CLI + API | CLI    | `compatible`  | Same proposal format; Python uses mistune vs marked for parsing           |
+| `llms.txt` custom frontmatter-field extraction           | CLI + API | No     | `Node-only`   | Schema-driven source collections; no demonstrated demand for a Python port |
 | Config, reminders, licensing convenience gate            | CLI + API | CLI    | `compatible`  | Policy-equivalent where implemented; Python path/env resolution differs   |
 | Typed library API                                        | Yes       | No     | `Node-only`   | Python is a CLI-oriented port, not a separately supported package         |
 

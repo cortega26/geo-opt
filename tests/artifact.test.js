@@ -113,6 +113,25 @@ describe("artifact invariants", () => {
     assert.ok(result.stdout.includes("geo-opt"), "La ayuda del CLI no menciona 'geo-opt'");
   });
 
+  it("CLI version coincide con package.json desde bin/ y dist/bin/", () => {
+    build();
+    const expectedVersion = JSON.parse(
+      readFileSync(path.join(repoRoot, "package.json"), "utf8")
+    ).version;
+
+    for (const cliPath of [
+      path.join(repoRoot, "bin", "cli.js"),
+      path.join(repoRoot, "dist", "bin", "cli.js"),
+    ]) {
+      const result = spawnSync(process.execPath, [cliPath, "--version"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+      });
+      assert.strictEqual(result.status, 0, `CLI version falló desde ${cliPath}:\n${result.stderr}`);
+      assert.strictEqual(result.stdout.trim(), expectedVersion);
+    }
+  });
+
   it("dist/index.js exporta los símbolos principales de la librería", async () => {
     build();
     const distIndex = path.join(repoRoot, "dist", "index.js");

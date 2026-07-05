@@ -25,7 +25,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   frontmatter fields (e.g. `body`, `excerpt`) as page content for
   `llms-full.txt`, fixing empty content blocks for schema-driven collections
   (Astro and similar frameworks) where the markdown body is empty and all
-  content lives in structured frontmatter (closes #18)
+  content lives in structured frontmatter. This option is Node-only; the Python
+  compatibility CLI remains unchanged. (Closes #18)
 - `extractFrontmatterContent(content, fields)` exported API function that
   concatenates specified frontmatter field values and the markdown body into a
   single content string for use in full-text generation
