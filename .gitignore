@@ -44,7 +44,6 @@ npm-debug.log*
 
 # Project specific
 geo_config.json
-tmp-cli-*
 .claude/
 .continue/
 .codegraph/
