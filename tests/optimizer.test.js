@@ -22,6 +22,7 @@ import {
   createFinding,
   discoverFiles,
   extractPageMetadata,
+  extractFrontmatterContent,
   extractSections,
   generateLlmsTxt,
   generateLlmsFullTxt,
@@ -2872,4 +2873,90 @@ test("geo-opt report command is blocked without Pro license", () => {
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
+});
+
+// ---- extractFrontmatterContent ----
+
+test("extractFrontmatterContent returns empty string for empty fields list", () => {
+  const content = "---\ntitle: Test\nbody: Some content.\n---\n";
+  assert.strictEqual(extractFrontmatterContent(content, []), "");
+});
+
+test("extractFrontmatterContent extracts a single string field", () => {
+  const content = "---\ntitle: My Page\nbody: This is the body text.\n---\n";
+  const result = extractFrontmatterContent(content, ["body"]);
+  assert.strictEqual(result, "This is the body text.");
+});
+
+test("extractFrontmatterContent combines multiple fields in order", () => {
+  const content = "---\nbody: Body content here.\nexcerpt: Short excerpt.\n---\n";
+  const result = extractFrontmatterContent(content, ["body", "excerpt"]);
+  assert.ok(result.includes("Body content here."), "Should include body");
+  assert.ok(result.includes("Short excerpt."), "Should include excerpt");
+  const bodyIdx = result.indexOf("Body content here.");
+  const excerptIdx = result.indexOf("Short excerpt.");
+  assert.ok(bodyIdx < excerptIdx, "body should come before excerpt");
+});
+
+test("extractFrontmatterContent skips missing fields silently", () => {
+  const content = "---\ntitle: Test\nbody: Body text.\n---\n";
+  const result = extractFrontmatterContent(content, ["nonexistent", "body"]);
+  assert.strictEqual(result, "Body text.");
+});
+
+test("extractFrontmatterContent joins array field values as paragraphs", () => {
+  const content = "---\nfacts:\n  - First fact.\n  - Second fact.\n---\n";
+  const result = extractFrontmatterContent(content, ["facts"]);
+  assert.ok(result.includes("First fact."), "Should include first item");
+  assert.ok(result.includes("Second fact."), "Should include second item");
+});
+
+test("extractFrontmatterContent appends non-empty markdown body after field values", () => {
+  const content = "---\nexcerpt: Excerpt text.\n---\n\nMarkdown body paragraph.\n";
+  const result = extractFrontmatterContent(content, ["excerpt"]);
+  assert.ok(result.includes("Excerpt text."), "Should include excerpt");
+  assert.ok(result.includes("Markdown body paragraph."), "Should include markdown body");
+  const excerptIdx = result.indexOf("Excerpt text.");
+  const bodyIdx = result.indexOf("Markdown body paragraph.");
+  assert.ok(excerptIdx < bodyIdx, "frontmatter fields should come before body");
+});
+
+test("extractFrontmatterContent returns empty string when specified fields are absent", () => {
+  const content = "---\ntitle: Only Title\n---\n";
+  const result = extractFrontmatterContent(content, ["body", "content"]);
+  assert.strictEqual(result, "");
+});
+
+test("extractFrontmatterContent works on content without frontmatter", () => {
+  const content = "# Regular Markdown\n\nJust a body without frontmatter.\n";
+  const result = extractFrontmatterContent(content, ["body"]);
+  // No frontmatter — field 'body' not found in data, but the full markdown body is included.
+  assert.ok(
+    result.includes("Just a body without frontmatter."),
+    "Should include the markdown body when there is no frontmatter"
+  );
+});
+
+// ---- extractPageMetadata frontmatter fallbacks ----
+
+test("extractPageMetadata uses frontmatter title when H1 is absent", () => {
+  const content =
+    "---\ntitle: Frontmatter Title\ndescription: Some desc.\n---\n\nNo heading here.\n";
+  const meta = extractPageMetadata(content, "page.md");
+  assert.strictEqual(meta.title, "Frontmatter Title");
+});
+
+test("extractPageMetadata uses frontmatter description when body paragraph is absent", () => {
+  const content = "---\ntitle: My Page\ndescription: Frontmatter description text.\n---\n";
+  const meta = extractPageMetadata(content, "page.md");
+  assert.ok(
+    meta.description.includes("Frontmatter description text"),
+    "Should fall back to frontmatter description"
+  );
+});
+
+test("extractPageMetadata prefers H1 over frontmatter title", () => {
+  const content = "---\ntitle: Frontmatter Title\n---\n\n# Real H1 Title\n\nSome content here.\n";
+  const meta = extractPageMetadata(content, "page.md");
+  assert.strictEqual(meta.title, "Real H1 Title");
 });

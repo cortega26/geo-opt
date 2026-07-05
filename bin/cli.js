@@ -3,6 +3,7 @@ import { Command, Option } from "commander";
 import fs from "fs";
 import chalk from "chalk";
 import path from "path";
+
 import {
   auditFiles,
   aggregateReport,
@@ -15,6 +16,7 @@ import {
   checkRobots,
   discoverFiles,
   extractPageMetadata,
+  extractFrontmatterContent,
   generateLlmsTxt,
   generateLlmsFullTxtFiles,
   suggestSection,
@@ -57,6 +59,26 @@ import {
 import { generateBadgeUrl, generateBadgeMarkdown, scoreToBadgeGrade } from "../src/badge.js";
 import { CONSENT_GRANTED, resolveTelemetryStatus, setTelemetryConsent } from "../src/telemetry.js";
 
+function resolvePackageVersion() {
+  for (const relativePath of ["../package.json", "../../package.json"]) {
+    try {
+      const packageJson = JSON.parse(
+        fs.readFileSync(new URL(relativePath, import.meta.url), { encoding: "utf8" })
+      );
+      if (typeof packageJson.version !== "string" || packageJson.version.length === 0) {
+        throw new Error(`Missing package version in ${relativePath}`);
+      }
+      return packageJson.version;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+
+  throw new Error("Unable to locate geo-opt package.json");
+}
+
+const packageVersion = resolvePackageVersion();
+
 // --- Global --config option ---
 function resolveConfig(cmd) {
   try {
@@ -95,7 +117,7 @@ program
   .name("geo-opt")
   .description("AI-discoverability CLI: GEO, structured data, and technical SEO")
   .option("--config <path>", "Path to geo_config.json")
-  .version("2.0.0");
+  .version(packageVersion);
 
 // --- Audit ---
 program
@@ -515,6 +537,10 @@ llmstxtCmd
   .option("--full", "Also generate llms-full.txt with complete page content")
   .option("--max-chars <number>", "Max characters per llms-full file before splitting", "500000")
   .option("--strip-prefix <prefix>", "Remove this prefix from generated URLs (e.g. 'src/data')")
+  .option(
+    "--frontmatter-fields <fields...>",
+    "YAML frontmatter fields to use as page content for llms-full.txt (e.g. body excerpt)"
+  )
   .option("--dry-run", "Preview without writing files")
   .action((files, options, cmd) => {
     const config = resolveConfig(cmd);
@@ -559,6 +585,7 @@ llmstxtCmd
 
     const entries = [];
     const errors = [];
+    const frontmatterFields = options.frontmatterFields || [];
     for (const fp of discovered) {
       try {
         const content = fs.readFileSync(fp, { encoding: "utf8" });
@@ -577,13 +604,24 @@ llmstxtCmd
           url = resolvePageUrl(fp, commonBase, "", { stripPrefix });
         }
 
+        // Build content for llms-full.txt. When --frontmatter-fields is
+        // specified, extract those YAML fields (plus the markdown body) so
+        // that schema-driven collections with empty bodies are represented.
+        let entryContent;
+        if (options.full) {
+          entryContent =
+            frontmatterFields.length > 0
+              ? extractFrontmatterContent(content, frontmatterFields) || content
+              : content;
+        }
+
         entries.push({
           path: fp,
           url,
           title,
           description,
           section,
-          content: options.full ? content : undefined,
+          content: options.full ? entryContent : undefined,
         });
       } catch (err) {
         errors.push({ file: fp, error: err.message });

@@ -169,6 +169,9 @@ Generate `llms.txt` and `llms-full.txt` following the community proposal, plus a
 ```bash
 node bin/cli.js llmstxt audit public/llms.txt
 node bin/cli.js llmstxt generate content/ --recursive --site-url https://example.com  # Pro
+# Node-only: extract selected YAML fields when a collection keeps content in frontmatter
+node bin/cli.js llmstxt generate content/ --recursive --site-url https://example.com \
+  --full --frontmatter-fields body excerpt
 node bin/cli.js sitemap generate content/ --base-url https://example.com               # Pro
 ```
 
@@ -258,7 +261,7 @@ The command exits non-zero when any file falls below the threshold, blocking dep
 | `robots audit <file>` | Free + Pro | Evaluate crawler policy; `--format json` for machine output |
 | `robots generate` | Pro | Draft `robots.txt` with `search-visible` or `open` preset |
 | `llmstxt audit <file>` | Free + Pro | Validate structure and check content coverage |
-| `llmstxt generate [files...]` | Pro | Create `llms.txt` and optional `llms-full.txt` |
+| `llmstxt generate [files...]` | Pro | Create `llms.txt` and optional `llms-full.txt`; Node also supports `--frontmatter-fields` |
 | `sitemap generate [files...]` | Pro | Generate `sitemap.xml` with GEO-derived priorities |
 | `report [files...]` | Pro | Standalone HTML report; `--compare <baseline.json>` for before/after diff |
 | `generate-all [dir]` | Pro | One-shot package: audit report, schema, `llms.txt`, and `sitemap.xml` |
@@ -371,6 +374,10 @@ console.log(score);
 console.log(report.dimensionScores);
 // { structure: 17, evidence: 13, quotations: 7, citations: 17, clarity: 22 }
 ```
+
+For schema-driven Markdown collections, `extractFrontmatterContent(markdown,
+["body", "excerpt"])` exposes the same Node-only extraction used by
+`llmstxt generate --frontmatter-fields`.
 
 **TypeScript** users get full type coverage out of the box:
 

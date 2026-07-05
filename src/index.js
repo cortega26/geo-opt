@@ -79,6 +79,7 @@ export {
 export { validateSchema, validateSchemaFile } from "./validate.js";
 export {
   extractPageMetadata,
+  extractFrontmatterContent,
   resolvePageUrl,
   findCommonBaseDir,
   suggestSection,

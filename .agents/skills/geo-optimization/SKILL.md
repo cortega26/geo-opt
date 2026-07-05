@@ -282,6 +282,12 @@ node bin/cli.js llmstxt generate ./content --recursive --site-url https://exampl
 # Include full page content (llms-full.txt)
 node bin/cli.js llmstxt generate ./content --recursive --site-url https://example.com --full
 
+# Node-only: extract selected YAML fields from frontmatter-only content collections
+node bin/cli.js llmstxt generate ./content --recursive \
+  --site-url https://example.com \
+  --full \
+  --frontmatter-fields body excerpt
+
 # Preview before writing
 node bin/cli.js llmstxt generate ./content --recursive --site-url https://example.com --dry-run
 

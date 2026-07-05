@@ -6,6 +6,7 @@ import {
   preprocessContent,
   cleanHtmlText,
   truncateDescription,
+  parseFrontmatter,
 } from "./text.js";
 import { AI_CRAWLER_REGISTRY, CRAWLER_REGISTRY_VERSION } from "./robots.js";
 
@@ -13,7 +14,9 @@ import { AI_CRAWLER_REGISTRY, CRAWLER_REGISTRY_VERSION } from "./robots.js";
 
 /**
  * Extract page metadata from raw content (title, description, sections).
- * Supports both Markdown and HTML.
+ * Supports both Markdown and HTML. For Markdown files, falls back to
+ * frontmatter `title` and `description` fields when the document body
+ * does not contain an H1 or opening paragraph.
  *
  * @param {string} content - raw file content
  * @param {string} filepath - file path (used to detect HTML vs Markdown)
@@ -21,6 +24,11 @@ import { AI_CRAWLER_REGISTRY, CRAWLER_REGISTRY_VERSION } from "./robots.js";
  */
 export function extractPageMetadata(content, filepath) {
   const cleanText = preprocessContent(content);
+
+  // Parse frontmatter once for fallback lookups (Markdown only).
+  const isHtml =
+    filepath.endsWith(".html") || filepath.endsWith(".htm") || /<html/i.test(cleanText);
+  const frontmatter = isHtml ? { data: {} } : parseFrontmatter(content);
 
   // H1 title
   let titleMatch = cleanText.match(/^#\s+(.+)$/m);
@@ -30,6 +38,10 @@ export function extractPageMetadata(content, filepath) {
     if (h1Match) {
       title = cleanHtmlText(h1Match[1]);
     }
+  }
+  // Frontmatter `title` field as fallback before using the file basename.
+  if (!title && frontmatter.data.title && typeof frontmatter.data.title === "string") {
+    title = frontmatter.data.title.trim();
   }
   if (!title) {
     title = path.basename(filepath, path.extname(filepath)) || "Untitled";
@@ -41,7 +53,7 @@ export function extractPageMetadata(content, filepath) {
   if (introMatch) {
     description = cleanMarkdownToPlainText(introMatch[1].trim());
   }
-  if (!description && (filepath.endsWith(".html") || /<html/i.test(cleanText))) {
+  if (!description && isHtml) {
     const $desc = cheerio.load(content);
     const metaDesc = $desc('meta[name="description"]').attr("content");
     if (metaDesc) description = cleanHtmlText(metaDesc);
@@ -50,12 +62,60 @@ export function extractPageMetadata(content, filepath) {
       if (firstP) description = cleanHtmlText(firstP);
     }
   }
+  // Frontmatter `description` field as fallback.
+  if (
+    !description &&
+    frontmatter.data.description &&
+    typeof frontmatter.data.description === "string"
+  ) {
+    description = frontmatter.data.description.trim();
+  }
   description = truncateDescription(description);
 
   // Sections (H2+)
   const sections = extractSections(content);
 
   return { title, description, sections };
+}
+
+/**
+ * Build page content from specified YAML frontmatter fields.
+ *
+ * When source markdown files store their human-readable content in custom
+ * frontmatter fields (common in schema-driven frameworks like Astro), this
+ * function extracts those fields and concatenates them into a single text
+ * block suitable for llms-full.txt. The markdown body (if non-empty) is
+ * appended after the frontmatter-derived content.
+ *
+ * @param {string} content - raw file content (with YAML frontmatter)
+ * @param {string[]} fields - ordered list of frontmatter field names to extract
+ * @returns {string} combined content string, or empty string if selected fields and body are empty
+ */
+export function extractFrontmatterContent(content, fields) {
+  if (!fields || fields.length === 0) return "";
+  const { data, body } = parseFrontmatter(content);
+
+  const parts = [];
+  for (const field of fields) {
+    const value = data[field];
+    if (value == null) continue;
+    if (typeof value === "string" && value.trim()) {
+      parts.push(value.trim());
+    } else if (Array.isArray(value)) {
+      // Arrays of strings are joined as paragraphs.
+      const joined = value
+        .filter((v) => typeof v === "string" && v.trim())
+        .map((v) => v.trim())
+        .join("\n\n");
+      if (joined) parts.push(joined);
+    }
+  }
+
+  // Append the markdown body if it has content beyond the frontmatter.
+  const trimmedBody = body ? body.trim() : "";
+  if (trimmedBody) parts.push(trimmedBody);
+
+  return parts.join("\n\n");
 }
 
 /**

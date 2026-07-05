@@ -242,6 +242,27 @@ describe("Node-only capabilities (tier: Node-only)", () => {
     );
   });
 
+  it("Python llmstxt generate rejects Node-only --frontmatter-fields", () => {
+    assert.throws(
+      () =>
+        execFileSync(
+          PYTHON,
+          [
+            PY_SCRIPT,
+            "llmstxt",
+            "generate",
+            path.join(FIXTURES, "sample.md"),
+            "--frontmatter-fields",
+            "body",
+            "--dry-run",
+          ],
+          { cwd: REPO_ROOT, encoding: "utf8", stdio: "pipe" }
+        ),
+      undefined,
+      "Python should reject --frontmatter-fields"
+    );
+  });
+
   it("Node.js v2 produces profile info that Python v1 does not", () => {
     const nodeV2 = nodeAudit("sample.md", ["--model", "v2"]);
     assert.ok(nodeV2.profile, "Node v2 report should have profile info");

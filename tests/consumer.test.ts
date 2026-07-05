@@ -165,6 +165,7 @@ import {
   checkRobots,
   validateSchemaFile,
   extractPageMetadata,
+  extractFrontmatterContent,
   resolvePageUrl,
   generateLlmsTxt,
   generateLlmsFullTxt,
@@ -516,6 +517,10 @@ validateSchemaFile(testMd);
 
 // --- LLMs.txt ---
 const _pageMeta: PageMetadata = extractPageMetadata("content", fileMd);
+const _frontmatterContent: string = extractFrontmatterContent(
+  "---\nbody: Full page content.\n---\n",
+  ["body"]
+);
 const _pageUrl: string = resolvePageUrl(fileMd, FIXTURE_DIR, "https://example.com");
 const _llmsEntry: LlmsEntry = {
   title: "Page",
