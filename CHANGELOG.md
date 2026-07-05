@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [2.2.0](https://github.com/cortega26/geo-opt/compare/v2.1.3...v2.2.0) (2026-07-05)
+
+
+### Features
+
+* **cli:** support frontmatter content and dynamic version ([#19](https://github.com/cortega26/geo-opt/issues/19)) ([fa274ac](https://github.com/cortega26/geo-opt/commit/fa274acfc61b525c2881441f33d012687f462871)), closes [#18](https://github.com/cortega26/geo-opt/issues/18) [#20](https://github.com/cortega26/geo-opt/issues/20)
+
 ## [2.1.3](https://github.com/cortega26/geo-opt/compare/v2.1.2...v2.1.3) (2026-06-30)
 
 
