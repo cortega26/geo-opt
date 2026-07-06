@@ -9,7 +9,7 @@ const CODE_PATH_PATTERNS = [
   /^scripts\/.*\.(?:js|mjs|cjs|py)$/,
   /^tests\/.*\.(?:js|mjs|cjs|py)$/,
   /^\.agents\/skills\/geo-optimization\/scripts\/.*\.py$/,
-  /^(?:package|package-lock)\.json$/,
+  /^package\.json$/,
   /^eslint\.config\.js$/,
 ];
 

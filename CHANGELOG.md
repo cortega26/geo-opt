@@ -23,6 +23,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- Allow lockfile-only dependency resolution updates to pass the changelog policy
+  while continuing to require entries for package manifest changes
 - `geo-opt -V` / `--version` now reads the version dynamically from
   `package.json` instead of returning a hardcoded string (closes #20)
 
