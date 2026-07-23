@@ -21,6 +21,31 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Tests
+
+- Plan 058 §6.4/§6.6 tests now skip gracefully when maintainer-local
+  `plans/business/` and `plans/018-…md` files are absent (e.g. in CI or a
+  fresh clone), since `plans/` is git-ignored by design. They still verify
+  content when the files are present locally.
+
+### Docs
+
+- Reconciled public Free/Pro capability claims with current runtime behavior
+  (Plan 058). `docs/free-vs-pro.md`, `docs/commercial-licensing.md`,
+  `docs/architecture.md`, `README.md`, and `README.es.md` no longer mark
+  Community commands (`inject`, `robots generate`, `llmstxt generate`,
+  `sitemap generate`, `generate-all`, recursive audit, CI thresholds) as Pro-only.
+  Only `report`, `--no-branding`, and the Pro schema types (`course`, `event`,
+  `recipe`, `howto`) are actually Pro-gated. Corrected stale `architecture.md`
+  maturity claims (npm package is published; v2 is the default scoring model;
+  `technical` is a supported CLI command). Updated test-count badge from 573 to
+  666 and added a standalone `scripts/check-test-count.js` to catch future badge
+  drift (run manually; not yet wired into `npm run check` to avoid a package.json
+  change outside this plan's scope). Added a truthful copy-paste local-to-CI onboarding route. Quarantined the
+  historical `plans/business/launch-content/` drafts as not-approved-for-
+  publication and fixed their stale `cortega26/GEO-skill.git` repo URL. Marked
+  Plan 018 as superseded; updated `plans/README.md` to record Plan 058 DONE.
+
 ### Fixed
 
 - Allow lockfile-only dependency resolution updates to pass the changelog policy

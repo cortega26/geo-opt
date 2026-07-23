@@ -1,7 +1,7 @@
 # Architecture, contracts and runtime capabilities
 
 **Status:** normative current-state document
-**Last verified:** 2026-06-27 (post plan 034)
+**Last verified:** 2026-07-22 (Plan 058 factual reconciliation)
 
 The modular JavaScript implementation under `src/` is the canonical runtime for
 the `geo-opt` command-line interface and library. A Python 3 compatibility port
@@ -16,13 +16,15 @@ the current execution roadmap and architecture gate in the local
 
 ## Current maturity
 
-- The public npm package has not been released.
-- V1 is the default scoring model.
-- V2 is experimental and available only in Node.js through `--model v2`.
-- The pure technical HTML audit is available through the JavaScript API; there
-  is no supported `technical` CLI command yet.
-- The v2 finding/version/type contracts are being stabilized by roadmap gate
-  T0. Do not treat experimental JSON as frozen until that gate closes.
+- The public npm package is published as [`geo-opt`](https://www.npmjs.com/package/geo-opt).
+- V2 is the default scoring model. V1 is available via `--model v1` and is
+  deprecated (a migration note and deprecation warning are emitted when used).
+- The v2 *model* is experimental and profile-aware: it is characterized against
+  a 32-fixture regression corpus, not calibrated against live retrieval or
+  citation outcomes. The v2 *contract* (finding/version/type shapes) is
+  stabilized through roadmap gate T0 (closed 2026-06-27).
+- The `technical` CLI command audits HTML for technical SEO/GEO fundamentals,
+  locally offline or against remote URLs/sitemaps with SSRF guards.
 - Supported runtimes are Node.js 22 LTS and Node.js 24 LTS. Node.js 20 reached
   EOL on 2026-03-24 and is no longer a supported target.
 

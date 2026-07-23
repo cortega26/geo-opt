@@ -15,7 +15,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="Estado de CI"></a>
-  <img src="https://img.shields.io/badge/tests-573_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="573 tests pasados">
+  <img src="https://img.shields.io/badge/tests-666_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="666 tests pasados">
   <img src="https://img.shields.io/badge/cobertura_de_ramas-80%25-16a34a" alt="Cobertura de ramas 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-tipos_incluidos-3178C6?logo=typescript&logoColor=white" alt="Tipos TypeScript incluidos">
@@ -76,7 +76,7 @@ El modelo de puntuación está fundamentado en el [artículo GEO aceptado en KDD
 - 🧩 **Un solo toolkit, toda la superficie.** Auditoría, Schema.org JSON-LD para 8 tipos, `robots.txt`, `llms.txt`, `sitemap.xml`, comprobaciones técnicas de SEO y reportes HTML — desde una única CLI y una librería JavaScript tipada.
 - 🚦 **Nativo para CI.** Quality gates por umbral con códigos de salida distintos de cero; JSON legible por máquinas en stdout, diagnósticos en stderr. Se integra en GitHub Actions o GitLab CI en un solo paso.
 - 🤖 **Multirruntime.** Implementación canónica en Node.js más un port de Python 3 incluido para flujos de trabajo impulsados por agentes, mantenidos coherentes por una suite de conformance compartida.
-- ✅ **Diseñado para producción.** 573 tests en 97 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
+- ✅ **Diseñado para producción.** 666 tests en 97 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
 
 ---
 
@@ -134,7 +134,7 @@ Genera JSON-LD Schema.org para tipos `Article`, `NewsArticle`, `FAQ`, `Product`,
 # Previsualizar JSON-LD sin escribir en disco
 node bin/cli.js schema contenido/articulo.md article
 
-# Inyectar JSON-LD con copia de seguridad automática (Pro)
+# Inyectar JSON-LD con copia de seguridad automática
 node bin/cli.js inject contenido/articulo.md article --backup
 
 # Validar datos estructurados existentes
@@ -147,7 +147,7 @@ Audita `robots.txt` contra las políticas documentadas de crawlers de IA — cra
 
 ```bash
 node bin/cli.js robots audit public/robots.txt
-node bin/cli.js robots generate --preset search-visible  # Pro
+node bin/cli.js robots generate --preset search-visible
 ```
 
 ### Señalar
@@ -156,11 +156,11 @@ Genera archivos `llms.txt` y `llms-full.txt` siguiendo la propuesta de la comuni
 
 ```bash
 node bin/cli.js llmstxt audit public/llms.txt
-node bin/cli.js llmstxt generate contenido/ --recursive --site-url https://ejemplo.com  # Pro
+node bin/cli.js llmstxt generate contenido/ --recursive --site-url https://ejemplo.com
 # Solo Node: extrae campos YAML cuando una colección guarda el contenido en el frontmatter
 node bin/cli.js llmstxt generate contenido/ --recursive --site-url https://ejemplo.com \
   --full --frontmatter-fields body excerpt
-node bin/cli.js sitemap generate contenido/ --base-url https://ejemplo.com               # Pro
+node bin/cli.js sitemap generate contenido/ --base-url https://ejemplo.com
 ```
 
 ### SEO técnico
@@ -186,7 +186,7 @@ node bin/cli.js audit contenido/ --format json > base.json
 node bin/cli.js report contenido/ --compare base.json
 
 # Paquete de optimización en un solo paso
-node bin/cli.js generate-all contenido/ --site-url https://ejemplo.com  # Pro
+node bin/cli.js generate-all contenido/ --site-url https://ejemplo.com
 ```
 
 ---
@@ -221,19 +221,60 @@ node bin/cli.js audit ruta/al/contenido.md
 
 Una vez instalado, ejecuta los ejemplos de abajo como `geo-opt <comando>` (o `npx geo-opt <comando>`); la forma `node bin/cli.js <comando>` que aparece en este README es la invocación equivalente desde una copia del código fuente. Añade `--help` a cualquier comando para ver todos los argumentos y valores por defecto.
 
-### Integración con CI/CD
+### Del primer uso al gate de pre-merge
 
-Agrega un único paso a cualquier pipeline para aplicar un umbral mínimo de calidad de contenido en todo el sitio:
+El trabajo canónico es **checks locales y versionados para contenido Markdown,
+HTML y de sitios estáticos antes de merge, sin subir contenido propietario.**
+Cinco comandos te llevan del primer uso al gate de CI:
 
-```yaml
-# Ejemplo para GitHub Actions
-- name: Auditar calidad del contenido
-  run: node bin/cli.js audit contenido/ --recursive --threshold 70
-  env:
-    TOOLTICIAN_LICENSE_KEY: ${{ secrets.TOOLTICIAN_LICENSE_KEY }}
+```bash
+# 1. Instalar (o usa npx geo-opt … sin instalar nada)
+npm install -g geo-opt
+
+# 2. Primera auditoría local en un único archivo — sin red, sin registro
+geo-opt audit ruta/al/contenido.md
+
+# 3. Auditoría por lote de un directorio con gate de calidad para CI
+geo-opt audit content/ --recursive --threshold 70
+
+# 4. Salida legible por máquinas para tooling downstream
+geo-opt audit content/ --recursive --format json > geo-audit.json
+
+# 5. Paquete de optimización en un solo paso (auditoría + llms.txt + sitemap + robots)
+geo-opt generate-all content/ --site-url https://example.com
 ```
 
-El comando sale con código de error cuando algún archivo está por debajo del umbral, bloqueando deploys de contenido sin optimizar. El flag `--format json` emite salida legible por máquinas en stdout; los diagnósticos siempre van a stderr. En [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml) hay una plantilla lista para GitLab CI.
+Estos comandos encuentran problemas de calidad de contenido y producen guía de
+remediación. Son **hallazgos de QA**, nunca una predicción de ranking o citación.
+
+### Integración con CI/CD
+
+Agrega un único paso a cualquier pipeline para aplicar un umbral mínimo de
+calidad de contenido en todo el sitio. No se requiere clave de licencia para los
+gates de auditoría/umbral; `TOOLTICIAN_LICENSE_KEY` sólo se necesita para el
+comando Pro `report` o `--no-branding`.
+
+```yaml
+# .github/workflows/geo-opt.yml
+name: Content quality gate
+on: [pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g geo-opt
+      - run: geo-opt audit content/ --recursive --threshold 70
+```
+
+El comando sale con código de error cuando algún archivo está por debajo del
+umbral, bloqueando deploys de contenido sin optimizar. El flag `--format json`
+emite salida legible por máquinas en stdout; los diagnósticos siempre van a
+stderr. En [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml) hay una
+plantilla lista para GitLab CI.
 
 ---
 
@@ -243,16 +284,16 @@ El comando sale con código de error cuando algún archivo está por debajo del 
 |---|---|---|
 | `audit [archivos...]` | Free + Pro | Puntúa contenido; admite `--recursive`, `--format json`, `--summary`, `--threshold <n>`, `--model v2` |
 | `technical [archivos...]` | Free + Pro | Audita HTML buscando fundamentos técnicos de SEO/GEO; archivos locales sin red, `--url`/`--sitemap` para remoto con protecciones SSRF |
-| `schema <archivo> <tipo>` | Free + Pro | Imprime el JSON-LD generado en stdout |
+| `schema <archivo> <tipo>` | Free + Pro | Imprime el JSON-LD generado en stdout. Tipos Community: `article`, `news-article`, `faq`, `product`. Tipos Pro: `course`, `event`, `recipe`, `howto` |
 | `validate <archivo>` | Free + Pro | Inspecciona y verifica bloques JSON-LD en Markdown o HTML |
-| `inject <archivo> <tipo>` | Pro | Escribe el JSON-LD en el archivo; admite `--dry-run`, `--backup`, `--recursive`, `--no-branding` |
+| `inject <archivo> <tipo>` | Free + Pro | Escribe el JSON-LD en el archivo; admite `--dry-run`, `--backup`, `--recursive`. `--no-branding` es Pro |
 | `robots audit <archivo>` | Free + Pro | Evalúa la política de crawlers; `--format json` para salida de máquina |
-| `robots generate` | Pro | Genera `robots.txt` con preset `search-visible` u `open` |
+| `robots generate` | Free + Pro | Genera `robots.txt` con preset `search-visible` u `open` |
 | `llmstxt audit <archivo>` | Free + Pro | Valida la estructura y comprueba la cobertura del contenido |
-| `llmstxt generate [archivos...]` | Pro | Crea `llms.txt` y opcionalmente `llms-full.txt`; Node también admite `--frontmatter-fields` |
-| `sitemap generate [archivos...]` | Pro | Genera `sitemap.xml` con prioridades derivadas de GEO |
+| `llmstxt generate [archivos...]` | Free + Pro | Crea `llms.txt` y opcionalmente `llms-full.txt`; Node también admite `--frontmatter-fields` |
+| `sitemap generate [archivos...]` | Free + Pro | Genera `sitemap.xml` con prioridades derivadas de GEO |
 | `report [archivos...]` | Pro | Reporte HTML independiente; `--compare <base.json>` para comparar antes/después |
-| `generate-all [dir]` | Pro | Paquete en un solo paso: reporte de auditoría, schema, `llms.txt` y `sitemap.xml` |
+| `generate-all [dir]` | Free + Pro | Paquete en un solo paso: reporte de auditoría, schema, `llms.txt` y `sitemap.xml` |
 | `badge <archivo>` | Free + Pro | Genera un badge de puntuación GEO para el archivo |
 | `init` | Free + Pro | Crea un archivo `geo_config.json` inicial |
 | `config get\|set` | Free + Pro | Administra preferencias locales (recordatorios, telemetría) |
@@ -274,29 +315,30 @@ Cada heurística y recomendación lleva una etiqueta que describe la calidad del
 
 ## Free vs. Pro
 
-**Si lo lees, es Free. Si lo escribes o escalas, es Pro.**
+**Community es completo. Pro añade reportes, salida sin marca y tipos de schema avanzados.**
+
+La titularidad Pro gatinga exactamente tres superficies: el comando `report`, el flag `--no-branding` (en `inject` y `report`), y los tipos Schema.org Pro (`course`, `event`, `recipe`, `howto`). Todo lo demás — auditorías recursivas y multi-archivo, umbrales de CI, `inject`, `robots generate`, `llmstxt generate`, `sitemap generate`, `generate-all`, `technical`, y todas las funciones de lectura/escritura/lote de la librería — funciona en Community sin clave de licencia.
 
 | Capacidad | Free | Pro |
 |---|---|---|
 | Auditar archivos individuales | Sí | Sí |
-| Auditar múltiples archivos / directorios | No | Sí |
-| Umbrales de calidad para CI/CD | No | Sí |
+| Auditar múltiples archivos / directorios | Sí | Sí |
+| Umbrales de calidad para CI/CD | Sí | Sí |
 | Generar JSON-LD (stdout, con branding) | Sí | Sí |
-| Inyectar JSON-LD en archivos | No | Sí |
-| Inyección en lote (`--recursive`) | No | Sí |
+| Inyectar JSON-LD en archivos | Sí | Sí |
+| Inyección en lote (`--recursive`) | Sí | Sí |
 | Salida sin marca (`--no-branding`) | No | Sí |
 | Validar JSON-LD | Sí | Sí |
-| Auditoría técnica de HTML (archivos locales) | Sí | Sí |
+| Auditoría técnica de HTML (local + remoto) | Sí | Sí |
 | Auditar `robots.txt` | Sí | Sí |
-| Generar `robots.txt` | No | Sí |
+| Generar `robots.txt` | Sí | Sí |
 | Auditar `llms.txt` | Sí | Sí |
-| Generar `llms.txt` | No | Sí |
-| Generar `sitemap.xml` | No | Sí |
+| Generar `llms.txt` | Sí | Sí |
+| Generar `sitemap.xml` | Sí | Sí |
+| Paquete de optimización en un paso (`generate-all`) | Sí | Sí |
 | Reportes HTML con comparación antes/después | No | Sí |
-| Paquete de optimización en un paso (`generate-all`) | No | Sí |
 | Tipos de schema disponibles | `article`, `news-article`, `faq`, `product` | Todos los de Free + `course`, `event`, `recipe`, `howto` |
-| Librería JavaScript — funciones de lectura | Sí | Sí |
-| Librería JavaScript — funciones de escritura / lote | No | Sí |
+| Librería JavaScript — funciones de lectura, escritura y lote | Sí | Sí |
 
 La matriz completa de funcionalidades, incluyendo la superficie completa de la API JavaScript, está en [`docs/free-vs-pro.md`](docs/free-vs-pro.md).
 
@@ -396,7 +438,7 @@ El diseño completo de telemetría opt-in (actualmente inactivo) está documenta
 
 ```bash
 npm run check          # suite completa: lint + formato + tests JS + tests Python + conformance + typecheck + changelog
-npm test               # 573 tests · 97 suites · 0 fallos (Node.js)
+npm test               # 666 tests · 97 suites · 0 fallos (Node.js)
 npm run test:python    # suite de tests del port de compatibilidad Python (38 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier en modo dry-run

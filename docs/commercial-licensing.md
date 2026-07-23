@@ -1,12 +1,13 @@
 # Commercial licensing
 
 **Status:** implemented-behavior summary, not an offer
-**Last verified:** 2026-06-29 at commit `5ee9c0c`
+**Last verified:** 2026-07-22 at commit `b2e6055`
 
-`geo-opt` is currently distributed under the Tooltician Community License 1.0
-with a separate commercial path for customers that need batch and recursive
-workflows, file generation and injection, CI/CD quality gates, branding-free
-output, or rights beyond the Community terms. The commercial path is not yet
+`geo-opt` is currently distributed under the Tooltician Community License 1.0.
+The Community edition is a complete, functional, local-first toolkit; a separate
+commercial path exists for customers who need the Pro-only surfaces:
+standalone HTML audit reports, branding-free output, and the advanced Schema.org
+types (`course`, `event`, `recipe`, `howto`). The commercial path is not yet
 generally available because the included terms still require qualified legal
 review.
 
@@ -18,16 +19,17 @@ offer to sell a license.
 | Capability | Community | Commercial entitlement |
 |---|---|---|
 | Auditoría de un solo archivo (`audit <file>`) | Incluido | Incluido |
-| Auditoría recursiva, multi-archivo y agregados | ❌ | Incluido |
-| `audit --threshold` (CI/CD quality gate) | ❌ | Incluido |
-| Generación JSON-LD por stdout (`schema`) | Incluido, con branding | Incluido |
+| Auditoría recursiva, multi-archivo y agregados | Incluido | Incluido |
+| `audit --threshold` (CI/CD quality gate) | Incluido | Incluido |
+| Generación JSON-LD por stdout (`schema`), tipos Community | Incluido, con branding | Incluido |
+| Generación JSON-LD, tipos Pro (`course`, `event`, `recipe`, `howto`) | ❌ | Incluido |
 | Validación JSON-LD (`validate`) | Incluido | Incluido |
-| Inyección JSON-LD (`inject`) | ❌ | Incluido |
-| `robots.txt` y `llms.txt` auditoría | Incluido | Incluido |
-| `robots.txt` y `llms.txt` generación | ❌ | Incluido |
+| Inyección JSON-LD (`inject`) | Incluido (con branding) | Incluido |
 | `--no-branding` | ❌ | Incluido con titularidad válida |
-| API de librería: funciones de lectura | Incluido | Incluido |
-| API de librería: funciones de lote y escritura | ❌ | Incluido |
+| `robots.txt` y `llms.txt` auditoría y generación | Incluido | Incluido |
+| `sitemap generate`, `generate-all`, `badge` | Incluido | Incluido |
+| Reportes HTML con comparación antes/después (`report`) | ❌ | Incluido |
+| API de librería: funciones de lectura, escritura y lote | Incluido | Incluido |
 | Acceso al código fuente | Community License terms | Términos comerciales aplicables |
 | Recordatorios de soporte | Infrecuentes y desactivables | Suprimidos |
 | Redistribución, embedding u OEM | Solo términos Community | Requiere autorización escrita expresa |
@@ -56,9 +58,11 @@ to source control.
 }
 ```
 
-Cuando no hay una titularidad válida, las operaciones de lectura sobre un solo
-archivo y la generación de schema por stdout permanecen utilizables. Las
-operaciones de lote, escritura y generación de archivos requieren Pro. Consulta
+Sin una titularidad válida, todas las capacidades de la tabla anterior marcadas
+como Community siguen funcionando: auditoría recursiva, umbrales de CI,
+inyección, generación de `robots.txt`/`llms.txt`/`sitemap.xml`, `generate-all`,
+y la API de lectura/escritura/lote. Sólo `report`, `--no-branding` y los tipos de
+schema Pro requieren titularidad. Consulta
 [`docs/free-vs-pro.md`](free-vs-pro.md) para el desglose completo.
 
 ## Community reminder policy
