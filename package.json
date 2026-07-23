@@ -1,6 +1,6 @@
 {
   "name": "geo-opt",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Source-available AI-discoverability CLI: GEO content audit, Schema.org JSON-LD, technical SEO, robots.txt, sitemap.xml, and llms.txt — 100% local.",
   "main": "dist/index.js",
   "types": "index.d.ts",

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1](https://github.com/cortega26/geo-opt/compare/v2.2.0...v2.2.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **deps:** patch high-severity advisories in brace-expansion and fast-xml-parser ([#32](https://github.com/cortega26/geo-opt/issues/32)) ([ccca80f](https://github.com/cortega26/geo-opt/commit/ccca80f0cf216eea7ec264ecf4df45a35c990ce2)), closes [hi#severity](https://github.com/hi/issues/severity) [hi#severity](https://github.com/hi/issues/severity)
+
 # [2.2.0](https://github.com/cortega26/geo-opt/compare/v2.1.3...v2.2.0) (2026-07-05)
 
 
