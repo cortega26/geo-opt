@@ -1,51 +1,72 @@
 # Free vs. Pro
 
-`geo-opt` es un toolkit de descubribilidad por IA — GEO (Generative Engine Optimization), datos estructurados y SEO técnico — que viene en dos ediciones. La edición **Free** permite auditar, validar y evaluar cualquier página individual sin costo ni registro. La edición **Pro** desbloquea la optimización automatizada, la escritura directa de archivos y el procesamiento a escala de sitio completo, con acceso a más de 15 comandos adicionales y a la API (Application Programming Interface) de librería avanzada descrita en esta página.
+`geo-opt` is an AI-discoverability toolkit — GEO (Generative Engine Optimization),
+structured data, and technical SEO — that comes in two editions. The **Community**
+edition is a complete, functional, local-first toolkit: it audits, generates,
+injects, and validates across Markdown and HTML, including recursive/batch
+workflows, CI thresholds, and full artifact generation. The **Pro** edition adds
+standalone HTML reports, branding-free output, and advanced Schema.org types.
 
-Si puedes leerlo, es Free. Si lo escribes o lo escalas, es Pro.
+**Verified 2026-07-22** against runtime at `b2e6055`. Runtime and tests outrank
+prose; if a claim here disagrees with `bin/cli.js` or `src/`, the source is correct.
 
-## Tabla comparativa
+## What Pro actually gates
 
-### Comandos CLI
+Pro entitlement gates exactly three surfaces:
 
-| Comando | Free | Pro |
+1. The `report` command (standalone HTML audit reports with charts and
+   before/after comparison).
+2. The `--no-branding` flag on `inject` (and on `report`).
+3. The Pro Schema.org types: `course`, `event`, `recipe`, `howto`.
+
+Everything else in the CLI and library — recursive and multi-file audits, CI
+thresholds, `inject`, `robots generate`, `llmstxt generate`, `sitemap generate`,
+`generate-all`, `technical`, all read functions, and all write/batch library
+functions — runs Community-side without a license key.
+
+## Tabla comparativa — Comandos CLI
+
+| Comando | Community | Pro |
 |---|---|---|
-| `audit <file>` | ✅ Un solo archivo | ✅ |
-| `audit <file1> <file2> ...` | ❌ | ✅ Multi-archivo |
-| `audit --recursive` | ❌ | ✅ Directorios completos |
-| `audit --summary` | ❌ | ✅ Agregado de sitio |
-| `audit --threshold <n>` | ❌ | ✅ Quality gate de CI/CD |
-| `schema <file> <type>` | ✅ Por stdout, con branding | ✅ |
+| `audit [files...]` | ✅ Incluye `--recursive`, `--summary`, `--threshold`, `--format json`, multi-archivo | ✅ |
+| `technical [files...]` | ✅ Local offline; `--url`/`--sitemap` con protecciones SSRF | ✅ |
+| `schema <file> <type>` | ✅ Tipos Community (`article`, `news-article`, `faq`, `product`) por stdout, con branding | ✅ |
+| `schema <file> <type>` (tipos Pro) | ❌ `course`, `event`, `recipe`, `howto` requieren Pro | ✅ |
 | `validate <file>` | ✅ | ✅ |
-| `inject <file> <type>` | ❌ | ✅ Inyección en archivo |
-| `inject --recursive` | ❌ | ✅ Inyección por lote |
-| `inject --no-branding` | ❌ | ✅ Sin marca Tooltician |
+| `inject <file> <type>` | ✅ Incluye `--dry-run`, `--backup`, `--recursive` | ✅ |
+| `inject --no-branding` | ❌ Requiere Pro | ✅ |
 | `robots audit <file>` | ✅ | ✅ |
-| `robots generate` | ❌ | ✅ Genera `robots.txt` |
+| `robots generate` | ✅ Presets `search-visible` u `open` | ✅ |
 | `llmstxt audit <file>` | ✅ | ✅ |
-| `llmstxt audit --recursive` | ❌ | ✅ Coverage de sitio |
-| `llmstxt generate` | ❌ | ✅ Genera `llms.txt` |
-| `init` | ✅ | ✅ |
-| `config get/set` | ✅ | ✅ |
-| `badge <file>` | ✅ Single file GEO badge | ✅ |
+| `llmstxt generate` | ✅ Incluye `--recursive`, `--full`, `--frontmatter-fields` (Node) | ✅ |
+| `sitemap generate` | ✅ | ✅ |
+| `generate-all [dir]` | ✅ Paquete completo: auditoría, schema, `llms.txt`, `sitemap.xml`, `robots.txt` | ✅ |
+| `badge <file>` | ✅ | ✅ |
+| `init`, `config get/set` | ✅ | ✅ |
+| `report [files...]` | ❌ Requiere Pro | ✅ Reportes HTML con gráficos y `--compare <baseline.json>` |
 
-### API de librería JavaScript
+## API de librería JavaScript
 
-| Función | Free | Pro |
+The library exports the full surface; Pro enforcement happens inside specific
+function bodies for the three gated surfaces above (`report` rendering,
+`--no-branding`, Pro schema types). Write and batch functions are callable from
+Community.
+
+| Función | Community | Pro |
 |---|---|---|
 | `scoreContent`, `scoreContentV2` | ✅ | ✅ |
 | `auditContent`, `auditFile` | ✅ | ✅ |
-| `auditFiles`, `aggregateReport` | ❌ | ✅ |
+| `auditFiles`, `aggregateReport` | ✅ | ✅ |
 | `observeContent`, `observeAndParse` | ✅ | ✅ |
-| `observeTechnicalHtml`, `auditTechnicalHtml`, `buildTechnicalFindings` | ❌ | ✅ |
-| `generateSchemaData` | ✅ | ✅ |
-| `injectSchema` | ❌ | ✅ |
-| `batchInject` | ❌ | ✅ |
+| `observeTechnicalHtml`, `auditTechnicalHtml`, `buildTechnicalFindings` | ✅ | ✅ |
+| `generateSchemaData` | ✅ Tipos Community; tipos Pro requieren titularidad | ✅ |
+| `injectSchema` | ✅ (con branding) | ✅ `--no-branding` requiere Pro |
+| `batchInject` | ✅ (con branding) | ✅ |
 | `validateSchemaFile` | ✅ | ✅ |
 | `auditRobots`, `checkRobots` | ✅ | ✅ |
-| `generateRobotsTxt` | ❌ | ✅ |
+| `generateRobotsTxt` | ✅ | ✅ |
 | `auditLlmsTxt` | ✅ | ✅ |
-| `generateLlmsTxt`, `generateLlmsFullTxt` | ❌ | ✅ |
+| `generateLlmsTxt`, `generateLlmsFullTxt` | ✅ | ✅ |
 | `discoverFiles`, `extractPageMetadata`, `resolvePageUrl` | ✅ | ✅ |
 | `createFinding`, `buildReportMeta`, `mapLegacyToFindings` | ✅ | ✅ |
 | `loadConfig` | ✅ | ✅ |
@@ -74,36 +95,31 @@ mensaje descriptivo y código de salida distinto de cero.
 
 ## Flujo de ejemplo
 
-### Free: audita y evalúa
+### Community: audita, genera e inyecta
 
 ```bash
-# Auditar una página individual
-node bin/cli.js audit mi-articulo.md
-
-# Ver el JSON-LD que se generaría (con branding)
-node bin/cli.js schema mi-articulo.md article
-
-# Validar JSON-LD existente
-node bin/cli.js validate mi-articulo.md
-
-# Revisar el robots.txt
-node bin/cli.js robots audit public/robots.txt
-```
-
-### Pro: optimiza y escala
-
-```bash
-# Auditar todo el sitio de una vez
-node bin/cli.js audit content/ --recursive --summary --format json
-
-# Fallar en CI si alguna página no alcanza el umbral
+# Auditar un directorio completo con umbral de calidad para CI
 node bin/cli.js audit content/ --recursive --threshold 70
 
-# Inyectar JSON-LD sin marca en todo el sitio
+# Inyectar JSON-LD con backup automático (con branding)
+node bin/cli.js inject content/article.md article --backup
+
+# Generar el paquete GEO completo (auditoría + llms.txt + sitemap + robots)
+node bin/cli.js generate-all content/ --site-url https://example.com
+```
+
+### Pro: reportes HTML y salida sin marca
+
+```bash
+# Generar reporte HTML con gráficos y comparación antes/después
+node bin/cli.js audit content/ --format json > baseline.json
+node bin/cli.js report content/ --compare baseline.json
+
+# Inyectar JSON-LD sin marca Tooltician en todo el sitio
 node bin/cli.js inject content/ article --recursive --no-branding
 
-# Generar llms.txt con cobertura completa
-node bin/cli.js llmstxt generate content/ --recursive --site-url https://example.com --full
+# Generar schema de tipo Pro (course, event, recipe, howto)
+node bin/cli.js schema content/course-page.md course
 ```
 
 ## Recordatorios de soporte comunitario

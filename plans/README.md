@@ -1,11 +1,12 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-06-29 — Community/Pro reauditoria filed; plan 023 reconciled DONE; advisor audit 041–050 DONE; library/dependency adoption cluster 051–056 filed (short-term 051–053, medium 054–055, long-term/DEFERRED 056)
+**Last reconciled:** 2026-07-22 — Plan 058 factual product-truth reconciliation complete (Community/Pro docs match runtime gates; local-to-CI onboarding route added; stale launch-content drafts quarantined as historical). Plan 059 remains TODO pending owner start date. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
 **Pro gate:** P0 GO (038–040 done, 2026-06-28) ✓  
-**Business gate:** ACTIVE (018 S02 done 2026-06-29; S03–S07 superseded by DEC-003; next: S02.5 LinkedIn launch)
+**Business gate:** ACTIVE (Plan 058 factual truth/onboarding → Plan 059 90-day product-led adoption validation; Plan 018 is historical context, not the execution master)
 
 This file is the single source of truth for current execution order. Individual
 plan files are self-contained handoffs; `plans/archive/` is historical evidence
@@ -33,12 +34,16 @@ Statuses: `READY`, `TODO`, `IN PROGRESS`, `PARTIAL`, `BLOCKED`, `DEFERRED`,
 
 ## Roadmap
 
-Direction decision (2026-06-29): business validation reactivated via organic
-launch (LinkedIn + Community hook replacing traditional customer discovery).
-Monetization proposals adapt to observable metrics instead of interviews.
-Technical tracks (quality hardening, Pro differentiation) are complete.
-The project now focuses on **go-to-market execution** — launch the free
-Community edition, drive adoption, and convert power users to Pro.
+Historical direction (2026-06-29): LinkedIn + Community was proposed as a
+replacement for traditional discovery. It is retained in Plan 018 as a dated
+hypothesis, not current execution.
+
+Current direction (2026-07-22): validate one product-led job for a solo
+maintainer—local, version-controlled quality checks for Markdown, HTML, and
+static-site content before merge, without uploading proprietary content.
+Technical tracks are complete. The next work is product truth and durable
+onboarding/discoverability, not a LinkedIn campaign, sales funnel, paid tier,
+or feature expansion.
 
 | Horizon   | Track              | Outcome                                              | Plans / slices                  | Gate      |
 | --------- | ------------------ | ---------------------------------------------------- | ------------------------------ | --------- |
@@ -46,9 +51,11 @@ Community edition, drive adoption, and convert power users to Pro.
 | ~~Now~~   | ~~Pro differentiation~~ | ~~Compelling upgrade from Community → Pro~~         | ~~038–040~~                     | P0 ✓      |
 | ~~Next~~  | ~~Product correctness~~ | ~~Defensible structured data and `llms.txt` behavior~~ | ~~024–025~~                  | T1 ✓      |
 | ~~Now~~   | ~~Technical expansion~~ | ~~Sitemap/remote audit, repository readiness~~    | ~~023~~                         | done ✓    |
-| Now       | Business validation | LinkedIn launch, Community as hook, site content     | 018 S02.5–S04 (adapted); [reaudit](business/pro-community-reaudit-2026-06-29.md) | G1 |
-| Deferred  | Pro product suite  | Reports, baselines, CI entitlements                  | 018 S10–S15                     | after Q0   |
-| Deferred  | Hosted product     | Workspace, history, monitoring                       | 018 S19+                        | after G4   |
+| Now       | Product-led validation | Truthful local-to-CI entry, then independent adoption/pain/WTP evidence | [058](058-relaunch-community-validation.md) → [059](059-rebaseline-g1-evidence-cohort.md); 018 is historical context | A1/A2/A3 at day 90 |
+| Deferred  | Paid workflow / exceptional service | At most one evidenced self-service workflow; a service only on unsolicited inbound | [060](060-decide-community-pro-boundary.md), then [061](061-prepare-bounded-diagnostic-intake.md) only if separately triggered | 059 `CONTINUE`, capacity/economics |
+| Deferred  | Product-direction spikes | Baseline, frontmatter, and preflight only on their own real-workflow evidence | [062](062-spike-versioned-site-baselines.md), [063](063-normalize-generate-all-frontmatter.md), [064](064-spike-three-pillar-preflight.md) | independent demand; no sequence |
+| Deferred  | Pro product suite  | Commercial work only after a viable paid workflow is evidenced | 018 S10–S15                     | after 060 separate decision |
+| Deferred  | Hosted product     | Workspace, history, monitoring                       | 018 S19+                        | repeated paid/recurrent workflow |
 | Deferred  | Evaluation         | Reproducible citation evaluation                     | 028                             | budget     |
 | Deferred  | Engine adapters    | Provider adapters, IndexNow, freshness               | 027                             | demand     |
 
@@ -65,11 +72,16 @@ T0 (029–034) COMPLETE ✓
         │       │
         │       └── 024 (structured data) DONE ── 025 (llms artifacts) DONE
         │
-        ├── Business track (018 S02.5 → S03 → S04) IN PROGRESS
+        ├── Product-led track (058 DONE → 059 TODO) ACTIVE
         │       │
-        │       └── DEC-003: LinkedIn + Community hook (2026-06-29)
+        │       ├── historical context: 018 and Pro dossier (parked)
+        │       ├── CONTINUE (A1 + A2 + A3) → 060 paid-workflow evaluation
+        │       ├── unsolicited inbound + capacity/economics → 061 exception
+        │       ├── separate real-workflow triggers → 062 / 063 / 064
+        │       └── PARTIAL → one docs/onboarding adjustment
+        │           MAINTENANCE → six-month commercial/feature freeze
         │
-        └── Deferred: 018 S08–S15 (post-G1), 027–028
+        └── Deferred: 018 S08–S15, 027–028
                 (026 SUPERSEDED)
 ```
 
@@ -247,7 +259,7 @@ GitHub Issue when it hits a real `geo-opt` defect.
 
 | Plan | Title | Cat | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
-| [057](057-positioning-and-defect-reporting.md) | Reposition as three-pillar AI-discoverability toolkit + optional agent defect-reporting protocol (docs + skill + issue template; no runtime change) | positioning / dx | P2 | M | — | TODO |
+| [057](057-positioning-and-defect-reporting.md) | Three-pillar umbrella + optional defect-reporting protocol; not the active acquisition message | positioning / dx | P3 | M | 058 for positioning | DEFERRED |
 
 ### Deferred (by owner decision 2026-06-27)
 
@@ -296,17 +308,81 @@ P0 is `GO` when:
 - Community edition shows clear upgrade prompts for Pro features;
 - README and docs describe the Community/Pro boundary explicitly.
 
-## Business program (ACTIVE)
+## Business program (ACTIVE — product-led validation)
 
-[018 Tooltician AI Discoverability](018-build-tooltician-ai-discoverability-business.md)
-is active again after Q0 and P0. The current motion is DEC-003: organic launch
-through LinkedIn with Community as the hook, then G1 evaluation from observable
-adoption signals. The Community/Pro reauditoria is recorded in
-[`business/pro-community-reaudit-2026-06-29.md`](business/pro-community-reaudit-2026-06-29.md).
+The active program is [Plan 058](058-relaunch-community-validation.md) followed
+by [Plan 059](059-rebaseline-g1-evidence-cohort.md). It is deliberately aligned
+with one solo maintainer who prefers quality-led, asynchronous adoption over
+selling: truthful documentation, a copy-paste CI/pre-merge path, durable
+technical examples, and replies to real inbound feedback.
 
-Current recommendation: execute 018 S02.5, create
-`plans/business/funnel-and-metrics.md`, and do not build Workspace, prompt
-tracking or new Pro epics before G1/G4 gates justify them.
+The current audience is repository-based Markdown/HTML/static-site maintainers,
+not agencies as a default sales motion. Do not make the founder's LinkedIn reach
+the experiment, solicit consulting, or create a paid funnel. Quality is not a
+distribution strategy by itself, so the experiment permits discoverable assets
+that remain valuable even if nobody buys.
+
+[Plan 018](018-build-tooltician-ai-discoverability-business.md), the old G1
+funnel, and the Community/Pro re-audit are historical business context. They do
+not authorize a public Pro launch, Diagnostic, Monitoring, Workspace, or a
+feature roadmap. Plan 059's A1/A2/A3 continuation threshold is the only active
+commercial gate.
+
+### Pro public-launch viability review (DRAFT)
+
+[`pro-viability/README.md`](pro-viability/README.md) is a parked decision
+dossier, not a launch program. It cannot advance during Plan 059. It preserves
+four reviewable parts for a future, evidence-backed single-workflow evaluation:
+
+| Part | Decision | Status |
+|---|---|---|
+| [Community/Pro boundary and offer](pro-viability/01-product-boundary-and-offer.md) | What is paid and whether the US$49 Individual SKU is credible | DRAFT |
+| [Entitlement architecture](pro-viability/02-entitlement-architecture.md) | Polar activation, offline grace, API/CLI and Python scope | DRAFT |
+| [Commercial, legal and operations](pro-viability/03-commercial-legal-operations.md) | Chilean seller, MoR, terms, tax, refund and support readiness | DRAFT |
+| [Launch economics and gates](pro-viability/04-launch-economics-and-gates.md) | Costs, rollout, metrics, rollback and 60-day decision | DRAFT |
+
+Do not review the parts merely because 90 days pass. Reopen them only after
+Plan 059 `CONTINUE`, a repeated job, a named paid workflow, and a realistic
+solo-maintainer support/economics model. No checkout, public price, licensing
+implementation, or broad plan-018 revival is authorized while they remain
+DRAFT or ADAPT.
+
+### Selected advisor directions (2026-07-22)
+
+The maintainer selected the net-positive directions and then applied a
+solo-founder operating-fit filter. The repository first establishes factual
+product truth, then runs one small product-led experiment; it does not treat a
+dated social draft, passive metrics, or technical completeness as a business.
+
+| Plan | Status | Decision / outcome | Dependency |
+| --- | --- | --- | --- |
+| [057](057-positioning-and-defect-reporting.md) | DEFERRED | Keep the three-pillar umbrella factual; keep defect reporting separate | 058 for positioning; actual DX need for Part B |
+| [058](058-relaunch-community-validation.md) | DONE | Corrected runtime/documentation truth and established a narrow local-to-CI entry (2026-07-22) | none |
+| [059](059-rebaseline-g1-evidence-cohort.md) | TODO | Run a capped 90-day product-led test and record A1/A2/A3 decision | 058; owner start date and discoverability surface |
+| [060](060-decide-community-pro-boundary.md) | DEFERRED | Evaluate one paid workflow only if product-led evidence and economics justify it | 059 `CONTINUE`; named WTP; capacity model |
+| [061](061-prepare-bounded-diagnostic-intake.md) | DEFERRED | Consider a bounded human service only as unsolicited-inbound exception | 059 `CONTINUE`; inbound; owner choice/capacity/economics |
+| [062](062-spike-versioned-site-baselines.md) | DEFERRED | Design a baseline only after two independent reports of that job | 059 `CONTINUE`; specific repeated baseline pain |
+| [063](063-normalize-generate-all-frontmatter.md) | DEFERRED | Maintenance/DX correction only if a real workflow is blocked | documented workflow block or correctness priority |
+| [064](064-spike-three-pillar-preflight.md) | DEFERRED | Design a unified preflight only after two independent combined-workflow reports | 059 `CONTINUE`; specific repeated demand |
+
+Only one plan may be in progress. The immediate execution order is 058, then
+059. At the end of a real 90-day distribution effort, `CONTINUE` permits only
+the narrow review in 060; `PARTIAL` permits one evidence-backed onboarding or
+positioning adjustment; `MAINTENANCE` freezes commercial and feature expansion
+for six months. `DISTRIBUTION INCOMPLETE` is not a market verdict. These plans
+retain Plan 018 and the Pro dossier as history without treating them as current
+evidence.
+
+### Solo-founder operating guardrails
+
+- Cap Plan 059 at one focused day per week for 90 calendar days.
+- Spend that time only on correctness, first-run friction, one integration
+  path, durable documentation/examples, and real inbound feedback.
+- Do not build or sell Pro, services, Workspace, Monitoring, or speculative
+  features during the window; do not make personal LinkedIn reach the channel.
+- If the hard continuation threshold is missed after real distribution, keep
+  the package healthy in six-month maintenance mode rather than inventing a new
+  commercial program.
 
 ## Reconciliation of pre-T0 plans
 
