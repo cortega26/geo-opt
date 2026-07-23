@@ -21,6 +21,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Tests
+
+- Plan 058 §6.4/§6.6 tests now skip gracefully when maintainer-local
+  `plans/business/` and `plans/018-…md` files are absent (e.g. in CI or a
+  fresh clone), since `plans/` is git-ignored by design. They still verify
+  content when the files are present locally.
+
 ### Docs
 
 - Reconciled public Free/Pro capability claims with current runtime behavior

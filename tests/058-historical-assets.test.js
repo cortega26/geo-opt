@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -13,13 +13,29 @@ const launchDir = path.join(repoRoot, "plans", "business", "launch-content");
 // HISTORICAL / NOT APPROVED FOR PUBLICATION, and must not reference the
 // stale `cortega26/GEO-skill.git` repo URL (the actual repo is
 // `cortega26/geo-opt`). We do NOT rewrite the draft bodies.
+//
+// NOTE: `plans/business/launch-content/` is maintainer-local and git-ignored
+// (see docs/architecture.md and plans/058-work/spec.md §6.5). These files do
+// NOT exist in CI or a fresh clone. The tests below SKIP when the directory
+// is absent; they only assert content when the maintainer runs them locally
+// where the files are present.
 
 function read(rel) {
   return readFileSync(path.join(launchDir, rel), "utf8");
 }
 
 describe("Plan 058 §6.4 — stale campaign assets are quarantined", () => {
-  const files = readdirSync(launchDir).filter((f) => f.endsWith(".md"));
+  const present = existsSync(launchDir);
+  const files = present ? readdirSync(launchDir).filter((f) => f.endsWith(".md")) : [];
+
+  if (!present) {
+    it("launch-content directory is maintainer-local (skipped in CI)", () => {
+      // plans/ is git-ignored by design; nothing to verify in CI.
+      assert.ok(true);
+    });
+    return;
+  }
+
   assert.ok(files.length >= 4, `expected ≥4 launch-content files, found ${files.length}`);
 
   for (const f of files) {
@@ -59,11 +75,17 @@ describe("Plan 058 §6.4 — stale campaign assets are quarantined", () => {
 });
 
 describe("Plan 058 §6.4 — funnel record acknowledges the quarantine", () => {
+  const funnelPath = path.join(repoRoot, "plans", "business", "funnel-and-metrics.md");
+
+  if (!existsSync(funnelPath)) {
+    it("funnel-and-metrics.md is maintainer-local (skipped in CI)", () => {
+      assert.ok(true);
+    });
+    return;
+  }
+
   it("plans/business/funnel-and-metrics.md notes launch-content is quarantined", () => {
-    const text = readFileSync(
-      path.join(repoRoot, "plans", "business", "funnel-and-metrics.md"),
-      "utf8"
-    );
+    const text = readFileSync(funnelPath, "utf8");
     assert.match(
       text,
       /launch-content|quarantin|historical/iu,
