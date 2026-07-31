@@ -26,7 +26,7 @@
   `chore/065-harden-ci-entry-assets`; all done criteria re-verified).
   Review revision 1 (2026-07-31) applied: dead `format` input removed,
   stderr captured via `$RUNNER_TEMP`, `badge-url` documented, regression
-  assertions added. Merge is the maintainer's decision.
+  assertions added. Merged into main 2026-07-31 (squash, `d550d08`).
 
 ## Why this matters
 
