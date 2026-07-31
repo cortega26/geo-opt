@@ -28,6 +28,21 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Build
+
+- **CI security audit is no longer red on an unfixable advisory.** The
+  `Security audit` step ran `npm audit --audit-level=high`, which failed on
+  `main` (and blocked every open Dependabot PR) because of
+  [GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg)
+  in `brace-expansion`. That copy is bundled inside the npm CLI tarball
+  (`semantic-release` → `@semantic-release/npm` → `npm`), so `overrides`
+  cannot reach it, and npm 11.19.0 / 12.0.2 both still bundle the vulnerable
+  5.0.7. The step now runs `npm run audit:check`
+  (`scripts/check-audit.js`), which keeps blocking on every high/critical
+  advisory except a dated, justified allowlist. This deliberately avoids
+  `--omit=dev`, which would have suppressed the advisory by blinding the gate
+  to the whole dev toolchain. Dev-only; no runtime or published-package change.
+
 ### Tests
 
 - Plan 058 §6.4/§6.6 tests now skip gracefully when maintainer-local

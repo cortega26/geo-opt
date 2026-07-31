@@ -261,6 +261,16 @@ GitHub Issue when it hits a real `geo-opt` defect.
 |---|---|---|---|---|---|---|
 | [057](057-positioning-and-defect-reporting.md) | Three-pillar umbrella + optional defect-reporting protocol; not the active acquisition message | positioning / dx | P3 | M | 058 for positioning | DEFERRED |
 
+### Accepted security advisories
+
+Advisories that the CI gate (`scripts/check-audit.js`) blocks on are listed
+here whenever one is accepted rather than fixed, so a suppression is never
+silent. The gate itself carries the full justification.
+
+| Advisory | Package | Sev | Accepted | Recheck | Why unfixable |
+|---|---|---|---|---|---|
+| [GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg) | `brace-expansion` `<=5.0.7` | high | 2026-07-31 | 2026-10-31 | Bundled inside the npm CLI tarball via `semantic-release` → `@semantic-release/npm` → `npm`; `overrides` cannot reach bundled deps and npm 11.19.0 / 12.0.2 both still ship 5.0.7. Dev-only — `semantic-release` runs only in the Release workflow and is not reachable from published code. |
+
 ### Deferred (by owner decision 2026-06-27)
 
 | Plan / program | Reason |
