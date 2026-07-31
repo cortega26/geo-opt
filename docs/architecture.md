@@ -53,6 +53,13 @@ the current execution roadmap and architecture gate in the local
 The Python compatibility implementation lives at
 `.agents/skills/geo-optimization/scripts/geo_optimizer.py`.
 
+The `.agents/skills/geo-optimization/` directory is the bundled agent
+skill: `SKILL.md` is the entry point, backed by the canonical Node CLI
+(`bin/cli.js`) and the Python port above. It is distributed with the
+repository checkout only — it is not part of the npm package. Its
+capability boundaries follow the matrix below (v2 and the technical HTML
+audit are `Node-only`).
+
 ## Why JavaScript is canonical
 
 1. `bin/cli.js` is the package CLI entry point.

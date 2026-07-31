@@ -103,6 +103,7 @@ Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/ab
   - [Free vs. Pro](#free-vs-pro)
   - [Configuration](#configuration)
   - [JavaScript library](#javascript-library)
+  - [Agent skill](#agent-skill)
   - [Privacy guarantees](#privacy-guarantees)
   - [Development](#development)
   - [Research](#research)
@@ -455,6 +456,35 @@ npm run typecheck   # compiles tests/consumer.test.ts against index.d.ts
 ```
 
 Any new root export must update `index.d.ts` and the consumer fixture in the same change to keep the contract in sync.
+
+---
+
+## Agent skill
+
+**For AI coding agents.** The repository bundles an agent skill at
+[`.agents/skills/geo-optimization/`](.agents/skills/geo-optimization/) —
+[`SKILL.md`](.agents/skills/geo-optimization/SKILL.md) is the entry point.
+It walks an agent through the same three pillars as a workflow: audit →
+analyze → apply → inject schema → verify. Run the audit, review the
+scorecard, apply the content rules, inject the JSON-LD, and re-audit to
+confirm.
+
+**Two implementations.** Mirroring the skill's own docs: the canonical
+Node CLI (`node bin/cli.js`) and a capability-scoped Python port
+(`python3 scripts/geo_optimizer.py`). The Python port supports the legacy
+v1 audit and selected schema, robots, `llms.txt`, batch, config, and
+injection workflows; it does not currently support the v2 model or the
+technical HTML audit. See [`docs/architecture.md`](docs/architecture.md)
+for the normative capability matrix.
+
+**Distribution.** The skill ships with the repository checkout and is not
+part of the npm package.
+
+**Use it.** Copy the skill directory into your agent's skills path —
+`.claude/skills/` for Claude Code, or your agent's equivalent — and point
+the agent at `SKILL.md`. The skill's commands assume a `geo-opt`
+repository checkout — `node bin/cli.js` is the canonical CLI path; the
+Python port's scripts work from the copied directory.
 
 ---
 

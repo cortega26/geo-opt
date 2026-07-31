@@ -90,6 +90,7 @@ El modelo de puntuación está fundamentado en el [artículo GEO aceptado en KDD
 - [Free vs. Pro](#free-vs-pro)
 - [Configuración](#configuración)
 - [Librería JavaScript](#librería-javascript)
+- [Habilidad para agentes](#habilidad-para-agentes)
 - [Garantías de privacidad](#garantías-de-privacidad)
 - [Desarrollo](#desarrollo)
 - [Investigación](#investigación)
@@ -443,6 +444,36 @@ npm run typecheck   # compila tests/consumer.test.ts contra index.d.ts
 ```
 
 Cualquier nueva exportación raíz debe actualizar `index.d.ts` y la prueba de consumidor en el mismo cambio para mantener el contrato sincronizado.
+
+---
+
+## Habilidad para agentes
+
+**Para agentes de IA.** El repositorio incluye una habilidad para agentes
+en [`.agents/skills/geo-optimization/`](.agents/skills/geo-optimization/) —
+el punto de entrada es [`SKILL.md`](.agents/skills/geo-optimization/SKILL.md).
+Guía al agente por los mismos tres pilares como flujo de trabajo: auditar →
+analizar → aplicar → inyectar el esquema → verificar. Ejecuta la auditoría,
+revisa el informe de puntuación, aplica las reglas de contenido, inyecta el
+JSON-LD y vuelve a auditar para confirmar.
+
+**Dos implementaciones.** Como dice la propia documentación de la habilidad:
+el CLI canónico de Node (`node bin/cli.js`) y un puerto Python de alcance
+acotado (`python3 scripts/geo_optimizer.py`). El puerto Python admite la
+auditoría v1 heredada y flujos seleccionados de esquema, robots, `llms.txt`,
+lote, configuración e inyección; no admite actualmente el modelo v2 ni la
+auditoría técnica de HTML. Consulta la matriz de capacidades normativa en
+[`docs/architecture.md`](docs/architecture.md).
+
+**Distribución.** La habilidad se distribuye con el checkout del repositorio
+y no forma parte del paquete npm.
+
+**Cómo usarla.** Copia el directorio de la habilidad a la ruta de
+habilidades de tu agente — `.claude/skills/` en Claude Code, o el
+equivalente de tu agente — y apunta al agente a `SKILL.md`. Los comandos
+de la habilidad asumen un checkout del repositorio de `geo-opt` —
+`node bin/cli.js` es la ruta del CLI canónico; los scripts del puerto
+Python funcionan desde el directorio copiado.
 
 ---
 
