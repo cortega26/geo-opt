@@ -1,7 +1,7 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-07-22 — Plan 058 factual product-truth reconciliation complete (Community/Pro docs match runtime gates; local-to-CI onboarding route added; stale launch-content drafts quarantined as historical). Plan 059 remains TODO pending owner start date. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Last reconciled:** 2026-07-31 — plans 065–067 added (CI entry-asset hardening, agent-skill discoverability, quality-badge verification). Plan 058 factual product-truth reconciliation complete (2026-07-22); Plan 059 remains TODO pending owner start date. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
 **Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
@@ -384,6 +384,42 @@ positioning adjustment; `MAINTENANCE` freezes commercial and feature expansion
 for six months. `DISTRIBUTION INCOMPLETE` is not a market verdict. These plans
 retain Plan 018 and the Pro dossier as history without treating them as current
 evidence.
+
+### Advisor directions — 2026-07-31 (entry assets, skill discoverability, quality badges)
+
+Direction audit at commit `296b60f` (2026-07-31), `next` variant. All three
+plans serve the Plan 059 window (first-run friction, correctness of the
+entry surface, durable discoverability) without feature expansion; none
+requires product, pricing, or telemetry changes. Execute in order 065 →
+066 → 067; they are independent (no cross-dependencies) and the
+one-active-plan rule applies.
+
+| Plan | Title | Cat | Priority | Effort | Depends on | Status |
+|---|---|---|---|---|---|---|
+| [065](065-harden-ci-entry-assets.md) | Fix and test the CI entry assets (GitLab template include URL org 404; GitHub Action + GitLab score parse reads nonexistent `score` field — real field is `effectiveScore`, verified; document the action in README; contract test pins org/field/model default) | dx/docs | P1 | S | — | DONE (2026-07-31, review-approved; merge pending) |
+| [066](066-make-agent-skill-discoverable.md) | Make the bundled `geo-optimization` agent skill discoverable: README section (en+es), architecture-doc pointer; packaging note stays repo-only (skill paths are repo-layout-relative; npm `files` inclusion is a separate decision) | docs/direction | P2 | S | — | READY |
+| [067](067-verify-and-wire-quality-badges.md) | Verify quality badges against live runs: wire existing `check-test-count.js` into `npm run check` + CI; new `check-coverage.js` (c8 text-summary, floor semantics — measured branch coverage 81.33% ≥ badge 80, verified 2026-07-31) | dx | P3 | S | — | READY |
+
+Recommended order rationale: 065 first — it repairs the copy-paste CI
+surface that Plan 059 will point users at (a broken GitLab include 404s
+before the user runs anything; the action's score/badge always report 0);
+do it before the 90-day observation clock starts if possible. 066 and 067
+are cheap truth/discoverability wins that fit the one-day-per-week budget.
+
+Considered and rejected during this audit (do not re-file without new
+evidence):
+
+- **`tmp-cli-*` files and `deep-research/` in the repo root**: REJECTED —
+  both are locally ignored (`.git/info/exclude`, `.gitignore`); not public
+  hygiene issues.
+- **`README.es.md` out of sync**: REJECTED — heading parity verified.
+- **Stale `docs/architecture.md` wording about the `technical` CLI**:
+  REJECTED — already reconciled (2026-07-22).
+- **Python port removal / v2-parity expansion**: REJECTED — documented
+  capability-boundary decision (plan 034, capability matrix); no new
+  demand evidence.
+- **GitHub Action end-to-end smoke test in a scratch public repo**:
+  deferred to post-065 execution; out of scope for the plan itself.
 
 ### Solo-founder operating guardrails
 
