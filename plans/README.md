@@ -397,7 +397,7 @@ one-active-plan rule applies.
 | Plan | Title | Cat | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
 | [065](archive/065-harden-ci-entry-assets.md) | Fix and test the CI entry assets (GitLab template include URL org 404; GitHub Action + GitLab score parse reads nonexistent `score` field — real field is `effectiveScore`, verified; document the action in README; contract test pins org/field/model default) | dx/docs | P1 | S | — | DONE (2026-07-31; squash-merged as `d550d08`) |
-| [066](066-make-agent-skill-discoverable.md) | Make the bundled `geo-optimization` agent skill discoverable: README section (en+es), architecture-doc pointer; packaging note stays repo-only (skill paths are repo-layout-relative; npm `files` inclusion is a separate decision) | docs/direction | P2 | S | — | DONE (2026-07-31, review-approved; merge pending) |
+| [066](archive/066-make-agent-skill-discoverable.md) | Make the bundled `geo-optimization` agent skill discoverable: README section (en+es), architecture-doc pointer; packaging note stays repo-only (skill paths are repo-layout-relative; npm `files` inclusion is a separate decision) | docs/direction | P2 | S | — | DONE (2026-07-31; squash-merged as `e4a680c`) |
 | [067](067-verify-and-wire-quality-badges.md) | Verify quality badges against live runs: wire existing `check-test-count.js` into `npm run check` + CI; new `check-coverage.js` (c8 text-summary, floor semantics — measured branch coverage 81.33% ≥ badge 80, verified 2026-07-31) | dx | P3 | S | — | READY |
 
 Recommended order rationale: 065 first — it repairs the copy-paste CI
@@ -452,8 +452,8 @@ evidence):
 
 ## Completed history
 
-Plans 001–017, 019–021, 023–026, 029–056, 058, 065 are completed and stored
-under [`archive/`](archive/). The prior audit register is
+Plans 001–017, 019–021, 023–026, 029–056, 058, 065, 066 are completed and
+stored under [`archive/`](archive/). The prior audit register is
 [`archive/audit-findings-2026-06-25.md`](archive/audit-findings-2026-06-25.md).
 Historical pre-current-roadmap plans live under
 [`archive/public-history/`](archive/public-history/).

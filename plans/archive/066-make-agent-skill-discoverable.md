@@ -28,7 +28,7 @@
   headings are translated, so parity checks compare heading LEVELS, not
   strings. Review revision 1 (2026-07-31) applied: usage hint now states
   the checkout assumption (the skill's Node CLI path is checkout-only).
-  Merge is the maintainer's decision.
+  Merged into main 2026-07-31 (squash, `e4a680c`).
 
 ## Why this matters
 
