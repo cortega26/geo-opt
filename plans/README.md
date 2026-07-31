@@ -51,7 +51,7 @@ or feature expansion.
 | ~~Now~~   | ~~Pro differentiation~~ | ~~Compelling upgrade from Community → Pro~~         | ~~038–040~~                     | P0 ✓      |
 | ~~Next~~  | ~~Product correctness~~ | ~~Defensible structured data and `llms.txt` behavior~~ | ~~024–025~~                  | T1 ✓      |
 | ~~Now~~   | ~~Technical expansion~~ | ~~Sitemap/remote audit, repository readiness~~    | ~~023~~                         | done ✓    |
-| Now       | Product-led validation | Truthful local-to-CI entry, then independent adoption/pain/WTP evidence | [058](058-relaunch-community-validation.md) → [059](059-rebaseline-g1-evidence-cohort.md); 018 is historical context | A1/A2/A3 at day 90 |
+| Now       | Product-led validation | Truthful local-to-CI entry, then independent adoption/pain/WTP evidence | [058](archive/058-relaunch-community-validation.md) → [059](059-rebaseline-g1-evidence-cohort.md); 018 is historical context | A1/A2/A3 at day 90 |
 | Deferred  | Paid workflow / exceptional service | At most one evidenced self-service workflow; a service only on unsolicited inbound | [060](060-decide-community-pro-boundary.md), then [061](061-prepare-bounded-diagnostic-intake.md) only if separately triggered | 059 `CONTINUE`, capacity/economics |
 | Deferred  | Product-direction spikes | Baseline, frontmatter, and preflight only on their own real-workflow evidence | [062](062-spike-versioned-site-baselines.md), [063](063-normalize-generate-all-frontmatter.md), [064](064-spike-three-pillar-preflight.md) | independent demand; no sequence |
 | Deferred  | Pro product suite  | Commercial work only after a viable paid workflow is evidenced | 018 S10–S15                     | after 060 separate decision |
@@ -94,7 +94,7 @@ T0 (029–034) COMPLETE ✓
 | [029](archive/029-stabilize-audit-contracts.md) | Valid v2 findings and unambiguous report/model versions | DONE |
 | [030](archive/030-unify-audit-core-and-cli-boundaries.md) | One audit flow; core no longer owns process exits | DONE |
 | [031](archive/031-verify-public-api-and-types.md) | Runtime exports and declarations stay synchronized | DONE |
-| [032](032-build-reproducible-package.md) | Publishable artifact without tracked-source mutation | DONE |
+| [032](archive/032-build-reproducible-package.md) | Publishable artifact without tracked-source mutation | DONE |
 | [033](archive/033-modernize-runtimes-and-quality-gates.md) | Supported runtimes and risk-focused CI gates | DONE |
 | [034](archive/034-define-python-compatibility-tier.md) | Explicit, tested Node/Python capability contract | DONE |
 
@@ -126,7 +126,7 @@ AI discoverability — not just a score, but fixes.
 | [022](022-calibrate-profiled-audit-v2.md) | Program slice | Profile-aware v2 model (default switch: v2 is now default, migration note and deprecation warning added) | P1 | L | T0 done | DONE |
 | [024](archive/024-align-structured-data-semantics.md) | Execution | Accurate structured-data semantics | P1 | M | 030, 031, 034 | DONE |
 | [025](archive/025-harden-llms-artifacts.md) | Execution | Proposal-correct, curated artifacts | P2 | M | 024 | DONE |
-| [023](023-add-technical-discovery-audit.md) | Program slice | Phase 1 + 2 done (CLI technical, parseSitemapXml, remote fetch with SSRF guards per security review 2026-06-28) | P2 | L | T0 | DONE |
+| [023](archive/023-add-technical-discovery-audit.md) | Program slice | Phase 1 + 2 done (CLI technical, parseSitemapXml, remote fetch with SSRF guards per security review 2026-06-28) | P2 | L | T0 | DONE |
 | [026](archive/026-add-open-source-readiness.md) | Direction | Rule-pack readiness, not another engine | P3 | M | Q0, demand | SUPERSEDED |
 
 ### Advisor audit — post-Q0 quality fixes (2026-06-28)
@@ -139,16 +139,16 @@ Plans 048–050 cover the remaining positive-tradeoff findings from the same aud
 
 | Plan | Title | Cat | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
-| [041](041-fix-glob-ignore-translation.md) | Glob `**`/`*`/`?` ignore patterns translate correctly; no silent `.gitignore` discard | bug | P1 | S | — | DONE |
-| [042](042-add-typecheck-to-ci.md) | CI runs `npm run typecheck` (protect public `index.d.ts`) | dx | P1 | S | — | DONE |
-| [043](043-guard-all-artifact-writers.md) | CWD write-guard on robots/sitemap/llmstxt/generate-all writers | security | P2 | S | — | DONE |
-| [044](044-v2-safe-correctness-fixes.md) | Score-neutral v2 fixes: missing-h1 remediation, named v2 pronoun limit, reachable low confidence | bug | P2 | S | — | DONE |
-| [045](045-v2-quote-heading-detection-accuracy.md) | v2 quote/heading detection (mid-line + curly quotes, HTML DOM order, per-occurrence attribution) — **changes v2 scores** | bug | P2 | M | — | DONE |
-| [046](046-cover-sitemap-and-report-escaping.md) | Cover sitemap split/`validateSitemapXml` + HTML-report XSS-escaping regression tests | tests | P2 | S | — | DONE |
-| [047](047-fix-generate-all-sitemap-and-reread.md) | Fix `generate-all` sitemap `lastmod`; reuse audited content instead of re-reading | bug | P3 | M | — | DONE |
-| [048](048-consolidate-extract-page-metadata.md) | Consolidate `extractPageMetadata` — eliminate title divergence between JSON-LD and llms.txt for H1-less files | bug | P2 | S | — | DONE |
-| [049](049-tooling-hygiene.md) | Lint `tests/` (template-literal false positives, dead vars), expand pre-commit hook to lint + format | dx | P2 | S | — | DONE |
-| [050](050-core-layering-and-deduplication.md) | Extract `buildExplainLines` helper (scoring.js + renderer.js duplication); `injectSchema` returns result instead of printing | tech-debt | P3 | M | — | DONE |
+| [041](archive/041-fix-glob-ignore-translation.md) | Glob `**`/`*`/`?` ignore patterns translate correctly; no silent `.gitignore` discard | bug | P1 | S | — | DONE |
+| [042](archive/042-add-typecheck-to-ci.md) | CI runs `npm run typecheck` (protect public `index.d.ts`) | dx | P1 | S | — | DONE |
+| [043](archive/043-guard-all-artifact-writers.md) | CWD write-guard on robots/sitemap/llmstxt/generate-all writers | security | P2 | S | — | DONE |
+| [044](archive/044-v2-safe-correctness-fixes.md) | Score-neutral v2 fixes: missing-h1 remediation, named v2 pronoun limit, reachable low confidence | bug | P2 | S | — | DONE |
+| [045](archive/045-v2-quote-heading-detection-accuracy.md) | v2 quote/heading detection (mid-line + curly quotes, HTML DOM order, per-occurrence attribution) — **changes v2 scores** | bug | P2 | M | — | DONE |
+| [046](archive/046-cover-sitemap-and-report-escaping.md) | Cover sitemap split/`validateSitemapXml` + HTML-report XSS-escaping regression tests | tests | P2 | S | — | DONE |
+| [047](archive/047-fix-generate-all-sitemap-and-reread.md) | Fix `generate-all` sitemap `lastmod`; reuse audited content instead of re-reading | bug | P3 | M | — | DONE |
+| [048](archive/048-consolidate-extract-page-metadata.md) | Consolidate `extractPageMetadata` — eliminate title divergence between JSON-LD and llms.txt for H1-less files | bug | P2 | S | — | DONE |
+| [049](archive/049-tooling-hygiene.md) | Lint `tests/` (template-literal false positives, dead vars), expand pre-commit hook to lint + format | dx | P2 | S | — | DONE |
+| [050](archive/050-core-layering-and-deduplication.md) | Extract `buildExplainLines` helper (scoring.js + renderer.js duplication); `injectSchema` returns result instead of printing | tech-debt | P3 | M | — | DONE |
 
 Recommended execution order and dependency notes:
 
@@ -200,11 +200,11 @@ warrants. Short-term items also close monedario.cl audit findings
 
 | Plan | Title | Dep (tier) | Cat | Priority | Effort | Horizon | Depends on | Status |
 |---|---|---|---|---|---|---|---|---|
-| [051](051-yaml-frontmatter-parsing.md) | Parse YAML frontmatter with `yaml` (fixes stats/quotes/heading leakage #4/#5) | `yaml` (runtime) | bug+feature | P1 | M | short | — | DONE |
-| [052](052-fast-xml-parser-sitemap.md) | Parse sitemaps with `fast-xml-parser` (robust index/namespace/CDATA; relates to #2) | `fast-xml-parser` (runtime) | reliability+bug | P2 | M | short | — | DONE |
-| [053](053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | DONE |
-| [054](054-knip-dead-code-detection.md) | Add `knip` for unused file/export/dependency detection (non-blocking first) | `knip` (dev) | dx/tech-debt | P3 | S | medium | — | DONE |
-| [055](055-readability-metrics.md) | Bilingual reading-grade metrics via `text-readability` + custom Spanish formulas (Fernández-Huerta, Szigriszt-Pazos), gated by `lang` option | `text-readability` (runtime) | feature | P3 | M | medium | — | DONE |
+| [051](archive/051-yaml-frontmatter-parsing.md) | Parse YAML frontmatter with `yaml` (fixes stats/quotes/heading leakage #4/#5) | `yaml` (runtime) | bug+feature | P1 | M | short | — | DONE |
+| [052](archive/052-fast-xml-parser-sitemap.md) | Parse sitemaps with `fast-xml-parser` (robust index/namespace/CDATA; relates to #2) | `fast-xml-parser` (runtime) | reliability+bug | P2 | M | short | — | DONE |
+| [053](archive/053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | DONE |
+| [054](archive/054-knip-dead-code-detection.md) | Add `knip` for unused file/export/dependency detection (non-blocking first) | `knip` (dev) | dx/tech-debt | P3 | S | medium | — | DONE |
+| [055](archive/055-readability-metrics.md) | Bilingual reading-grade metrics via `text-readability` + custom Spanish formulas (Fernández-Huerta, Szigriszt-Pazos), gated by `lang` option | `text-readability` (runtime) | feature | P3 | M | medium | — | DONE |
 | [056](056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | near | — | READY |
 
 Recommended execution order:
@@ -322,7 +322,7 @@ P0 is `GO` when:
 
 ## Business program (ACTIVE — product-led validation)
 
-The active program is [Plan 058](058-relaunch-community-validation.md) followed
+The active program is [Plan 058](archive/058-relaunch-community-validation.md) followed
 by [Plan 059](059-rebaseline-g1-evidence-cohort.md). It is deliberately aligned
 with one solo maintainer who prefers quality-led, asynchronous adoption over
 selling: truthful documentation, a copy-paste CI/pre-merge path, durable
@@ -369,7 +369,7 @@ dated social draft, passive metrics, or technical completeness as a business.
 | Plan | Status | Decision / outcome | Dependency |
 | --- | --- | --- | --- |
 | [057](057-positioning-and-defect-reporting.md) | DEFERRED | Keep the three-pillar umbrella factual; keep defect reporting separate | 058 for positioning; actual DX need for Part B |
-| [058](058-relaunch-community-validation.md) | DONE | Corrected runtime/documentation truth and established a narrow local-to-CI entry (2026-07-22) | none |
+| [058](archive/058-relaunch-community-validation.md) | DONE | Corrected runtime/documentation truth and established a narrow local-to-CI entry (2026-07-22) | none |
 | [059](059-rebaseline-g1-evidence-cohort.md) | TODO | Run a capped 90-day product-led test and record A1/A2/A3 decision | 058; owner start date and discoverability surface |
 | [060](060-decide-community-pro-boundary.md) | DEFERRED | Evaluate one paid workflow only if product-led evidence and economics justify it | 059 `CONTINUE`; named WTP; capacity model |
 | [061](061-prepare-bounded-diagnostic-intake.md) | DEFERRED | Consider a bounded human service only as unsolicited-inbound exception | 059 `CONTINUE`; inbound; owner choice/capacity/economics |
@@ -416,7 +416,7 @@ evidence.
 
 ## Completed history
 
-Plans 001–017, 019–021, 024–026, 029–040 are completed and stored under
+Plans 001–017, 019–021, 023–026, 029–055, 058 are completed and stored under
 [`archive/`](archive/). The prior audit register is
 [`archive/audit-findings-2026-06-25.md`](archive/audit-findings-2026-06-25.md).
 Historical pre-current-roadmap plans live under

@@ -20,11 +20,12 @@ describe("Plan 058 §6.6 — plans/README.md marks Plan 058 DONE", () => {
   it("Plan 058 status is DONE in the advisor directions table", () => {
     const text = read("plans/README.md");
     // The advisor directions table has a Status column. Find a row whose
-    // first cell links to 058-relaunch-community-validation.md and whose
-    // Status column is DONE. (The roadmap table on line ~54 is a different
-    // shape and doesn't carry a per-plan status, so we match the link form.)
+    // first cell links to 058-relaunch-community-validation.md (in archive/
+    // since 2026-07-31) and whose Status column is DONE. (The roadmap table
+    // on line ~54 is a different shape and doesn't carry a per-plan status,
+    // so we match the link form.)
     const row = text.match(
-      /\|\s*\[058\]\(058-relaunch-community-validation\.md\)\s*\|\s*(\w+)\s*\|/u
+      /\|\s*\[058\]\((?:archive\/)?058-relaunch-community-validation\.md\)\s*\|\s*(\w+)\s*\|/u
     );
     assert.ok(row, "plan 058 advisor-table row not found in plans/README.md");
     assert.equal(row[1], "DONE", `plan 058 advisor-table status should be DONE, got ${row[1]}`);
