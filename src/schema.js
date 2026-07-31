@@ -66,7 +66,10 @@ export function validateWritableTargetInsideCwd(filepath) {
 
 export function assertWritableTargetInsideCwd(filepath) {
   const result = validateWritableTargetInsideCwd(filepath);
-  if (!result.valid) {
+  // Nota: en modo no-estricto (strictNullChecks desactivado) el narrowing por
+  // falsiness de un booleano no excluye el miembro `false` — ni `!valid` ni
+  // `valid === false` funcionan (verificado en TS 5.9 y 7.0). `!== true` sí.
+  if (result.valid !== true) {
     throw new Error(result.error);
   }
   return { targetRealPath: result.targetRealPath, cwdRealPath: result.cwdRealPath };
@@ -101,7 +104,8 @@ export function validateNewFileParentInsideCwd(filepath) {
 
 export function assertNewFileParentInsideCwd(filepath) {
   const result = validateNewFileParentInsideCwd(filepath);
-  if (!result.valid) {
+  // Mismo patrón que assertWritableTargetInsideCwd: ver nota de narrowing.
+  if (result.valid !== true) {
     throw new Error(result.error);
   }
   return { parentRealPath: result.parentRealPath, cwdRealPath: result.cwdRealPath };
@@ -144,7 +148,8 @@ export function validateOutputDirInsideCwd(dirPath) {
 
 export function assertOutputDirInsideCwd(dirPath) {
   const result = validateOutputDirInsideCwd(dirPath);
-  if (!result.valid) {
+  // Mismo patrón que assertWritableTargetInsideCwd: ver nota de narrowing.
+  if (result.valid !== true) {
     throw new Error(result.error);
   }
 }
@@ -203,9 +208,13 @@ function buildCourseNodes(
   authorNode,
   authorId
 ) {
-  const courseNode = { "@type": "Course", name: title };
   const courseId = optionalId(pubUrl, "course");
-  if (courseId) courseNode["@id"] = courseId;
+  /** @type {import("schema-dts").Course} */
+  const courseNode = {
+    "@type": "Course",
+    name: title,
+    ...(courseId ? { "@id": courseId } : {}),
+  };
   if (description) courseNode.description = description;
   const providerName = config.course?.provider;
   if (providerName) {
@@ -219,9 +228,13 @@ function buildCourseNodes(
 
 function buildEventNodes(title, description, config, pubUrl, orgNode, orgId) {
   const eventConfig = config.event || {};
-  const eventNode = { "@type": "Event", name: title };
   const eventId = optionalId(pubUrl, "event");
-  if (eventId) eventNode["@id"] = eventId;
+  /** @type {import("schema-dts").Event} */
+  const eventNode = {
+    "@type": "Event",
+    name: title,
+    ...(eventId ? { "@id": eventId } : {}),
+  };
   if (description) eventNode.description = description;
   if (eventConfig.startDate) eventNode.startDate = eventConfig.startDate;
   if (eventConfig.endDate) eventNode.endDate = eventConfig.endDate;
@@ -251,6 +264,8 @@ function buildRecipeNodes(title, description, content, config, pubUrl, authorNod
   );
   let stepTexts = extractNumberedSteps(instructionRaw);
   if (stepTexts.length === 0) stepTexts = extractListItems(instructionRaw);
+  const recipeId = optionalId(pubUrl, "recipe");
+  /** @type {import("schema-dts").Recipe} */
   const recipeNode = {
     "@type": "Recipe",
     name: title,
@@ -260,9 +275,8 @@ function buildRecipeNodes(title, description, content, config, pubUrl, authorNod
       position: i + 1,
       text,
     })),
+    ...(recipeId ? { "@id": recipeId } : {}),
   };
-  const recipeId = optionalId(pubUrl, "recipe");
-  if (recipeId) recipeNode["@id"] = recipeId;
   if (description) recipeNode.description = description;
   if (recipeConfig.totalTime) recipeNode.totalTime = recipeConfig.totalTime;
   if (recipeConfig.recipeYield) recipeNode.recipeYield = recipeConfig.recipeYield;
@@ -283,6 +297,11 @@ function buildHowToNodes(title, description, content, config, pubUrl) {
     "sources",
     "bibliography",
   ]);
+  // Los pasos derivados de secciones usan {name, text}; el fallback de pasos
+  // numerados usa {position, text}. Ambas son formas HowToStep válidas según
+  // Schema.org — el fallback no debe sintetizar un `name` (gobernanza: nunca
+  // inferir contenido).
+  /** @type {Array<import("schema-dts").HowToStep>} */
   let stepNodes = sections
     .filter((s) => !skippedHeaders.has(s.header.toLowerCase()))
     .map((s) => ({
@@ -297,9 +316,14 @@ function buildHowToNodes(title, description, content, config, pubUrl) {
       text,
     }));
   }
-  const howtoNode = { "@type": "HowTo", name: title, step: stepNodes };
   const howtoId = optionalId(pubUrl, "howto");
-  if (howtoId) howtoNode["@id"] = howtoId;
+  /** @type {import("schema-dts").HowTo} */
+  const howtoNode = {
+    "@type": "HowTo",
+    name: title,
+    step: stepNodes,
+    ...(howtoId ? { "@id": howtoId } : {}),
+  };
   if (description) howtoNode.description = description;
   if (howtoConfig.totalTime) howtoNode.totalTime = howtoConfig.totalTime;
   if (howtoConfig.estimatedCost) howtoNode.estimatedCost = howtoConfig.estimatedCost;
@@ -360,14 +384,16 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
       : "";
   const orgId = optionalId(pubUrl, "organization");
   const authorId = optionalId(pubUrl, "author");
+  /** @type {Array<import("schema-dts").Thing>} */
   const graphNodes = [];
 
+  /** @type {import("schema-dts").Organization} */
   let orgNode = null;
   if (pubInfo.name || pubUrl) {
     orgNode = {
       "@type": "Organization",
+      ...(orgId ? { "@id": orgId } : {}),
     };
-    if (orgId) orgNode["@id"] = orgId;
     if (pubInfo.name) orgNode.name = pubInfo.name;
     if (pubUrl) orgNode.url = pubUrl;
     if (pubInfo.logo) {
@@ -379,13 +405,14 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
     if (orgId) graphNodes.push(orgNode);
   }
 
+  /** @type {import("schema-dts").Person} */
   let authorNode = null;
   if (authorInfo.name) {
     authorNode = {
       "@type": "Person",
       name: authorInfo.name,
+      ...(authorId ? { "@id": authorId } : {}),
     };
-    if (authorId) authorNode["@id"] = authorId;
     if (authorInfo.jobTitle) authorNode.jobTitle = authorInfo.jobTitle;
     if (authorInfo.sameAs) authorNode.sameAs = authorInfo.sameAs;
     if (authorId) graphNodes.push(authorNode);
@@ -393,12 +420,13 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
 
   for (const type of types) {
     if (type === "article") {
+      const articleId = optionalId(pubUrl, "article");
+      /** @type {import("schema-dts").Article} */
       const articleNode = {
         "@type": "Article",
         headline: title,
+        ...(articleId ? { "@id": articleId } : {}),
       };
-      const articleId = optionalId(pubUrl, "article");
-      if (articleId) articleNode["@id"] = articleId;
       if (description) articleNode.description = description;
       if (config.datePublished) articleNode.datePublished = config.datePublished;
       if (authorNode) articleNode.author = referenceOrInline(authorNode, authorId);
@@ -411,13 +439,14 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
             'Use "article" for general content that is not time-sensitive news.'
         );
       }
+      const newsId = optionalId(pubUrl, "article");
+      /** @type {import("schema-dts").NewsArticle} */
       const newsNode = {
         "@type": "NewsArticle",
         headline: title,
         datePublished: config.datePublished,
+        ...(newsId ? { "@id": newsId } : {}),
       };
-      const newsId = optionalId(pubUrl, "article");
-      if (newsId) newsNode["@id"] = newsId;
       if (description) newsNode.description = description;
       if (config.dateModified) newsNode.dateModified = config.dateModified;
       if (authorNode) newsNode.author = referenceOrInline(authorNode, authorId);
@@ -425,6 +454,7 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
       graphNodes.push(newsNode);
     } else if (type === "faq") {
       const sections = extractSections(content);
+      /** @type {Array<import("schema-dts").Question>} */
       const qaList = [];
       for (const section of sections.slice(0, 5)) {
         const header = section.header.trim();
@@ -444,25 +474,35 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
           },
         });
       }
+      const faqId = optionalId(pubUrl, "faq");
+      // schema-dts tipa FAQPage.mainEntity como `Question | ItemList`; el
+      // generador emite deliberadamente un array de Questions (guía de datos
+      // estructurados de Google para FAQPage). Excepción estrecha, documentada:
+      /** @type {import("schema-dts").FAQPage & { mainEntity?: Array<import("schema-dts").Question> }} */
       const faqNode = {
         "@type": "FAQPage",
         mainEntity: qaList,
+        ...(faqId ? { "@id": faqId } : {}),
       };
-      const faqId = optionalId(pubUrl, "faq");
-      if (faqId) faqNode["@id"] = faqId;
       graphNodes.push(faqNode);
     } else if (type === "product") {
+      const productId = optionalId(pubUrl, "product");
+      /** @type {import("schema-dts").Product} */
       const productNode = {
         "@type": "Product",
         name: title,
+        ...(productId ? { "@id": productId } : {}),
       };
-      const productId = optionalId(pubUrl, "product");
-      if (productId) productNode["@id"] = productId;
       if (description) productNode.description = description;
       if (orgNode) productNode.brand = referenceOrInline(orgNode, orgId);
 
       const offerInfo = config.product?.offer;
       if (offerInfo?.price !== undefined && offerInfo?.priceCurrency) {
+        // schema-dts tipa Offer.availability como la unión enumerada
+        // ItemAvailability, pero el esquema zod acepta cualquier string
+        // (proporcionado por el usuario, nunca inferido). Ampliar solo esa
+        // propiedad, nunca el @type.
+        /** @type {import("schema-dts").Offer & { availability?: string }} */
         productNode.offers = {
           "@type": "Offer",
           price: String(offerInfo.price),
@@ -500,6 +540,8 @@ export function generateSchemaData(filepath, schemaType, config, _content = null
     }
   }
 
+  // En schema-dts 2.x `Graph` es el nodo raíz en sí (lleva @context).
+  /** @type {import("schema-dts").Graph} */
   return {
     "@context": "https://schema.org",
     "@graph": graphNodes,

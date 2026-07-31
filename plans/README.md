@@ -205,7 +205,7 @@ warrants. Short-term items also close monedario.cl audit findings
 | [053](archive/053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | DONE |
 | [054](archive/054-knip-dead-code-detection.md) | Add `knip` for unused file/export/dependency detection (non-blocking first) | `knip` (dev) | dx/tech-debt | P3 | S | medium | — | DONE |
 | [055](archive/055-readability-metrics.md) | Bilingual reading-grade metrics via `text-readability` + custom Spanish formulas (Fernández-Huerta, Szigriszt-Pazos), gated by `lang` option | `text-readability` (runtime) | feature | P3 | M | medium | — | DONE |
-| [056](056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | near | — | READY |
+| [056](archive/056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | near | — | DONE (2026-07-31) |
 
 Recommended execution order:
 
@@ -226,11 +226,11 @@ Recommended execution order:
   audits. May stay DEFERRED if neither demand nor a language strategy exists.
 
 **Near term (unblocked 2026-07-31):**
-- **056** `schema-dts` (P3, M) — **READY**. No longer gated on the TypeScript
-  migration: measured at 11 errors via a per-file `tsconfig.schema.json` with
-  relaxed strictness (vs 187 under `strict`), and `schema-dts` was verified to
-  still catch property/`@type` typos through JSDoc under that config. Type-only,
-  zero runtime cost. Pairs with 053's `attw`.
+- **056** `schema-dts` (P3, M) — **DONE** (2026-07-31). Per-file
+  `tsconfig.schema.json` (`strict: false`) with JSDoc annotations on the
+  JSON-LD builders; `typecheck:schema` wired into `npm run check` and CI.
+  `headLine`-style typos now fail the gate (TS2561, verified). Type-only, zero
+  runtime cost. Pairs with 053's `attw`.
 
 Considered and intentionally NOT planned (do not re-file without new evidence):
 
