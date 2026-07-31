@@ -166,8 +166,7 @@ export function extractHtmlVisibleText(rawHtml) {
   const tableCount = $("table").length;
 
   // Obtener HTML del body (o del root si no hay body)
-  const bodyEl = $("body").length ? $("body") : $.root();
-  let html = bodyEl.html() || "";
+  let html = ($("body").length ? $("body").html() : $.root().html()) || "";
 
   // Insertar saltos de párrafo en cierres de elementos de bloque
   // para que getParagraphLengths() y observeAnswerFirst() funcionen correctamente
@@ -272,7 +271,7 @@ export function calculateReadability(text, { lang = null } = {}) {
  * YAML (only the first document is parsed for metadata).
  *
  * @param {string} content — raw file content
- * @returns {{ data: object, body: string }}
+ * @returns {{ data: Record<string, unknown>, body: string }}
  */
 export function parseFrontmatter(content) {
   // Normalize a leading BOM only for detection; keep body bytes intact.

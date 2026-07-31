@@ -28,6 +28,7 @@ export function extractPageMetadata(content, filepath) {
   // Parse frontmatter once for fallback lookups (Markdown only).
   const isHtml =
     filepath.endsWith(".html") || filepath.endsWith(".htm") || /<html/i.test(cleanText);
+  /** @type {{ data: Record<string, unknown>, body?: string }} */
   const frontmatter = isHtml ? { data: {} } : parseFrontmatter(content);
 
   // H1 title

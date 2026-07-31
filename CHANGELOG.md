@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- JSON-LD output in `src/schema.js` is now typed against `schema-dts`
+  (Google's Schema.org type definitions), so property-name and `@type`
+  mistakes are caught at compile time. Type-only; no runtime or dependency
+  change to the published package.
+
 ## [2.2.3](https://github.com/cortega26/geo-opt/compare/v2.2.2...v2.2.3) (2026-07-31)
 
 

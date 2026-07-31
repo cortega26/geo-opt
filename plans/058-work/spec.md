@@ -1,6 +1,6 @@
 # Spec — Plan 058: Reconcile factual product claims and prepare a narrow product-led entry point
 
-> **Source plan:** [`plans/058-relaunch-community-validation.md`](../058-relaunch-community-validation.md)
+> **Source plan:** [`plans/archive/058-relaunch-community-validation.md`](../archive/058-relaunch-community-validation.md)
 > **Scope:** repository documentation and local planning records ONLY.
 > **Hard limits (from plan):** no external publication, no LinkedIn/social posting, no
 > outreach, no Tooltician.com changes, no telemetry, no service CTA, no licensing
