@@ -22,6 +22,13 @@
 - **Category**: docs / direction
 - **Planned at**: commit `296b60f`, 2026-07-31
 - **Issue**: (none)
+- **Executed**: APPROVED 2026-07-31 (executor worktree, branch
+  `docs/066-agent-skill-discoverability`, commits `be2092b` + `d4aa4e9`;
+  all done criteria re-verified). Dispatch corrections applied: es
+  headings are translated, so parity checks compare heading LEVELS, not
+  strings. Review revision 1 (2026-07-31) applied: usage hint now states
+  the checkout assumption (the skill's Node CLI path is checkout-only).
+  Merge is the maintainer's decision.
 
 ## Why this matters
 
@@ -96,7 +103,7 @@ Repo conventions to match:
 |---|---|---|
 | Full quality gate | `npm run check` | exit 0 |
 | Changelog policy | `npm run changelog:check` | passes (docs-only change) |
-| Heading parity en/es | `diff <(grep -oP '^#{1,3} .*' README.md) <(grep -oP '^#{1,3} .*' README.es.md)` (filter fenced code blocks) | headings match |
+| Heading parity en/es | `diff <(grep -oP '^#{1,3}(?= )' README.md) <(grep -oP '^#{1,3}(?= )' README.es.md)` — note: the es README TRANSLATES its headings (`Quick start` → `Inicio rápido`), so compare the heading-LEVEL sequence, not the strings | no output (structural parity) |
 
 ## Scope
 
@@ -149,6 +156,12 @@ Repo conventions to match:
      skills path (`.claude/skills/` for Claude Code, or your agent's
      equivalent) and point the agent at `SKILL.md`. Keep it to two or
      three lines — no elaborate installation guide.
+   - (Review revision 1, 2026-07-31) The hint must add one sentence: the
+     skill's commands assume a `geo-opt` repository checkout (`node
+     bin/cli.js` is the canonical CLI path — the skill directory contains
+     no `bin/`); only the Python port's scripts work from the copied
+     directory. Without this, a user copying just the skill gets an agent
+     whose Node CLI commands cannot resolve.
 
 **Verify**:
 - `grep -n "## Agent skill" README.md` → found
@@ -184,8 +197,9 @@ section of the same file (Python v2/technical HTML are Node-only).
 
 **Verify**: `npm run check` → exit 0. Also run the heading-parity check
 from "Commands you will need" and confirm only the two newly added
-headings (TOC line + section heading) appear in the diff, identically
-named in both READMEs.
+headings appear in the diff (the es heading is TRANSLATED — `## Agent
+skill` / `## Habilidad para agentes`; parity is structural: same
+heading-level sequence, one new `##` per README).
 
 ## Test plan
 
@@ -199,7 +213,7 @@ named in both READMEs.
 
 Machine-checkable. ALL must hold:
 
-- [ ] `grep -n "Agent skill" README.md README.es.md` → both have the TOC line and the section heading
+- [ ] `grep -n "Agent skill" README.md` and `grep -n "Habilidad para agentes" README.es.md` → both have the TOC line and the section heading (es heading is translated, per the es README convention)
 - [ ] `grep -n "SKILL.md" docs/architecture.md` → found, with the repo-only packaging claim
 - [ ] The README section says the skill is in the repository checkout and NOT in the npm package (exact claim, no overreach)
 - [ ] No changes to `package.json`, `.agents/skills/geo-optimization/`, or `CHANGELOG.md` (`git status`)
