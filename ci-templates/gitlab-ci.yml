@@ -3,14 +3,14 @@
 # Include this template in your .gitlab-ci.yml:
 #
 #   include:
-#     - remote: 'https://raw.githubusercontent.com/tooltician-ai/geo-opt/main/ci-templates/gitlab-ci.yml'
+#     - remote: 'https://raw.githubusercontent.com/cortega26/geo-opt/main/ci-templates/gitlab-ci.yml'
 #
 # Then customize via CI/CD variables in your project settings:
 #
 #   GEO_OPT_PATH       — file or directory to audit (default: ".")
 #   GEO_OPT_THRESHOLD  — fail if score is below this value (e.g. "70")
 #   GEO_OPT_RECURSIVE  — set to "true" to scan directories recursively (Pro)
-#   GEO_OPT_MODEL      — scoring model: "v1" (default) or "v2"
+#   GEO_OPT_MODEL      — scoring model: "v2" (default) or "v1" (legacy)
 #   GEO_OPT_LABEL      — badge label text (default: "GEO Score")
 #   TOOLTICIAN_LICENSE_KEY — Pro license key (for recursive + no-branding features)
 
@@ -20,7 +20,7 @@
     GEO_OPT_PATH: "."
     GEO_OPT_THRESHOLD: ""
     GEO_OPT_RECURSIVE: "false"
-    GEO_OPT_MODEL: "v1"
+    GEO_OPT_MODEL: "v2"
     GEO_OPT_LABEL: "GEO Score"
     TOOLTICIAN_LICENSE_KEY: ""
   before_script:
@@ -69,7 +69,7 @@ geo-opt-audit:
         const fs = require('fs');
         try {
           const d = JSON.parse(fs.readFileSync('geo-opt-audit.json','utf8'));
-          const s = Array.isArray(d) ? (d[0]?.score ?? 0) : (d.score ?? 0);
+          const s = Array.isArray(d) ? (d[0]?.effectiveScore ?? 0) : (d.effectiveScore ?? 0);
           process.stdout.write(String(Math.round(s)));
         } catch { process.stdout.write('0'); }
       ")

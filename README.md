@@ -97,6 +97,7 @@ Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/ab
     - [Report *(Pro)*](#report-pro)
   - [Quick start](#quick-start)
     - [CI/CD integration](#cicd-integration)
+      - [GitHub Actions composite action](#github-actions-composite-action)
   - [Command reference](#command-reference)
   - [Evidence vocabulary](#evidence-vocabulary)
   - [Free vs. Pro](#free-vs-pro)
@@ -285,7 +286,33 @@ jobs:
 The command exits non-zero when any file falls below the threshold, blocking
 deploys of under-optimized content. The `--format json` flag emits
 machine-readable output on stdout for downstream tooling; diagnostics always go
-to stderr. A ready-to-use GitLab CI template ships in
+to stderr.
+
+#### GitHub Actions composite action
+
+A ready-made composite action
+([`geo-opt-audit`](.github/actions/geo-opt-audit/action.yml)) wraps the CLI for
+GitHub pipelines:
+
+```yaml
+- uses: cortega26/geo-opt/.github/actions/geo-opt-audit@v2.3.0
+  with:
+    path: content/
+    threshold: 70
+```
+
+- `path` — file or directory to audit (default: `.`).
+- `threshold` — exit with code 1 when the score is below this value, gating
+  the pipeline (e.g. `70`).
+- `model` — scoring model: `v2` (default, profile-aware) or `v1` (legacy).
+
+Outputs: `score` (0–100), `passed` (`true`/`false` — whether the threshold was
+met), `badge-url` (a shields.io badge URL for embedding in READMEs or PR
+comments), and `badge-markdown` (a ready-to-embed shields.io badge). The action
+audits content and gates on the CLI's exit code; it does not modify the
+repository.
+
+A ready-to-use GitLab CI template ships in
 [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml).
 
 ---

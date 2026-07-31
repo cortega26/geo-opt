@@ -14,6 +14,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+- Fixed the GitLab CI template include URL (wrong org in the `remote:`
+  reference) and the GitHub Actions composite action score parsing — the JSON
+  field is `effectiveScore`, so the score output and shields badge are no
+  longer always `0` — and documented the action in the README.
+
 ### Changed
 - JSON-LD output in `src/schema.js` is now typed against `schema-dts`
   (Google's Schema.org type definitions), so property-name and `@type`

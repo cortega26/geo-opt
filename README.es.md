@@ -273,7 +273,34 @@ jobs:
 El comando sale con código de error cuando algún archivo está por debajo del
 umbral, bloqueando deploys de contenido sin optimizar. El flag `--format json`
 emite salida legible por máquinas en stdout; los diagnósticos siempre van a
-stderr. En [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml) hay una
+stderr.
+
+#### Acción compuesta de GitHub Actions
+
+Una acción compuesta lista para usar
+([`geo-opt-audit`](.github/actions/geo-opt-audit/action.yml)) envuelve la CLI
+para pipelines de GitHub:
+
+```yaml
+- uses: cortega26/geo-opt/.github/actions/geo-opt-audit@v2.3.0
+  with:
+    path: content/
+    threshold: 70
+```
+
+- `path` — archivo o directorio a auditar (predeterminado: `.`).
+- `threshold` — sale con código 1 cuando la puntuación está por debajo de este
+  valor, bloqueando el pipeline (p. ej. `70`).
+- `model` — modelo de puntuación: `v2` (predeterminado, con conciencia de
+  perfil) o `v1` (legado).
+
+Salidas: `score` (0–100), `passed` (`true`/`false` — si se cumplió el umbral),
+`badge-url` (una URL de badge de shields.io para incrustar en READMEs o
+comentarios de PR) y `badge-markdown` (un badge de shields.io listo para
+incrustar). La acción audita el contenido y actúa como gate según el código de
+salida de la CLI; no modifica el repositorio.
+
+En [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml) hay una
 plantilla lista para GitLab CI.
 
 ---

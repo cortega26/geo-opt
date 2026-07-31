@@ -15,13 +15,9 @@ inputs:
     required: false
     default: "false"
   model:
-    description: "Scoring model: v1 (default) or v2 (profile-aware)"
+    description: "Scoring model: v2 (default, profile-aware) or v1 (legacy)"
     required: false
-    default: "v1"
-  format:
-    description: "Output format: text or json"
-    required: false
-    default: "text"
+    default: "v2"
   label:
     description: "Badge label text"
     required: false
@@ -72,9 +68,12 @@ runs:
           ARGS="$ARGS --threshold ${{ inputs.threshold }}"
         fi
 
-        # Run audit; capture output and exit code separately
-        OUTPUT=$($CLI $ARGS 2>&1) || AUDIT_EXIT=$?
+        # Run audit; capture stdout and exit code separately, keep stderr
+        # visible in the job log without polluting the parsed stdout. The
+        # stderr file lives in $RUNNER_TEMP so the repo is never modified.
+        OUTPUT=$($CLI $ARGS 2>"$RUNNER_TEMP/geo-opt-audit-stderr.txt") || AUDIT_EXIT=$?
         AUDIT_EXIT=${AUDIT_EXIT:-0}
+        cat "$RUNNER_TEMP/geo-opt-audit-stderr.txt" >&2
 
         # Parse score from JSON (handles single-file and multi-file output)
         SCORE=$(echo "$OUTPUT" | node -e "
@@ -83,7 +82,7 @@ runs:
           process.stdin.on('end', () => {
             try {
               const d = JSON.parse(chunks.join(''));
-              const s = Array.isArray(d) ? (d[0]?.score ?? 0) : (d.score ?? 0);
+              const s = Array.isArray(d) ? (d[0]?.effectiveScore ?? 0) : (d.effectiveScore ?? 0);
               process.stdout.write(String(Math.round(s)));
             } catch { process.stdout.write('0'); }
           });
@@ -111,7 +110,7 @@ runs:
           echo "passed=false" >> "$GITHUB_OUTPUT"
         fi
 
-        # Re-print human-readable output (already in text form from stderr mix)
+        # Re-print the audit output; stderr was already streamed above
         echo "$OUTPUT"
 
         exit $AUDIT_EXIT
