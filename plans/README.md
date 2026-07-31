@@ -205,7 +205,7 @@ warrants. Short-term items also close monedario.cl audit findings
 | [053](053-package-publish-validation.md) | Validate published package with `publint` + `@arethetypeswrong/cli` in CI | both (dev) | dx/release | P2 | S | short | — | DONE |
 | [054](054-knip-dead-code-detection.md) | Add `knip` for unused file/export/dependency detection (non-blocking first) | `knip` (dev) | dx/tech-debt | P3 | S | medium | — | DONE |
 | [055](055-readability-metrics.md) | Bilingual reading-grade metrics via `text-readability` + custom Spanish formulas (Fernández-Huerta, Szigriszt-Pazos), gated by `lang` option | `text-readability` (runtime) | feature | P3 | M | medium | — | DONE |
-| [056](056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | long | TS migration | DEFERRED |
+| [056](056-schema-dts-typed-jsonld.md) | Type JSON-LD output with `schema-dts` (compile-time vocabulary guard) | `schema-dts` (dev/type-only) | tech-debt | P3 | M | near | — | READY |
 
 Recommended execution order:
 
@@ -225,10 +225,12 @@ Recommended execution order:
   English-tuned indices must not be emitted for the Spanish content the tool
   audits. May stay DEFERRED if neither demand nor a language strategy exists.
 
-**Long term (gated):**
-- **056** `schema-dts` (P3, M) — DEFERRED until the TypeScript migration opens
-  (memory `project-ts-migration.md`, reevaluate ~2026-07-27); type-only, zero
-  runtime cost. Pairs with 053's `attw`.
+**Near term (unblocked 2026-07-31):**
+- **056** `schema-dts` (P3, M) — **READY**. No longer gated on the TypeScript
+  migration: measured at 11 errors via a per-file `tsconfig.schema.json` with
+  relaxed strictness (vs 187 under `strict`), and `schema-dts` was verified to
+  still catch property/`@type` typos through JSDoc under that config. Type-only,
+  zero runtime cost. Pairs with 053's `attw`.
 
 Considered and intentionally NOT planned (do not re-file without new evidence):
 

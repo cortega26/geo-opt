@@ -49,3 +49,12 @@ geo_config.json
 .codegraph/
 deep-research/
 daemon.pid
+
+# Commercial strategy — deliberately NOT published in this public repo.
+# Contains pricing, margins, revenue projections, GO/NO-GO gates and
+# unreleased launch content. Engineering plans under plans/ ARE tracked.
+plans/business/
+plans/pro-viability/
+plans/018-build-tooltician-ai-discoverability-business.md
+plans/060-decide-community-pro-boundary.md
+plans/061-prepare-bounded-diagnostic-intake.md
