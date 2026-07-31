@@ -52,6 +52,12 @@ jobs:
       - name: JS tests
         run: npm test
 
+      - name: Test-count badge
+        run: node scripts/check-test-count.js
+
+      - name: Coverage badge
+        run: npm run test:coverage && node scripts/check-coverage.js
+
       - name: Typecheck
         run: npm run typecheck
 

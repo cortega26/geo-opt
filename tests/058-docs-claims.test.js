@@ -181,8 +181,8 @@ describe("Plan 058 §6.2 — README test-count badge is internally consistent", 
   //   - The authoritative badge-vs-actual-count check lives in
   //     `scripts/check-test-count.js`, run standalone as
   //     `node scripts/check-test-count.js` (NOT inside `npm test`, so no
-  //     recursion). It is not yet wired into `npm run check` because that
-  //     would require a `package.json` edit outside this plan's scope (§6.5).
+  //     recursion). It is wired into `npm run check` (immediately after
+  //     `npm test`) so the badge cannot drift silently.
   // If the badge drifts, the standalone check fails; if the README numbers
   // disagree with each other, this test fails.
   function badgeNumber(text) {
@@ -196,12 +196,12 @@ describe("Plan 058 §6.2 — README test-count badge is internally consistent", 
     const n = badgeNumber(text);
     assert.match(
       text,
-      new RegExp(`${n} tests across 97 suites`, "u"),
+      new RegExp(`${n} tests across 112 suites`, "u"),
       "highlights line must match badge number"
     );
     assert.match(
       text,
-      new RegExp(`${n} tests · 97 suites`, "u"),
+      new RegExp(`${n} tests · 112 suites`, "u"),
       "dev section must match badge number"
     );
   });
@@ -211,12 +211,12 @@ describe("Plan 058 §6.2 — README test-count badge is internally consistent", 
     const n = badgeNumber(text);
     assert.match(
       text,
-      new RegExp(`${n} tests en 97 suites`, "u"),
+      new RegExp(`${n} tests en 112 suites`, "u"),
       "highlights line must match badge number"
     );
     assert.match(
       text,
-      new RegExp(`${n} tests · 97 suites`, "u"),
+      new RegExp(`${n} tests · 112 suites`, "u"),
       "dev section must match badge number"
     );
   });

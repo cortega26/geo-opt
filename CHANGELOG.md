@@ -28,6 +28,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   longer always `0` — and documented the action in the README.
 
 ### Changed
+- CI now verifies the README test-count and branch-coverage badges against
+  live runs (new scripts/check-coverage.js; check-test-count.js wired into
+  npm run check; 058 test registration count-deterministic; README test
+  badges corrected to the live count).
 - JSON-LD output in `src/schema.js` is now typed against `schema-dts`
   (Google's Schema.org type definitions), so property-name and `@type`
   mistakes are caught at compile time. Type-only; no runtime or dependency
