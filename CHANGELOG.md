@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2](https://github.com/cortega26/geo-opt/compare/v2.2.1...v2.2.2) (2026-07-31)
+
+
+### Bug Fixes
+
+* **ci:** gate security audit on an allowlist instead of a bare npm audit ([#36](https://github.com/cortega26/geo-opt/issues/36)) ([b5e0835](https://github.com/cortega26/geo-opt/commit/b5e0835c32d98926e1c776f511c7879db14b5e80))
+
 ## [2.2.1](https://github.com/cortega26/geo-opt/compare/v2.2.0...v2.2.1) (2026-07-23)
 
 
