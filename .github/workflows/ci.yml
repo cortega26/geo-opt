@@ -75,4 +75,6 @@ jobs:
         run: node bin/cli.js audit docs/ --recursive --threshold 30
 
       - name: Security audit
-        run: npm audit --audit-level=high
+        # Blocks on high/critical advisories, minus a justified allowlist of
+        # advisories that are unfixable upstream. See scripts/check-audit.js.
+        run: npm run audit:check

@@ -36,6 +36,7 @@
     "format": "prettier --write src/ bin/ scripts/ tests/",
     "format:check": "prettier --check src/ bin/ scripts/ tests/",
     "changelog:check": "node scripts/check-changelog.js",
+    "audit:check": "node scripts/check-audit.js",
     "build": "node scripts/build.js",
     "knip": "knip",
     "typecheck": "tsc -p tsconfig.json",
