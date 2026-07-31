@@ -49,6 +49,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   advisory except a dated, justified allowlist. This deliberately avoids
   `--omit=dev`, which would have suppressed the advisory by blinding the gate
   to the whole dev toolchain. Dev-only; no runtime or published-package change.
+- **Changelog policy no longer fails every dependency bump.** Because
+  `package.json` is a tracked code path, the `Changelog policy` CI step failed
+  on every Dependabot PR — which is what trained the habit of merging those PRs
+  red, and is why a broken `main` went unnoticed for five days.
+  `scripts/check-changelog.js` now exempts a change whose files are exactly
+  `package.json` / `package-lock.json` **and** whose `package.json` differs from
+  the base only in its dependency blocks; semantic-release already records such
+  bumps in the released notes from the `build(deps):` commit message. The check
+  fails closed — if the base manifest cannot be read, or anything outside the
+  dependency blocks changed, a hand-written entry is still required.
 
 ### Tests
 
