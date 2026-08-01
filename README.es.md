@@ -125,6 +125,10 @@ node bin/cli.js audit contenido/ --recursive --summary --format json
 
 # Gate de calidad en CI — sale con error si algún archivo no alcanza 70
 node bin/cli.js audit contenido/ --recursive --threshold 70
+
+# Los fallos parciales (archivos ilegibles o rutas inexistentes) también
+# salen con error, tanto en modo texto como JSON (auditoría F-05)
+node bin/cli.js audit ok.md inexistente.md --format json
 ```
 
 ### Estructurar
@@ -272,7 +276,10 @@ jobs:
 ```
 
 El comando sale con código de error cuando algún archivo está por debajo del
-umbral, bloqueando deploys de contenido sin optimizar. El flag `--format json`
+umbral, bloqueando deploys de contenido sin optimizar. Los fallos parciales —
+archivos ilegibles o rutas explícitas inexistentes — también salen con error
+en modo texto y JSON por igual (auditoría F-05), de modo que una ruta mal
+escrita nunca puede pasar un pipeline en silencio. El flag `--format json`
 emite salida legible por máquinas en stdout; los diagnósticos siempre van a
 stderr.
 
@@ -497,7 +504,7 @@ El diseño completo de telemetría opt-in (actualmente inactivo) está documenta
 ```bash
 npm run check          # suite completa: lint + formato + tests JS + tests Python + conformance + typecheck + changelog
 npm test               # 745 tests · 112 suites · 0 fallos (Node.js)
-npm run test:python    # suite de tests del port de compatibilidad Python (38 tests)
+npm run test:python    # suite de tests del port de compatibilidad Python (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier en modo dry-run
 npm run typecheck      # compilación del consumidor TypeScript

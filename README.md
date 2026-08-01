@@ -146,6 +146,10 @@ node bin/cli.js audit content/ --recursive --summary --format json
 
 # CI quality gate — exits non-zero if any file scores below 70
 node bin/cli.js audit content/ --recursive --threshold 70
+
+# Partial failures (unreadable files or missing paths) also exit non-zero,
+# in text and JSON modes alike (audit F-05)
+node bin/cli.js audit ok.md missing.md --format json
 ```
 
 ### Structure
@@ -293,9 +297,11 @@ jobs:
 ```
 
 The command exits non-zero when any file falls below the threshold, blocking
-deploys of under-optimized content. The `--format json` flag emits
-machine-readable output on stdout for downstream tooling; diagnostics always go
-to stderr.
+deploys of under-optimized content. Partial failures — unreadable files or
+explicit paths that do not exist — also exit non-zero in both text and JSON
+modes (audit F-05), so a typo'd path can never pass a pipeline silently. The
+`--format json` flag emits machine-readable output on stdout for downstream
+tooling; diagnostics always go to stderr.
 
 #### GitHub Actions composite action
 
@@ -516,7 +522,7 @@ The full opt-in telemetry design (currently dormant) is documented in [`docs/tel
 ```bash
 npm run check          # full suite: lint + format + JS tests + Python tests + conformance + typecheck + changelog
 npm test               # 745 tests · 112 suites · 0 failures (Node.js)
-npm run test:python    # Python compatibility port test suite (38 tests)
+npm run test:python    # Python compatibility port test suite (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier dry-run
 npm run typecheck      # TypeScript consumer compilation
