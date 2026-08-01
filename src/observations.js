@@ -564,6 +564,23 @@ function observeAnswerFirst(textContent, _tokens, htmlMeta = null) {
 }
 
 /**
+ * Detecta si el número en `index` es un identificador técnico (versión,
+ * puerto, ID de endpoint) en vez de una estadística real (F-07).
+ * @param {string} textContent
+ * @param {number} index — índice del match numérico en textContent
+ * @returns {boolean}
+ */
+function isContextualIdentifier(textContent, index) {
+  const before = textContent.slice(Math.max(0, index - 60), index);
+  // "v22", "v3.2" — v pegado al número
+  if (/v$/i.test(before)) return true;
+  // Palabras clave técnicas como última palabra del contexto precedente
+  return /\b(?:v|version|versions|port|endpoint|id|ids|api|node|release|build|branch|commit|issue|status|code)\b\s*:?\s*$/i.test(
+    before
+  );
+}
+
+/**
  * Check attribution proximity: are stats and quotes near their sources?
  * @param {string} textContent
  * @param {any[]} tokens
@@ -578,8 +595,19 @@ function observeAttributionProximity(textContent, _tokens, _htmlMeta = null) {
       /\b\d+(?:\.\d+)?%|\$\d+(?:\.\d+)?[kKmMbB]?|\b\d{2,}(?:,\d{3})*(?:\.\d+)?\b/g
     ) || [];
 
-  // Filter years
-  const stats = statMatches.filter((s) => !/^(19|20)\d{2}$/.test(s));
+  // Filter years y contextos técnicos (versiones, puertos, IDs) — F-07
+  const stats = [];
+  {
+    const seen = new Map();
+    for (const raw of statMatches) {
+      if (/^(19|20)\d{2}$/.test(raw)) continue;
+      const occurrence = seen.get(raw) || 0;
+      seen.set(raw, occurrence + 1);
+      const idx = nthIndexOf(textContent, raw, occurrence);
+      if (idx !== -1 && isContextualIdentifier(textContent, idx)) continue;
+      stats.push(raw);
+    }
+  }
 
   const sourcePatterns = [
     /according\s+to/i,
@@ -808,6 +836,58 @@ function observeSemanticHtml(rawContent, filepath) {
 }
 
 /**
+ * Detecta una sección de fuentes REAL: un heading (Sources/References/...) con
+ * links de contenido debajo. Reemplaza la búsqueda por keyword global, que
+ * daba +5 puntos de citations por una mención casual de "sources" (F-08).
+ * @param {string} textContent
+ * @param {object|null} htmlMeta
+ * @returns {boolean}
+ */
+function hasRealSourcesSection(textContent, htmlMeta = null) {
+  const sectionKeywords = /(?:sources|references|citations|bibliography|further reading)/i;
+
+  if (htmlMeta && htmlMeta.cheerio) {
+    const $ = htmlMeta.cheerio;
+    for (const h of $("h1,h2,h3,h4,h5,h6").toArray()) {
+      if (sectionKeywords.test($(h).text())) {
+        let next = $(h).next();
+        for (let i = 0; i < 5 && next.length; i++, next = next.next()) {
+          if (next.is("a[href]")) return true;
+          if (next.is("ul,ol")) {
+            if (next.find("a[href]").length > 0) return true;
+            continue;
+          }
+          // Contenedores (div/section/p/li) con links dentro — el HTML real
+          // de CMS suele envolver la lista de referencias (edge case F-08,
+          // revisión 2026-08-01).
+          if (next.is("div,section,article,main,p,li")) {
+            if (next.find("a[href]").length > 0) return true;
+            continue;
+          }
+          if (next.is("h1,h2,h3,h4,h5,h6")) break;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Markdown/plain: heading con keyword seguido de links (hasta el próximo
+  // heading, máx. 40 líneas).
+  const lines = textContent.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (/^#{1,6}\s+.*/.test(lines[i]) && sectionKeywords.test(lines[i].replace(/^#{1,6}\s+/, ""))) {
+      for (let j = i + 1; j < Math.min(lines.length, i + 40); j++) {
+        if (/^#{1,6}\s/.test(lines[j])) break; // siguiente heading termina la sección
+        if (/\[[^\]]+\]\([^)]+\)/.test(lines[j]) || /href=["']https?:\/\//i.test(lines[j])) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Check link quality: density, types, and sources section.
  * @param {string} textContent
  * @param {any[]} tokens
@@ -853,13 +933,7 @@ function observeLinkQuality(textContent, tokens, htmlMeta = null) {
     externalLinks += htmlLinks.length;
   }
 
-  const hasSourcesSection = [
-    "sources",
-    "references",
-    "citations",
-    "bibliography",
-    "further reading",
-  ].some((keyword) => textContent.toLowerCase().includes(keyword));
+  const hasSourcesSection = hasRealSourcesSection(textContent, htmlMeta);
 
   // Excessive links: more than 30 external links with fewer than 500 words of prose
   const wordCount = (textContent.match(/\b\w+\b/g) || []).length;

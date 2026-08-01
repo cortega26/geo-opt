@@ -23,6 +23,7 @@ import {
   scoreToPriority,
   determineChangefreq,
   validateSitemapXml,
+  collectSubSitemapPageUrls,
 } from "../src/sitemap.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -623,5 +624,78 @@ describe("parseSitemapXml", () => {
       result.issues.some((i) => i.toLowerCase().includes("parse error")),
       `Expected parse error, got: ${result.issues.join(", ")}`
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-07-31 — F-11: tope de sub-sitemaps
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("collectSubSitemapPageUrls — sub-sitemap cap (F-11)", () => {
+  function urlsetWith(loc) {
+    return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${loc}</loc></url></urlset>`;
+  }
+
+  function sitemapIndexWith(locs) {
+    return `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs
+      .map((l) => `<sitemap><loc>${l}</loc></sitemap>`)
+      .join("")}</sitemapindex>`;
+  }
+
+  it("sitemap-mode-caps-sub-sitemaps", async () => {
+    const subs = Array.from({ length: 150 }, (_, i) => ({ loc: `http://x/sub-${i}.xml` }));
+    let fetches = 0;
+    const warnings = [];
+    const fetchFn = async (url) => {
+      fetches += 1;
+      const n = url.match(/sub-(\d+)/)[1];
+      return { html: urlsetWith(`http://x/page-${n}.html`) };
+    };
+
+    const { pageUrls, fetched, skipped } = await collectSubSitemapPageUrls(subs, {
+      fetchFn,
+      onWarn: (m) => warnings.push(m),
+    });
+
+    assert.equal(fetched, 100, "tope de 100 fetches");
+    assert.equal(skipped, 50, "50 sub-sitemaps restantes descartados");
+    assert.equal(pageUrls.length, 100, "una URL de página por sub-sitemap fetcheado");
+    assert.ok(
+      warnings.some((w) => w.includes("limit reached")),
+      "warning de tope emitido"
+    );
+  });
+
+  it("nested sitemap indexes count against the same cap", async () => {
+    // Nivel 1: 60 subs, cada uno índice con 2 subs anidados (total 120+).
+    const level1 = Array.from({ length: 60 }, (_, i) => ({ loc: `http://x/l1-${i}.xml` }));
+    let fetches = 0;
+    const fetchFn = async (url) => {
+      fetches += 1;
+      const m = url.match(/l1-(\d+)/);
+      if (m) {
+        const i = Number(m[1]);
+        return {
+          html: sitemapIndexWith([`http://x/l2-${i}-a.xml`, `http://x/l2-${i}-b.xml`]),
+        };
+      }
+      return { html: urlsetWith("http://x/page.html") };
+    };
+
+    const { fetched, skipped } = await collectSubSitemapPageUrls(level1, { fetchFn });
+
+    assert.equal(fetched, 100, "la anidación cuenta contra el tope global de 100");
+    assert.ok(skipped > 0, "los sub-sitemaps anidados restantes se descartan");
+  });
+
+  it("respects a custom maxFetches", async () => {
+    const subs = Array.from({ length: 10 }, (_, i) => ({ loc: `http://x/sub-${i}.xml` }));
+    let fetches = 0;
+    const fetchFn = async (url) => {
+      fetches += 1;
+      return { html: urlsetWith("http://x/page.html") };
+    };
+    const { fetched } = await collectSubSitemapPageUrls(subs, { fetchFn, maxFetches: 3 });
+    assert.equal(fetched, 3);
   });
 });

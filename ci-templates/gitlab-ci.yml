@@ -9,10 +9,10 @@
 #
 #   GEO_OPT_PATH       — file or directory to audit (default: ".")
 #   GEO_OPT_THRESHOLD  — fail if score is below this value (e.g. "70")
-#   GEO_OPT_RECURSIVE  — set to "true" to scan directories recursively (Pro)
+#   GEO_OPT_RECURSIVE  — set to "true" to scan directories recursively
 #   GEO_OPT_MODEL      — scoring model: "v2" (default) or "v1" (legacy)
 #   GEO_OPT_LABEL      — badge label text (default: "GEO Score")
-#   TOOLTICIAN_LICENSE_KEY — Pro license key (for recursive + no-branding features)
+#   TOOLTICIAN_LICENSE_KEY — Pro license key (Pro-gated features: report, --no-branding)
 
 .geo-opt-audit:
   image: node:22-alpine
@@ -40,9 +40,6 @@
       eval "geo-opt $ARGS"
   artifacts:
     when: always
-    reports:
-      # Produce a JSON audit report as a CI artifact for download/inspection
-      dotenv: geo-opt-env.env
     paths:
       - geo-opt-audit.json
     expire_in: 30 days
@@ -88,3 +85,9 @@ geo-opt-audit:
 
       echo "GEO score: ${SCORE}/100"
       echo "Badge URL: ${BADGE_URL}"
+  artifacts:
+    when: always
+    reports:
+      # Este job es el que crea geo-opt-env.env — el dotenv se declara aquí,
+      # no en el job hidden (F-13): un artifact dotenv ausente falla el job.
+      dotenv: geo-opt-env.env

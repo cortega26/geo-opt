@@ -15,7 +15,7 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="CI status"></a>
-  <img src="https://img.shields.io/badge/tests-664_passed-16a34a?logo=nodedotjs&logoColor=white" alt="664 tests passed">
+  <img src="https://img.shields.io/badge/tests-716_passed-16a34a?logo=nodedotjs&logoColor=white" alt="710 tests passed">
   <img src="https://img.shields.io/badge/branch_coverage-80%25-16a34a" alt="Branch coverage 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-types_included-3178C6?logo=typescript&logoColor=white" alt="TypeScript types included">
@@ -78,7 +78,7 @@ Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/ab
 - **One toolkit, the whole surface.** Audit, Schema.org JSON-LD for 8 types, `robots.txt`, `llms.txt`, `sitemap.xml`, technical SEO checks, and HTML reports — from a single CLI and a typed JavaScript library.
 - **CI-native.** Threshold-based quality gates with non-zero exit codes; machine-readable JSON on stdout, diagnostics on stderr. Drop it into GitHub Actions or GitLab CI in one step.
 - **Cross-runtime.** Canonical Node.js implementation plus a bundled Python 3 port for agent-driven workflows, kept honest by a shared conformance suite.
-- **Engineered to ship.** 664 tests across 112 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
+- **Engineered to ship.** 716 tests across 112 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
 
 ---
 
@@ -128,6 +128,14 @@ Unlike cloud-based SEO tools, every audit, schema generation, and validation run
 ### Audit
 
 Score content across five evidence-backed dimensions using the stable v1 model or the experimental profile-aware v2 model. Audit a single file, a list of files, or an entire directory tree. Set a minimum score threshold and let the CLI exit code gate your CI/CD pipeline automatically.
+
+> **⚠️ What the score does and does not mean.** Both models measure *style
+> markers* (structure, attribution patterns, citations, clarity) — not factual
+> accuracy, not veracity, not ranking. Fabricated content with attributed
+> fake stats, fake quotes, and a link list can score 85+ ("Strong Style
+> Markers" band). Use the score as a formatting checklist, never as a
+> truthfulness gate. Known gaming vectors are archived in
+> `tests/fixtures/audit-v2/adversarial/` (audit 2026-07-31, F-06).
 
 ```bash
 # Single file, default model
@@ -507,7 +515,7 @@ The full opt-in telemetry design (currently dormant) is documented in [`docs/tel
 
 ```bash
 npm run check          # full suite: lint + format + JS tests + Python tests + conformance + typecheck + changelog
-npm test               # 664 tests · 112 suites · 0 failures (Node.js)
+npm test               # 716 tests · 112 suites · 0 failures (Node.js)
 npm run test:python    # Python compatibility port test suite (38 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier dry-run

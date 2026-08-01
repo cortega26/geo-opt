@@ -101,8 +101,52 @@ function isPrivateIPv4(ip) {
   if (octets[0] === 127) return true;
   // 0.0.0.0/8 (current network)
   if (octets[0] === 0) return true;
+  // 169.254.0.0/16 (link-local, cloud metadata service) — audit F-02
+  if (octets[0] === 169 && octets[1] === 254) return true;
+  // 100.64.0.0/10 (CGNAT) — defensa en profundidad, audit F-02
+  if (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) return true;
 
   return false;
+}
+
+/**
+ * Convierte dos hextets hexadecimales (::ffff:h1:h2) a su IPv4 subyacente.
+ * @param {string} hiHex
+ * @param {string} loHex
+ * @returns {string|null}
+ */
+function ipv4FromHexHextets(hiHex, loHex) {
+  const hi = parseInt(hiHex, 16);
+  const lo = parseInt(loHex, 16);
+  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+  return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+}
+
+/**
+ * Normaliza una dirección IPv6 mapeada a IPv4 (::ffff:a.b.c.d o
+ * ::ffff:7f00:1) a su IPv4 subyacente. Retorna null si no aplica.
+ * Cubre las formas compactas y expandidas (0:0:0:0:0:ffff:...).
+ * @param {string} ip
+ * @returns {string|null}
+ */
+function normalizeIpv4Mapped(ip) {
+  const normalized = ip.toLowerCase();
+
+  // Formas compactas: ::ffff:7f00:1 y ::ffff:127.0.0.1
+  const compactHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (compactHex) return ipv4FromHexHextets(compactHex[1], compactHex[2]);
+  const compactDecimal = normalized.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (compactDecimal) return compactDecimal[1];
+
+  // Formas expandidas: 0:0:0:0:0:ffff:7f00:1 y 0:0:0:0:0:ffff:a.b.c.d
+  const fullHex = normalized.match(/^0{1,4}(?::0{1,4}){4}:ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (fullHex) return ipv4FromHexHextets(fullHex[1], fullHex[2]);
+  const fullDecimal = normalized.match(
+    /^0{1,4}(?::0{1,4}){4}:ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/
+  );
+  if (fullDecimal) return fullDecimal[1];
+
+  return null;
 }
 
 /**
@@ -123,11 +167,18 @@ function isLoopbackIPv4(ip) {
  * @returns {boolean}
  */
 function isPrivateIPv6(ip) {
+  // IPv4-mapped IPv6 (::ffff:a.b.c.d): revalidar la IPv4 subyacente (F-03).
+  const mapped = normalizeIpv4Mapped(ip);
+  if (mapped !== null) return isPrivateIPv4(mapped);
+
   const normalized = ip.toLowerCase();
   // ::1 (loopback)
   if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
-  // fe80::/10 (link-local)
-  if (normalized.startsWith("fe80:")) return true;
+  // fe80::/10 (link-local): primer hextet en 0xfe80..0xfebf (F-03)
+  const firstHextet = parseInt(normalized.split(":")[0], 16);
+  if (!Number.isNaN(firstHextet) && firstHextet >= 0xfe80 && firstHextet <= 0xfebf) {
+    return true;
+  }
   // fd00::/8 (unique local addresses)
   if (normalized.startsWith("fd")) return true;
   // fc00::/8 (unique local addresses, reserved)
@@ -154,6 +205,14 @@ function isLoopbackIPv6(ip) {
  * @returns {{ blocked: boolean, reason?: string }}
  */
 function checkIp(ip, allowPrivate, allowLocalhost) {
+  // IPv4-mapped IPv6 (::ffff:7f00:1, ::ffff:127.0.0.1): validar la IPv4
+  // subyacente — cierra el hueco de la rama IPv4 cuando la forma lleva "."
+  // (F-03).
+  const mapped = normalizeIpv4Mapped(ip);
+  if (mapped !== null) {
+    return checkIp(mapped, allowPrivate, allowLocalhost);
+  }
+
   // Detectar si es IPv4 o IPv6
   if (ip.includes(".")) {
     // IPv4

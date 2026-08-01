@@ -424,7 +424,8 @@ function plainEnglishSummary(report) {
   }
 
   const bandAdvice = {
-    "production-ready": "This page is ready for production publication.",
+    "production-ready":
+      "Strong style markers. Note: the score reflects formatting signals, not factual accuracy or ranking (audit F-06).",
     solid: "Close to ready — a few tweaks will make a difference.",
     "at-risk": "Address the flagged issues before publishing widely.",
     "needs-work": "This page needs substantial improvement to be AI-discoverable.",

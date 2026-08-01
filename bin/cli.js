@@ -44,6 +44,7 @@ import {
   TOTAL_TIMEOUT_MS,
 } from "../src/index.js";
 import { assertOutputDirInsideCwd } from "../src/schema.js";
+import { collectSubSitemapPageUrls } from "../src/sitemap.js";
 import {
   renderV1Report,
   renderV2Report,
@@ -265,6 +266,16 @@ program
       }
     }
 
+    // Fallos de archivo: diagnósticos a stderr en JSON mode, que antes los
+    // silenciaba por completo (F-05). El modo texto ya imprime cada error en
+    // su propio loop, no se duplica.
+    const fileErrors = results.filter((r) => r.status === "error");
+    if (format === "json") {
+      for (const r of fileErrors) {
+        console.error(`\nError auditing ${r.file}: ${r.error}`);
+      }
+    }
+
     // Unified threshold check
     if (threshold !== null) {
       const failures = results.filter((r) => r.status === "success" && r.score < threshold);
@@ -286,6 +297,13 @@ program
           `\nAll ${results.filter((r) => r.status === "success").length} file(s) meet threshold ${threshold}/100.`
         );
       }
+    }
+
+    // Sin --threshold, los fallos parciales también deben fallar el comando
+    // (F-05): restaura el claim "non-zero exit codes" del README para el gate
+    // sin threshold.
+    if (fileErrors.length > 0) {
+      process.exit(1);
     }
   });
 
@@ -431,8 +449,11 @@ sitemapCmd
         }
       }
 
+      // Codificar cada segmento del path (RFC 3986): espacios y caracteres
+      // especiales no pueden aparecer crudos en llms.txt ni sitemap (F-09).
+      const encodedUrlPath = urlPath.split("/").map(encodeURIComponent).join("/");
       const entry = {
-        url: baseUrl ? baseUrl.replace(/\/+$/, "") + urlPath : urlPath,
+        url: baseUrl ? baseUrl.replace(/\/+$/, "") + encodedUrlPath : encodedUrlPath,
         filePath: fp,
       };
 
@@ -1448,6 +1469,9 @@ function emitTechnicalResults(results, options) {
     if (options.output) {
       const outPath = path.resolve(options.output);
       try {
+        // Misma guarda de cwd que report/robots/sitemap/llmstxt (F-12): el
+        // resto de escrituras del CLI la aplican; -o no podía escapar.
+        assertNewFileParentInsideCwd(outPath);
         fs.writeFileSync(outPath, output, { encoding: "utf8" });
       } catch (e) {
         console.error(`Error: Failed to write ${outPath}: ${e.message}`);
@@ -1729,58 +1753,20 @@ async function handleRemoteTechnical(options) {
         );
       }
 
-      const pageUrls = [];
-      for (const sub of parsed.sitemapUrls) {
-        try {
-          if (format !== "json") {
-            console.log(chalk.dim(`    Fetching sub-sitemap ${sub.loc}...`));
-          }
-          const subResult = await fetchUrl(sub.loc, {
-            ...fetchOptions,
-            maxSize: Math.max(fetchOptions.maxSize, 10_485_760),
-          });
-          const subParsed = parseSitemapXml(subResult.html);
-
-          if (subParsed.issues.length > 0 && format !== "json") {
-            console.warn(chalk.yellow(`    Sub-sitemap issues: ${subParsed.issues.join("; ")}`));
-          }
-
-          // Un sub-sitemap podría ser a su vez otro índice (anidación de 2 niveles)
-          if (subParsed.sitemapUrls.length > 0) {
-            if (format !== "json") {
-              console.warn(
-                chalk.yellow(
-                  `    Nested sitemap index with ${subParsed.sitemapUrls.length} entries — fetching one level deeper...`
-                )
-              );
-            }
-            for (const subSub of subParsed.sitemapUrls) {
-              try {
-                const subSubResult = await fetchUrl(subSub.loc, {
-                  ...fetchOptions,
-                  maxSize: Math.max(fetchOptions.maxSize, 10_485_760),
-                });
-                const subSubParsed = parseSitemapXml(subSubResult.html);
-                pageUrls.push(...subSubParsed.urls.map((u) => u.loc));
-              } catch (e) {
-                if (format !== "json") {
-                  console.warn(
-                    chalk.yellow(
-                      `    Failed to fetch nested sub-sitemap ${subSub.loc}: ${e.message}`
-                    )
-                  );
-                }
-              }
-            }
-          } else {
-            pageUrls.push(...subParsed.urls.map((u) => u.loc));
-          }
-        } catch (e) {
-          if (format !== "json") {
-            console.warn(chalk.yellow(`    Failed to fetch sub-sitemap ${sub.loc}: ${e.message}`));
-          }
-        }
-      }
+      // Tope total de fetches de sub-sitemaps en todos los niveles de
+      // anidación: un índice hostil con sub-sitemaps ilimitados (posiblemente
+      // cross-origin) no puede amplificar el trabajo del CLI (F-11). La
+      // lógica vive en src/sitemap.js con fetch inyectable para poder
+      // testearse sin red.
+      const { pageUrls } = await collectSubSitemapPageUrls(parsed.sitemapUrls, {
+        fetchFn: (url, opts) => fetchUrl(url, opts),
+        fetchOptions: {
+          ...fetchOptions,
+          maxSize: Math.max(fetchOptions.maxSize, 10_485_760),
+        },
+        onInfo: format !== "json" ? (m) => console.log(chalk.dim(m)) : undefined,
+        onWarn: format !== "json" ? (m) => console.warn(chalk.yellow(m)) : undefined,
+      });
 
       if (format !== "json") {
         console.log(chalk.dim(`  Extracted ${pageUrls.length} page URLs from sub-sitemaps.`));

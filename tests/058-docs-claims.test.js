@@ -236,3 +236,18 @@ describe("Plan 058 §6.2 — Pro-only surfaces are still documented as Pro", () 
     });
   }
 });
+
+describe("Plan 058 §6.2 — schema stdout claim (audit F-14)", () => {
+  it("free-vs-pro.md no longer claims schema prints 'con branding'", () => {
+    const text = read("docs/free-vs-pro.md");
+    const schemaLine = text
+      .split("\n")
+      .find((l) => l.includes("schema <file> <type>") && l.includes("Community"));
+    assert.ok(schemaLine, "tabla comparativa debe tener la fila de schema");
+    assert.ok(
+      !schemaLine.includes("con branding"),
+      "el runtime emite JSON puro por stdout: la tabla no debe decir 'con branding'"
+    );
+    assert.ok(schemaLine.includes("sin branding"), "debe declarar 'sin branding'");
+  });
+});

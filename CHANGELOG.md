@@ -21,6 +21,69 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Security
+- `report --compare` now escapes and normalizes every baseline JSON value
+  (audit F-01): malicious `total_score`/breakdown strings can no longer inject
+  raw `<script>` markup into the generated HTML report.
+- The SSRF guard now blocks `169.254.0.0/16` (cloud metadata service) and
+  `100.64.0.0/10` (CGNAT) in `isPrivateIPv4`, and IPv4-mapped IPv6 literals
+  (`::ffff:127.0.0.1`, `::ffff:7f00:1`) are re-validated as their underlying
+  IPv4; IPv6 link-local now covers the full `fe80::/10` range (audit F-02/F-03).
+
+### Fixed
+- `audit` now writes per-file read errors to stderr in `--format json` too and
+  exits non-zero on partial file failures even without `--threshold` (audit
+  F-05): JSON mode was silent (exit 0, empty stderr) while dropping failed
+  files, contradicting the README "diagnostics on stderr / non-zero exit
+  codes" contract.
+- The v2 observation engine no longer counts technical identifiers
+  (versions, ports, endpoint IDs, `v22`) as statistics, and `hasSourcesSection`
+  now requires a real heading with links below it instead of a global keyword
+  match — a casual "references" in prose no longer earns citations points
+  (audit F-07/F-08).
+- `llms.txt` and `llms-full.txt` (both the single-string and multi-file
+  variants) now escape titles, descriptions, and section names inside
+  markdown links (a hostile `Fraud](https://evil.example)` title can no
+  longer close the link and inject an arbitrary URL; `[` is also escaped for
+  parsers with stricter link-label semantics), and page URLs are
+  percent-encoded per segment (RFC 3986) in `resolvePageUrl` and the sitemap/
+  llmstxt CLI entry builder — filenames with spaces no longer produce invalid
+  `<loc>` URLs (audit F-09).
+- HTML sources-section detection (v2) now recognizes lists wrapped in
+  containers (`div`/`section`/`p`/`li`) under the heading, not only bare
+  `ul`/`ol` — CMS-generated HTML wrapped the reference list and lost the
+  citations credit (edge case, review 2026-08-01).
+- Markdown heading detection uses `\S` (any non-space) instead of `\w`
+  (ASCII-only in JavaScript) in the v1 scorer and the Python port, so
+  headings in Arabic, CJK, and Cyrillic are detected identically by both
+  runtimes — Node previously scored non-Latin documents 3 points lower in
+  structure (audit F-10).
+- Sitemap mode now caps total sub-sitemap fetches (100, across all nesting
+  levels) so a hostile sitemap index cannot amplify work into unbounded
+  requests; the traversal logic moved to `collectSubSitemapPageUrls` in
+  `src/sitemap.js` with an injectable fetch (audit F-11).
+- `technical -o` now applies the same CWD write guard as every other CLI
+  output (report, robots, sitemap, llmstxt): `-o ../..` can no longer write
+  outside the working directory (audit F-12).
+- The GitLab CI template no longer declares a `dotenv` artifact on the hidden
+  job (it failed jobs whose `extends` never created the file) and corrected
+  the comments claiming `--recursive` needs a Pro license (audit F-13).
+
+### Docs
+- `docs/free-vs-pro.md` now states the Pro verification model explicitly:
+  the license key is a public, locally-checked format with no cryptographic
+  signature — Pro is honor-system by design, not a security boundary
+  (audit F-04), and the CLI table no longer claims `schema` prints Community
+  output "con branding" (audit F-14: stdout is pure JSON).
+
+### Changed
+- The v2 readiness band ≥85 is relabeled from "Production-Ready" to
+  "Strong Style Markers" with a description stating the score measures
+  formatting signals, not factual accuracy or ranking; the band id
+  (`production-ready`) stays stable in the JSON contract (audit F-06).
+  README documents the known gaming vectors and the new
+  `style-markers-gamed` adversarial fixture joins the regression corpus.
+
 ### Fixed
 - Fixed the GitLab CI template include URL (wrong org in the `remote:`
   reference) and the GitHub Actions composite action score parsing — the JSON

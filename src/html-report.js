@@ -20,6 +20,18 @@ function esc(str) {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * Normaliza un valor externo (JSON no confiable) a número finito.
+ * NaN/Infinity/strings no numéricos caen al fallback (F-01).
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+function toFiniteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function scoreColor(score, max = 100) {
   const pct = max > 0 ? score / max : 0;
   if (pct >= 0.8) return "#16a34a";
@@ -558,12 +570,16 @@ export function renderComparisonHtml(before, after, filepath, options = {}) {
   const noBranding = options.noBranding ?? false;
   const brandingSpan = noBranding ? "" : "<span>Tooltician Pro</span>";
 
-  const beforeScore = before.total_score ?? before.effectiveScore ?? 0;
-  const afterScore = after.total_score ?? after.effectiveScore ?? 0;
+  // El baseline (before) es un JSON externo no confiable (F-01): todos sus
+  // valores se normalizan a números finitos antes de interpolar en el HTML.
+  const beforeData = before ?? {};
+  const afterData = after ?? {};
+  const beforeScore = toFiniteNumber(beforeData.total_score ?? beforeData.effectiveScore ?? 0);
+  const afterScore = toFiniteNumber(afterData.total_score ?? afterData.effectiveScore ?? 0);
 
   // Dimension comparison (V1 breakdown)
-  const beforeB = before.breakdown;
-  const afterB = after.breakdown;
+  const beforeB = beforeData.breakdown;
+  const afterB = afterData.breakdown;
   const dimNames = ["structure", "statistics", "quotations", "citations", "clarity"];
   const dimLabels = {
     structure: "Structure",
@@ -575,7 +591,7 @@ export function renderComparisonHtml(before, after, filepath, options = {}) {
 
   // Findings diff: compare by ruleId
   const beforeFails = new Set(
-    (before.findings || [])
+    (beforeData.findings || [])
       .filter(
         (f) =>
           f.severity === "fail" ||
@@ -586,7 +602,7 @@ export function renderComparisonHtml(before, after, filepath, options = {}) {
       .map((f) => f.ruleId)
   );
   const afterFails = new Set(
-    (after.findings || [])
+    (afterData.findings || [])
       .filter(
         (f) =>
           f.severity === "fail" ||
@@ -602,7 +618,7 @@ export function renderComparisonHtml(before, after, filepath, options = {}) {
   const unchanged = [...afterFails].filter((id) => beforeFails.has(id));
 
   const findingMsg = (ruleId, reportObj) => {
-    const f = (reportObj.findings || []).find((x) => x.ruleId === ruleId);
+    const f = ((reportObj ?? {}).findings || []).find((x) => x.ruleId === ruleId);
     return f ? f.message : ruleId;
   };
 
@@ -643,13 +659,13 @@ ${
       ${dimNames
         .filter((k) => beforeB[k] && afterB[k])
         .map((k) => {
-          const bv = beforeB[k].score;
-          const av = afterB[k].score;
-          const max = beforeB[k].max ?? afterB[k].max ?? 20;
+          const bv = toFiniteNumber(beforeB[k].score);
+          const av = toFiniteNumber(afterB[k].score);
+          const max = toFiniteNumber(beforeB[k].max ?? afterB[k].max ?? 20, 20);
           return `<tr>
           <td>${esc(dimLabels[k])}</td>
-          <td><span class="badge ${scoreBadgeClass(bv, max)}">${bv}/${max}</span></td>
-          <td><span class="badge ${scoreBadgeClass(av, max)}">${av}/${max}</span></td>
+          <td><span class="badge ${scoreBadgeClass(bv, max)}">${esc(bv)}/${esc(max)}</span></td>
+          <td><span class="badge ${scoreBadgeClass(av, max)}">${esc(av)}/${esc(max)}</span></td>
           <td>${deltaHtml(bv, av)}</td>
         </tr>`;
         })
@@ -667,16 +683,16 @@ ${
       ? "<p style='color:#16a34a;font-size:.875rem'>No findings in either report.</p>"
       : ""
   }
-  ${improved.map((id) => `<div class="compare-finding-improved">✓ Fixed: ${esc(findingMsg(id, before))}</div>`).join("")}
-  ${regressed.map((id) => `<div class="compare-finding-regressed">✗ New issue: ${esc(findingMsg(id, after))}</div>`).join("")}
-  ${unchanged.map((id) => `<div class="compare-finding-unchanged">⚠ Still failing: ${esc(findingMsg(id, after))}</div>`).join("")}
+  ${improved.map((id) => `<div class="compare-finding-improved">✓ Fixed: ${esc(findingMsg(id, beforeData))}</div>`).join("")}
+  ${regressed.map((id) => `<div class="compare-finding-regressed">✗ New issue: ${esc(findingMsg(id, afterData))}</div>`).join("")}
+  ${unchanged.map((id) => `<div class="compare-finding-unchanged">⚠ Still failing: ${esc(findingMsg(id, afterData))}</div>`).join("")}
 </div>
 
 ${
-  (after.recommendations || []).length > 0
+  (afterData.recommendations || []).length > 0
     ? `<div class="card">
   <h2>Current Recommendations</h2>
-  ${(after.recommendations || []).map((r) => `<div class="rec">${esc(r)}</div>`).join("")}
+  ${(afterData.recommendations || []).map((r) => `<div class="rec">${esc(r)}</div>`).join("")}
 </div>`
     : ""
 }`;

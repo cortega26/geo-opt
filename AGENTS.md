@@ -12,7 +12,11 @@ hreflang/canonical and crawler policy). GEO is the headline and differentiator;
 structured data and technical SEO are the foundations AI engines depend on. For
 GEO it provides a legacy 0–100 heuristic and an experimental, profile-aware v2
 model characterized against repository fixtures; neither is a ranking or
-citation predictor. It also generates, injects, and validates JSON-LD; audits
+citation predictor. Both models measure style markers (structure, attribution
+patterns, citations, clarity) — not factual accuracy, veracity, or ranking;
+fabricated content with attributed fake stats/quotes and a link list can
+score 85+ (audit 2026-07-31, F-06). Never present the score as a truthfulness
+gate. It also generates, injects, and validates JSON-LD; audits
 and generates `robots.txt` and `sitemap.xml`; and supports `llms.txt`, batch,
 and CI workflows.
 

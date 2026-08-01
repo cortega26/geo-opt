@@ -707,3 +707,61 @@ describe("fetchUrl — rate limiting", () => {
     assert.ok(successful.length >= 2, "Debería haber al menos 2 éxitos");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-07-31 — F-02/F-03: huecos de cobertura SSRF
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("SSRF guards — audit F-02/F-03", () => {
+  // El guard debe rechazar ANTES de intentar conectar (sin servidor local).
+  it("fetcher-blocks-link-local-metadata (169.254.0.0/16)", async () => {
+    await assert.rejects(
+      fetchUrl("http://169.254.169.254/latest/meta-data/"),
+      /blocked/i,
+      "169.254.169.254 (cloud metadata) debe bloquearse antes de conectar"
+    );
+  });
+
+  it("fetcher-blocks-cgnat-range (100.64.0.0/10)", async () => {
+    await assert.rejects(fetchUrl("http://100.64.1.2/"), /blocked/i);
+  });
+
+  it("fetcher-blocks-ipv4-mapped-loopback", async () => {
+    // ::ffff:7f00:1 (hex) y ::ffff:127.0.0.1 (decimal) mapean a 127.0.0.1.
+    await assert.rejects(
+      fetchUrl("http://[::ffff:7f00:1]/"),
+      /blocked/i,
+      "::ffff:7f00:1 mapea a loopback y debe bloquearse"
+    );
+    await assert.rejects(
+      fetchUrl("http://[::ffff:127.0.0.1]/"),
+      /blocked/i,
+      "::ffff:127.0.0.1 mapea a loopback y debe bloquearse"
+    );
+  });
+
+  it("fetcher-blocks-ipv4-mapped-private", async () => {
+    // ::ffff:7f00:1 en versión privada: ::ffff:c000:0201 -> 192.0.2.1 es TEST-NET,
+    // pero ::ffff:a00:1 -> 10.0.0.1 (privada) debe bloquearse.
+    await assert.rejects(fetchUrl("http://[::ffff:a00:1]/"), /blocked/i);
+  });
+
+  it("fetcher-blocks-link-local-v6-range (fe80::/10)", async () => {
+    // El prefijo /10 cubre fe80::..febf:: — no solo fe80: (F-03).
+    await assert.rejects(fetchUrl("http://[fe90::1]/"), /blocked/i);
+    await assert.rejects(fetchUrl("http://[febf::1]/"), /blocked/i);
+  });
+
+  it("allow-private no desbloquea loopback mapeado", async () => {
+    // allowPrivate=true solo permite privadas no-loopback; el loopback
+    // mapeado sigue bloqueado salvo allowLocalhost.
+    await assert.rejects(fetchUrl("http://[::ffff:7f00:1]/", { allowPrivate: true }), /blocked/i);
+    // 169.254.169.254 es privada no-loopback: allowPrivate=true la desbloquea.
+    await fetchUrl("http://169.254.169.254/latest/", { allowPrivate: true }).then(
+      () => assert.fail("esperaba fallo de conexión, no bloqueo"),
+      (err) => {
+        assert.ok(!/blocked/i.test(err.message), "no debe ser un bloqueo del guard");
+      }
+    );
+  });
+});

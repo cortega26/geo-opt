@@ -136,21 +136,23 @@ describe("readiness bands", () => {
     assert.ok(report.effectiveScore >= 55, `Expected >=55, got ${report.effectiveScore}`);
   });
 
-  it("excellent tech doc without quotes ranks solid or better", () => {
+  it("excellent tech doc without quotes ranks needs-work or better", () => {
     const content = readFileSync(
       "tests/fixtures/audit-v2/adversarial/excellent-tech-doc-no-quotes.md",
       "utf8"
     );
     const { report } = scoreContentV2(content, "pg17.md", {});
-    // This is the critical test: excellent tech doc MUST rank well
-    // even though it has zero quotes
+    // The doc has zero quotes and no real sources section: the word
+    // "references" only appears as a verb in prose, which after F-08 no
+    // longer earns citations points. Excellent structure alone lands it in
+    // needs-work — a real, honest calibration.
     assert.ok(
-      report.readinessBand === "production-ready" || report.readinessBand === "solid",
-      `Excellent tech doc should be solid+, got ${report.readinessBand} (${report.effectiveScore})`
+      report.readinessBand === "needs-work" || report.readinessBand === "solid",
+      `Excellent tech doc should be needs-work+, got ${report.readinessBand} (${report.effectiveScore})`
     );
     assert.ok(
-      report.effectiveScore >= 65,
-      `Expected effective score >= 65, got ${report.effectiveScore}`
+      report.effectiveScore >= 55,
+      `Expected effective score >= 55, got ${report.effectiveScore}`
     );
   });
 
@@ -566,5 +568,34 @@ describe("audit is not an injection", () => {
     } finally {
       fs.rmSync(stateDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("readiness band label — audit F-06", () => {
+  it("band-label-is-neutral: >=85 no longer claims Production-Ready", () => {
+    // Contenido fabricable (stats falsos atribuidos, quotes falsas con em
+    // dash, 5 links, seccion Sources real, fechas) alcanza la banda alta —
+    // el label debe describir marcadores estilisticos, no "Production-Ready".
+    const content = readFileSync(
+      "tests/fixtures/audit-v2/adversarial/style-markers-gamed.md",
+      "utf8"
+    );
+    const { report } = scoreContentV2(content, "gamed.md", {});
+    assert.ok(
+      report.effectiveScore >= 85,
+      `fixture gamed debe superar 85 para probar el label, got ${report.effectiveScore}`
+    );
+    assert.ok(
+      !report.readinessLabel.includes("Production-Ready"),
+      `label neutral: ${report.readinessLabel}`
+    );
+    assert.ok(
+      report.readinessLabel.includes("Style Markers"),
+      `label descriptivo: ${report.readinessLabel}`
+    );
+    // El band id (contract JSON) se mantiene estable.
+    assert.equal(report.readinessBand, "production-ready");
+    // La descripción declara que el score no valida veracidad.
+    assert.match(report.readinessDescription, /not factual accuracy|style markers/i);
   });
 });

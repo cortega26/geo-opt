@@ -206,7 +206,7 @@ export function scoreContent(content, filepath, config) {
     structBreakdown.push("Lists: No lists found (+0 pts)");
   }
 
-  const mdHasHeaders = /^##+\s+\w+/m.test(textContent);
+  const mdHasHeaders = /^##+\s+\S/m.test(textContent);
   const htmlHasHeaders = htmlStructure && htmlStructure.h2h3Count > 0;
   if (mdHasHeaders || htmlHasHeaders) {
     structScore += 3;
@@ -447,7 +447,7 @@ export function scoreContent(content, filepath, config) {
     !!(htmlStructure && htmlStructure.tableCount > 0);
   const hasList = hasMdList(tokens) || !!(htmlStructure && htmlStructure.listCount > 0);
   const hasHeaders =
-    /^##+\s+\w+/m.test(textContent) || !!(htmlStructure && htmlStructure.h2h3Count > 0);
+    /^##+\s+\S/m.test(textContent) || !!(htmlStructure && htmlStructure.h2h3Count > 0);
   const findings = mapLegacyToFindings({
     introWordCount,
     introHasDefinition,

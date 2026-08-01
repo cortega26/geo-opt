@@ -10,6 +10,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync, spawn } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -901,8 +902,10 @@ describe("CLI technical", () => {
     );
   });
 
-  it("--output escribe reporte JSON a archivo", () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), "geo-opt-cli-tech-"));
+  it("--output escribe reporte JSON a archivo (dentro de cwd)", () => {
+    // F-12: la guarda de cwd exige que -o apunte dentro del directorio de
+    // trabajo; los tmp dirs van bajo el repo, no en el sistema.
+    const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-tech-"));
     const outFile = join(tmpDir, "report.json");
     try {
       const { status } = run(["technical", htmlFixture, "--format", "json", "--output", outFile]);
@@ -1127,5 +1130,137 @@ describe("CLI technical — mutual exclusion", () => {
         stderr.includes("sitemap") ||
         stderr.includes("path")
     );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Audit — fallos parciales de archivo (F-05)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("CLI audit — partial file failures (F-05)", () => {
+  const okFixture = "tests/fixtures/audit-v2/editorial/tech-blog.md";
+
+  /** Crea un par ok.md + bad.md (este último ilegible) en un temp dir. */
+  function makeUnreadablePair() {
+    const dir = mkdtempSync(join(tmpdir(), "geo-opt-f05-"));
+    writeFileSync(join(dir, "ok.md"), "# OK doc\n\nSome content.\n");
+    const bad = join(dir, "bad.md");
+    writeFileSync(bad, "# Bad doc\n");
+    chmodSync(bad, 0o000);
+    return { dir, bad };
+  }
+
+  it("audit-json-reports-partial-failures", () => {
+    const { dir, bad } = makeUnreadablePair();
+    try {
+      const ok = join(dir, "ok.md");
+      const { status, stderr, stdout } = run(["audit", ok, bad, "--format", "json"]);
+      assert.notEqual(status, 0, "exit != 0 con fallos parciales");
+      assert.ok(stderr.includes("Error auditing"), "diagnóstico en stderr");
+      assert.ok(stderr.includes(bad), "stderr menciona el archivo fallido");
+      // El payload JSON sigue siendo parseable y contiene el reporte del éxito.
+      const parsed = JSON.parse(stdout);
+      assert.ok(
+        typeof parsed.total_score === "number" || typeof parsed.effectiveScore === "number",
+        "JSON con el reporte del éxito"
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("text mode partial failure also exits non-zero", () => {
+    const { dir, bad } = makeUnreadablePair();
+    try {
+      const ok = join(dir, "ok.md");
+      const { status, stderr } = run(["audit", ok, bad]);
+      assert.notEqual(status, 0, "exit != 0 en modo texto con fallos parciales");
+      assert.ok(stderr.includes("Error auditing"), "diagnóstico en stderr");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("all-success json still exits 0 (no behavior change)", () => {
+    const { status, stderr } = run(["audit", okFixture, "--format", "json"]);
+    assert.equal(status, 0);
+    assert.ok(!stderr.includes("Error auditing"), "sin errores en stderr");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// llmstxt/sitemap — URLs de página con caracteres especiales (F-09)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("CLI llmstxt/sitemap — URL encoding (F-09)", () => {
+  const encDir = mkdtempSync(join(repoRoot, "tmp-cli-enc-"));
+
+  before(() => {
+    // Título hostil (H1) y nombre de archivo con espacios.
+    writeFileSync(
+      join(encDir, "mi página con espacios.md"),
+      "# Fraud](https://evil.example)\n\nContenido de prueba.\n"
+    );
+  });
+
+  after(() => {
+    rmSync(encDir, { recursive: true, force: true });
+  });
+
+  it("llms-txt-escapes-hostile-titles e2e", () => {
+    const { status, stdout } = run([
+      "llmstxt",
+      "generate",
+      encDir,
+      "-r",
+      "--dry-run",
+      "--site-url",
+      "https://example.com",
+    ]);
+    assert.equal(status, 0);
+    // El cierre del link inyectado no aparece crudo en el artefacto.
+    assert.ok(!stdout.includes("](https://evil.example)"), "no markdown link injection");
+    // El path con espacios sale codificado.
+    assert.ok(stdout.includes("mi%20p%C3%A1gina%20con%20espacios"), "spaces encoded in URL");
+  });
+
+  it("sitemap-encodes-urls e2e", () => {
+    const { status, stdout } = run([
+      "sitemap",
+      "generate",
+      encDir,
+      "-r",
+      "--dry-run",
+      "--base-url",
+      "https://example.com",
+    ]);
+    assert.equal(status, 0);
+    assert.ok(stdout.includes("mi%20p%C3%A1gina%20con%20espacios"), "<loc> has encoded URL");
+    assert.ok(!stdout.includes("<loc>https://example.com/mi página"), "no raw spaces in <loc>");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// technical -o — guarda de cwd (F-12)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("CLI technical — output cwd guard (F-12)", () => {
+  it("technical-output-enforces-cwd", () => {
+    const escapeName = `geo-opt-escape-${process.pid}.json`;
+    const { status, stderr } = run([
+      "technical",
+      "tests/fixtures/audit-v2/commercial/landing-page.html",
+      "-f",
+      "json",
+      "-o",
+      `../${escapeName}`,
+    ]);
+    assert.notEqual(status, 0, "salida fuera de cwd debe rechazarse");
+    assert.ok(
+      /Security restriction|outside|CWD|cwd/i.test(stderr),
+      `error del guard en stderr: ${stderr.slice(0, 200)}`
+    );
+    const escaped = join(repoRoot, "..", escapeName);
+    assert.equal(existsSync(escaped), false, "el archivo no se escribe fuera de cwd");
   });
 });

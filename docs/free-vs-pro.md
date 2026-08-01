@@ -7,7 +7,8 @@ injects, and validates across Markdown and HTML, including recursive/batch
 workflows, CI thresholds, and full artifact generation. The **Pro** edition adds
 standalone HTML reports, branding-free output, and advanced Schema.org types.
 
-**Verified 2026-07-22** against runtime at `b2e6055`. Runtime and tests outrank
+**Verified 2026-08-01** against runtime at `e921f79` (rama `chore/audit-fixes`,
+remediación de la auditoría 2026-07-31). Runtime and tests outrank
 prose; if a claim here disagrees with `bin/cli.js` or `src/`, the source is correct.
 
 ## What Pro actually gates
@@ -30,7 +31,7 @@ functions — runs Community-side without a license key.
 |---|---|---|
 | `audit [files...]` | ✅ Incluye `--recursive`, `--summary`, `--threshold`, `--format json`, multi-archivo | ✅ |
 | `technical [files...]` | ✅ Local offline; `--url`/`--sitemap` con protecciones SSRF | ✅ |
-| `schema <file> <type>` | ✅ Tipos Community (`article`, `news-article`, `faq`, `product`) por stdout, con branding | ✅ |
+| `schema <file> <type>` | ✅ Tipos Community (`article`, `news-article`, `faq`, `product`) por stdout, sin branding (JSON puro) | ✅ |
 | `schema <file> <type>` (tipos Pro) | ❌ `course`, `event`, `recipe`, `howto` requieren Pro | ✅ |
 | `validate <file>` | ✅ | ✅ |
 | `inject <file> <type>` | ✅ Incluye `--dry-run`, `--backup`, `--recursive` | ✅ |
@@ -89,6 +90,17 @@ Community.
 ```
 
 La verificación es local. No se envía contenido ni datos a Tooltician.
+
+**Modelo de verificación (honor system).** La verificación solo comprueba el
+formato de la clave: `tt_pro_` seguido de 20+ caracteres alfanuméricos, sin
+firma criptográfica ni contacto con un servidor. El patrón es público (el
+código es fuente abierta), por lo que la edición Pro funciona bajo el modelo
+de honor: cualquier persona puede autogenerar una clave con ese formato. Esto
+NO es un mecanismo de seguridad — es un control comercial simbólico que asume
+buena fe. Las operaciones Pro (`report`, `--no-branding`, tipos Pro de
+`schema`) se desbloquean con cualquier clave de formato válido. Una futura
+edición comercial con activación real reemplazará este modelo por verificación
+criptográfica.
 
 Cuando una operación Pro se invoca sin titularidad, el comando termina con un
 mensaje descriptivo y código de salida distinto de cero.

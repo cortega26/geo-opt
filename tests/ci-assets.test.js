@@ -91,3 +91,38 @@ describe("Plan 065 — CI entry assets", () => {
     }
   });
 });
+
+describe("Plan 065 — GitLab template claims (audit F-13)", () => {
+  const template = read("ci-templates/gitlab-ci.yml");
+
+  it("does not claim Pro for --recursive (Community feature)", () => {
+    assert.ok(
+      template.includes("scan directories recursively\n"),
+      "GEO_OPT_RECURSIVE comment must not claim Pro"
+    );
+    const recursiveLine = template.split("\n").find((l) => l.includes("GEO_OPT_RECURSIVE"));
+    assert.ok(!recursiveLine.includes("Pro"), "recursive is Community, not Pro");
+  });
+
+  it("licenses comment describes the real Pro gates", () => {
+    const licenseLine = template.split("\n").find((l) => l.includes("TOOLTICIAN_LICENSE_KEY"));
+    assert.ok(!licenseLine.includes("recursive"), "license key not needed for recursive");
+    assert.ok(licenseLine.includes("--no-branding") || licenseLine.includes("report"));
+  });
+
+  it("dotenv artifact is declared on the job that creates the file", () => {
+    // El job hidden (.geo-opt-audit) no puede declarar dotenv: un artifact
+    // ausente falla el job en GitLab y el archivo solo lo crea el job
+    // concreto geo-opt-audit (echo ... >> geo-opt-env.env).
+    const hiddenBlock = template.slice(
+      template.indexOf(".geo-opt-audit:"),
+      template.indexOf("geo-opt-audit:\n  extends")
+    );
+    assert.ok(
+      !hiddenBlock.includes("dotenv:"),
+      "hidden job must not declare a dotenv artifact it never creates"
+    );
+    const concreteJob = template.slice(template.indexOf("geo-opt-audit:\n  extends"));
+    assert.ok(concreteJob.includes("dotenv: geo-opt-env.env"), "concrete job owns the dotenv");
+  });
+});

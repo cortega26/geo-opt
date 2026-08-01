@@ -381,3 +381,31 @@ describe("Compatible capability shape checks", () => {
     assert.ok(pythonOut.includes("llms.txt") || pythonOut.includes("# "));
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tier: equivalent — V1 audit, headings no-Latin (F-10)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("V1 audit equivalence — non-Latin headings (audit F-10)", () => {
+  // El regex de headings usaba \w (ASCII en JS): Node no detectaba headers
+  // árabes/chinos/cirílicos (20 pts) mientras Python sí (23 pts). Con \S en
+  // ambos, la paridad debe ser byte-a-byte en la dimensión estructura.
+  const FIXTURES = ["rtl.md", "cjk.md", "cyr.md"];
+
+  for (const fixture of FIXTURES) {
+    it(`conformance-non-latin-headings ${fixture}`, () => {
+      const node = nodeAudit(fixture);
+      const python = pythonAudit(fixture);
+      assert.equal(
+        node.total_score,
+        python.total_score,
+        `${fixture}: total_score diverge (${node.total_score} vs ${python.total_score})`
+      );
+      assert.equal(
+        node.breakdown.structure.score,
+        python.breakdown.structure.score,
+        `${fixture}: structure score diverge`
+      );
+    });
+  }
+});

@@ -1512,7 +1512,9 @@ def audit_file(filepath, config, output_format="text", _content=None):
         has_list = False
         struct_breakdown.append("Lists: No lists found (+0 pts)")
         
-    if re.search(r'^##+\s+\w+', text_content, re.MULTILINE) or re.search(r'<h[234]>', text_content.lower()):
+    # \S (cualquier no-espacio) en vez de \w (ASCII en JS) para cubrir
+    # headings en scripts no-Latin (árabe, CJK, cirílico) — paridad Node/Python.
+    if re.search(r'^##+\s+\S', text_content, re.MULTILINE) or re.search(r'<h[234]>', text_content.lower()):
         has_headers = True
         struct_score += 3
         struct_breakdown.append("Headers: Clean H2/H3 hierarchy found (+3 pts)")

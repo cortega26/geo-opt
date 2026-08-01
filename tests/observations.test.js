@@ -272,7 +272,8 @@ describe("content freshness", () => {
 
 describe("link quality", () => {
   it("passes for content with external links and sources section", () => {
-    const content = `# Article\n\nSee [Google](https://google.com), [Bing](https://bing.com), and [DuckDuckGo](https://duckduckgo.com).\n\n## Sources\n\n- Source 1\n- Source 2`;
+    // F-08: la sección Sources debe contener links reales para contar.
+    const content = `# Article\n\nSee [Google](https://google.com), [Bing](https://bing.com), and [DuckDuckGo](https://duckduckgo.com).\n\n## Sources\n\n- [Source 1](https://example.com/1)\n- [Source 2](https://example.com/2)`;
     const obs = observeContent(content, "test.md");
     assert.equal(obs.linkQuality.status, "pass");
     assert.ok(obs.linkQuality.externalLinkCount >= 3);
@@ -363,8 +364,10 @@ describe("adversarial fixture observations", () => {
     // Attribution should be low because there are no real stats or sources
     assert.equal(obs.attributionProximity.quotesWithAttribution, 0);
     assert.equal(obs.attributionProximity.statsWithNearbySource, 0);
-    // Link quality: claims to have references but they're vague
-    assert.equal(obs.linkQuality.hasSourcesSection, true);
+    // Link quality: a "References" heading with zero links is NOT a real
+    // sources section (F-08) — "Various industry reports" without links
+    // must not earn citations points.
+    assert.equal(obs.linkQuality.hasSourcesSection, false);
     assert.equal(obs.linkQuality.externalLinkCount, 0); // "Various industry reports" — zero actual links
   });
 
@@ -434,5 +437,121 @@ describe("observeAndParse", () => {
     assert.ok(result.textContent);
     assert.ok(Array.isArray(result.tokens));
     assert.equal(typeof result.textContent, "string");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-07-31 — F-07/F-08: falsos positivos del scoring
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("observations — audit F-07 (versions/ports/ids as stats)", () => {
+  it("observations-ignores-versions-ports-ids", () => {
+    const content = `# Technical Reference
+
+The application runs on Node version 22 with API endpoint 42 and listens on
+port 8080. The service ID 12345 maps to build 2026.07.1. According to the
+official docs, no further details are needed.`;
+    const obs = observeContent(content, "tech.md");
+    const ap = obs.attributionProximity;
+    assert.equal(ap.statsWithNearbySource + ap.statsWithoutNearbySource, 0);
+    assert.equal(ap.status, "pass", "sin stats reales no debe fallar atribución");
+  });
+
+  it("real percentages still count as stats", () => {
+    const content = `# Report
+
+According to the survey, 73% of users prefer plain text and 12.5% use dark
+mode.`;
+    const obs = observeContent(content, "report.md");
+    const ap = obs.attributionProximity;
+    assert.ok(ap.statsWithNearbySource + ap.statsWithoutNearbySource >= 2);
+  });
+
+  it("v-prefixed versions are excluded (v22)", () => {
+    const content = `# Docs
+
+Upgrade to v22 and set the limit to 10 items per page.`;
+    const obs = observeContent(content, "docs.md");
+    const ap = obs.attributionProximity;
+    // "10" es un número de 2 dígitos sin contexto técnico; "22" tras "v" no.
+    assert.ok(ap.statsWithoutNearbySource <= 1);
+  });
+});
+
+describe("observations — audit F-08 (real sources section)", () => {
+  it("observations-requires-real-sources-section", () => {
+    // La palabra "sources" en prosa, sin heading ni links, no es una sección.
+    const content = `# Article
+
+Our company aggregates multiple sources before publishing. The editorial
+team reviews every draft twice.`;
+    const obs = observeContent(content, "article.md");
+    assert.equal(obs.linkQuality.hasSourcesSection, false);
+  });
+
+  it("heading with links below counts as a sources section", () => {
+    const content = `# Article
+
+Body text with a [reference](https://example.com/ref).
+
+## Sources
+
+- [Example One](https://example.com/one)
+- [Example Two](https://example.com/two)`;
+    const obs = observeContent(content, "article.md");
+    assert.equal(obs.linkQuality.hasSourcesSection, true);
+  });
+
+  it("sources heading without links below does not count", () => {
+    const content = `# Article
+
+## Sources
+
+We collected data from internal systems during Q3. No public links yet.`;
+    const obs = observeContent(content, "article.md");
+    assert.equal(obs.linkQuality.hasSourcesSection, false);
+  });
+
+  it("HTML sources section detected via cheerio", () => {
+    const content = `<html><body>
+<h1>Guide</h1>
+<p>Introduction paragraph.</p>
+<h2>References</h2>
+<ul><li><a href="https://example.com/a">A</a></li></ul>
+</body></html>`;
+    const obs = observeContent(content, "guide.html");
+    assert.equal(obs.linkQuality.hasSourcesSection, true);
+  });
+});
+
+describe("observations — audit F-08 HTML containers (review 2026-08-01)", () => {
+  it("sources list wrapped in a div still counts", () => {
+    const content = `<html><body>
+<h1>Guide</h1>
+<p>Intro.</p>
+<h2>References</h2>
+<div><ul><li><a href="https://example.com/a">A</a></li></ul></div>
+</body></html>`;
+    const obs = observeContent(content, "guide.html");
+    assert.equal(obs.linkQuality.hasSourcesSection, true);
+  });
+
+  it("sources section with a plain paragraph of links counts", () => {
+    const content = `<html><body>
+<h2>Sources</h2>
+<p>See <a href="https://example.com/ref">the reference</a> and
+<a href="https://example.com/more">more</a>.</p>
+</body></html>`;
+    const obs = observeContent(content, "guide.html");
+    assert.equal(obs.linkQuality.hasSourcesSection, true);
+  });
+
+  it("div without links under the heading still does not count", () => {
+    const content = `<html><body>
+<h2>References</h2>
+<div><p>No links here, just prose about methodology.</p></div>
+</body></html>`;
+    const obs = observeContent(content, "guide.html");
+    assert.equal(obs.linkQuality.hasSourcesSection, false);
   });
 });

@@ -546,3 +546,70 @@ function _renderSitemapIndex(entries) {
   lines.push("");
   return lines.join("\n");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sub-sitemap traversal with a hard fetch cap (audit F-11)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sigue sub-sitemaps desde un índice (incluida la anidación de niveles) con
+ * un tope total de fetches. Un índice hostil con sub-sitemaps ilimitados
+ * (posiblemente cross-origin) no puede amplificar el trabajo del llamador.
+ *
+ * El fetch es inyectable para poder testear la lógica del tope sin red.
+ *
+ * @param {Array<{loc: string}>} sitemapUrls — sub-sitemaps del índice raíz
+ * @param {object} deps
+ * @param {(url: string, options?: object) => Promise<{html: string}>} deps.fetchFn
+ * @param {object} [deps.fetchOptions] — opciones pasadas a fetchFn
+ * @param {number} [deps.maxFetches=100] — tope total de fetches (todos los niveles)
+ * @param {(msg: string) => void} [deps.onInfo] — progreso (solo si aplica)
+ * @param {(msg: string) => void} [deps.onWarn] — warnings y aviso de tope
+ * @returns {Promise<{ pageUrls: string[], fetched: number, skipped: number }>}
+ */
+export async function collectSubSitemapPageUrls(sitemapUrls, deps) {
+  const {
+    fetchFn,
+    fetchOptions = {},
+    maxFetches = 100,
+    onInfo = () => {},
+    onWarn = () => {},
+  } = deps;
+
+  const pageUrls = [];
+  const queue = [...sitemapUrls];
+  let fetched = 0;
+
+  while (queue.length > 0 && fetched < maxFetches) {
+    const sub = queue.shift();
+    fetched += 1;
+    try {
+      onInfo(`    Fetching sub-sitemap ${sub.loc}...`);
+      const result = await fetchFn(sub.loc, fetchOptions);
+      const parsed = parseSitemapXml(result.html);
+
+      if (parsed.issues.length > 0) {
+        onWarn(`    Sub-sitemap issues: ${parsed.issues.join("; ")}`);
+      }
+
+      // Un sub-sitemap puede ser a su vez otro índice (anidación de niveles);
+      // los siguientes niveles se encolan y cuentan contra el mismo tope.
+      if (parsed.sitemapUrls.length > 0) {
+        onWarn(
+          `    Nested sitemap index with ${parsed.sitemapUrls.length} entries — fetching one level deeper...`
+        );
+        queue.push(...parsed.sitemapUrls);
+      } else {
+        pageUrls.push(...parsed.urls.map((u) => u.loc));
+      }
+    } catch (e) {
+      onWarn(`    Failed to fetch sub-sitemap ${sub.loc}: ${e.message}`);
+    }
+  }
+
+  const skipped = queue.length;
+  if (skipped > 0) {
+    onWarn(`  Sub-sitemap fetch limit reached (${maxFetches}); ${skipped} sub-sitemap(s) skipped.`);
+  }
+  return { pageUrls, fetched, skipped };
+}

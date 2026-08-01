@@ -662,10 +662,13 @@ function scoreClarity(obs, textContent, config, profile) {
 function readinessBand(pct) {
   if (pct >= 85) {
     return {
+      // El band id es contract estable del JSON; el label ya no afirma
+      // "Production-Ready" — el score mide marcadores estilísticos, no
+      // veracidad ni ranking (audit F-06).
       band: "production-ready",
-      label: "Production-Ready",
+      label: "Strong Style Markers",
       description:
-        "Content is well-structured, well-attributed, and clear. Ready for AI-engine indexing.",
+        "Content shows strong style markers (structure, attribution, citations, clarity). This measures formatting signals, not factual accuracy or ranking — fabricated content can score high.",
     };
   }
   if (pct >= 65) {

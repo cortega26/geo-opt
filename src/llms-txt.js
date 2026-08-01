@@ -158,7 +158,10 @@ export function resolvePageUrl(filepath, baseDir, siteUrl, opts = {}) {
     rel += "/";
   }
   if (rel === "") return cleanBase + "/";
-  return `${cleanBase}/${rel}`;
+  // Codificar cada segmento del path (RFC 3986): espacios, '#', '?', unicode —
+  // la URL cruda con espacios es inválida y rompe llms.txt y sitemap (F-09).
+  const encoded = rel.split("/").map(encodeURIComponent).join("/");
+  return `${cleanBase}/${encoded}`;
 }
 
 /**
@@ -183,6 +186,26 @@ export function findCommonBaseDir(filePaths) {
     }
   }
   return common.length > 0 ? common.join(path.sep) : process.cwd();
+}
+
+/**
+ * Escapa texto de títulos/descripciones para interpolarlo dentro de un link
+ * markdown `[text](url)`: `]` y `(` cerrarían el link y permitirían inyectar
+ * una URL arbitraria desde contenido hostil (F-09).
+ * @param {unknown} text
+ * @returns {string}
+ */
+function escapeLinkText(text) {
+  return (
+    String(text ?? "")
+      .replace(/\\/g, "\\\\")
+      // `[` se escapa por defensa: marked tolera el `[` interno dentro del
+      // label, pero otros parsers de llms.txt pueden cerrar el label antes
+      // (edge case F-09, revisión 2026-08-01).
+      .replace(/\[/g, "\\[")
+      .replace(/\]/g, "\\]")
+      .replace(/\(/g, "\\(")
+  );
 }
 
 // ---- llms.txt generation ----
@@ -251,11 +274,13 @@ export function generateLlmsTxt(entries, options = {}) {
 
   // Regular sections
   for (const [sectionName, sectionEntries] of sections) {
-    lines.push(`## ${sectionName}`);
+    lines.push(`## ${escapeLinkText(sectionName)}`);
     lines.push("");
     for (const entry of sectionEntries) {
-      const desc = entry.description ? `: ${cleanMarkdownToPlainText(entry.description)}` : "";
-      lines.push(`- [${entry.title}](${entry.url})${desc}`);
+      const desc = entry.description
+        ? `: ${escapeLinkText(cleanMarkdownToPlainText(entry.description))}`
+        : "";
+      lines.push(`- [${escapeLinkText(entry.title)}](${entry.url})${desc}`);
     }
     lines.push("");
   }
@@ -265,8 +290,10 @@ export function generateLlmsTxt(entries, options = {}) {
     lines.push("## Optional");
     lines.push("");
     for (const entry of optional) {
-      const desc = entry.description ? `: ${cleanMarkdownToPlainText(entry.description)}` : "";
-      lines.push(`- [${entry.title}](${entry.url})${desc}`);
+      const desc = entry.description
+        ? `: ${escapeLinkText(cleanMarkdownToPlainText(entry.description))}`
+        : "";
+      lines.push(`- [${escapeLinkText(entry.title)}](${entry.url})${desc}`);
     }
     lines.push("");
   }
@@ -319,7 +346,7 @@ function renderPageForFullTxt(entry, maxChars, lines) {
 
   lines.push("---");
   lines.push("");
-  lines.push(`## [${entry.title}](${entry.url})`);
+  lines.push(`## [${escapeLinkText(entry.title)}](${entry.url})`);
   lines.push("");
 
   const content = entry.content || "";
@@ -521,7 +548,7 @@ export function generateLlmsFullTxtFiles(entries, options = {}) {
     `# ${title} — Full Content\n\n> This file contains the complete content of all pages listed in llms.txt.\n`;
 
   for (const entry of entries) {
-    const pageHeader = `\n---\n\n## [${entry.title}](${entry.url})\n\n`;
+    const pageHeader = `\n---\n\n## [${escapeLinkText(entry.title)}](${entry.url})\n\n`;
     const content = entry.content || "";
     const cleaned = preserveContentStructure(content);
     const pageText = pageHeader + cleaned;
