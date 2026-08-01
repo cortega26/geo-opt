@@ -195,6 +195,7 @@ program
         : [".md", ".html", ".htm"]
     );
     let discovered;
+    const missingPaths = [];
     try {
       discovered = discoverFiles(files, {
         recursive: options.recursive || false,
@@ -202,6 +203,10 @@ program
         allowedExtensions: allowedExts,
         cwd: process.cwd(),
         config,
+        // F-05 residual: un path explícito inexistente en modo mixto (con
+        // otros archivos válidos) se descartaba en silencio — gate en verde
+        // con archivos fallidos. Se reporta a stderr y falla el comando.
+        onMissingPath: (p) => missingPaths.push(p),
       });
     } catch (e) {
       console.error(`Error: ${e.message}`);
@@ -276,6 +281,13 @@ program
       }
     }
 
+    // Paths explícitos inexistentes (F-05 residual): el discovery los
+    // descartaba en silencio en modo mixto; ahora se diagnostican igual que
+    // los errores de lectura, en ambos formatos.
+    for (const p of missingPaths) {
+      console.error(`\nError auditing ${p}: file does not exist`);
+    }
+
     // Unified threshold check
     if (threshold !== null) {
       const failures = results.filter((r) => r.status === "success" && r.score < threshold);
@@ -301,8 +313,8 @@ program
 
     // Sin --threshold, los fallos parciales también deben fallar el comando
     // (F-05): restaura el claim "non-zero exit codes" del README para el gate
-    // sin threshold.
-    if (fileErrors.length > 0) {
+    // sin threshold. Los paths inexistentes cuentan como fallos (residual).
+    if (fileErrors.length > 0 || missingPaths.length > 0) {
       process.exit(1);
     }
   });

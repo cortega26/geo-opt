@@ -63,6 +63,27 @@ describe("artifact invariants", () => {
     );
   });
 
+  // La ventana exacta de la race (un build vecino copiando el placeholder
+  // sobre el hash recién escrito mientras otro build corre) no es
+  // reproducible de forma determinista en un test — depende del interleaving
+  // de node --test. El invariante que el fix de scripts/build.js garantiza
+  // por construcción es este: la asignación de EXPECTED_HASH en dist es
+  // SIEMPRE el hash inyectado, nunca el placeholder del template (el
+  // cpSync excluye src/integrity.js; el paso 5 escribe la versión con hash).
+  it("dist/integrity.js nunca expone el placeholder en la asignación", () => {
+    build();
+    const integrity = readDist("integrity.js");
+    assert.match(
+      integrity,
+      /const EXPECTED_HASH = "[0-9a-f]{64}"/,
+      "la asignación de EXPECTED_HASH en dist es el hash SHA-256 inyectado"
+    );
+    assert.ok(
+      !integrity.includes('const EXPECTED_HASH = "<<<LICENSING_HASH>>>"'),
+      "el template placeholder no se filtra a dist/"
+    );
+  });
+
   it("dist/licensing.js es copia exacta de src/licensing.js (sin ofuscación)", () => {
     build();
     assert.strictEqual(

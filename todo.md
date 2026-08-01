@@ -1,60 +1,42 @@
-# Todo — Remediación auditoría 2026-07-31
+# Todo — Verificación e2e de la remediación (auditoría 2026-07-31)
 
-Spec: `spec.md`. Rama: `chore/audit-fixes`. Un commit por finding.
+Spec: `spec.md`. Base: `main` @ `7ebe7cd` (v2.3.2). Ciclo previo (fixes F-01..F-14
++ P3) ya fusionado; esta pasada verifica que los fixes se sostienen black-box.
 
 ## Preparación
 
-- [x] Leer informe de auditoría y localizar superficies
-- [x] Escribir spec.md
-- [x] Crear rama `chore/audit-fixes`
+- [x] Leer informe de auditoría y estado del repo (main limpio, v2.3.2)
+- [x] Gate `npm run check` baseline en verde
+- [x] Verificar marcadores de los 14 fixes en src/ (grep)
+- [x] Confirmar shapes: JSON v2 (readinessBand/Label, dimensions), baseline
+      --compare, flags CLI (llmstxt generate, sitemap generate, technical
+      --sitemap/--allow-localhost)
+- [x] Reescibir spec.md para la pasada de verificación
+- [x] Escribir tests/audit-2026-07-31.e2e.test.js
 
-## P0
+## Suite e2e (tests/audit-2026-07-31.e2e.test.js)
 
-- [x] **F-01** XSS `--compare`: normalizar + esc() en renderComparisonHtml; test html-report — `8fe33e8`
-- [x] **F-02** SSRF 169.254/16 + 100.64/10 en isPrivateIPv4; test fetcher — `9896b92`
-- [x] **F-03** IPv4-mapped + fe80::/10 en fetcher; 2 tests fetcher — `9896b92`
-
-## P1
-
-- [x] **F-05** JSON mode: errores a stderr + exit 1 sin threshold; test cli-smoke — `7f21fac`
-- [x] **F-07** Filtrar versiones/puertos/IDs en stats; test observations — `35d61ab`
-- [x] **F-08** hasSourcesSection por sección real; test observations — `35d61ab`
-- [x] **F-09** escapeLinkText + encodeURI (llms-txt, cli entry.url); tests — `f7a2bfd`
-- [x] **F-10** `\S` en headings Node+Python; fixtures no-Latin + conformance — `e796126`
-- [x] **F-11** Tope 100 sub-sitemaps; test unitario en sitemap.test.js (e2e TLS loopback no viable: entorno roto, ver spec) — `af8434f`
-
-## P2
-
-- [x] **F-04** Docs honor-system + test contract de patrón — `b585b12`
-- [x] **F-06** Relabel banda + nota reporte + docs; tests scoring-v2 — `e921f79`
-- [x] **F-12** Guarda cwd en `technical -o`; test write-guard/cli-smoke — `9872ccf`
-- [x] **F-13** Template GitLab: dotenv al job concreto + comentarios; test — `98a464a`
-
-## P3
-
-- [x] **F-14** free-vs-pro.md: schema sin branding + nota de verificación — `b585b12`
-- [x] CHANGELOG.md `Unreleased` con todos los fixes (por commit)
+- [x] F-01 report --compare escapa baseline malicioso (CLI, clave forjada)
+- [x] F-02 fetchUrl bloquea 169.254.0.0/16 y 100.64.0.0/10
+- [x] F-03 fetchUrl bloquea ::ffff:7f00:1, ::ffff:127.0.0.1, fe90::1, febf::1
+- [x] F-04 forja funcional (report exit 0) + docs honor-system
+- [x] F-05 audit -f json/texto con fallo parcial → exit ≠ 0, stderr no vacío
+- [x] F-06 banda gamed: id "production-ready" + label "Strong Style Markers"
+- [x] F-07 versiones/puertos/IDs → statistics.score === 0
+- [x] F-08 "sources" casual → citations.score === 0; control positivo > 0
+- [x] F-09 llms.txt + sitemap escapan título hostil y codifican URL (%20)
+- [x] F-10 paridad no-Latin node === python (rtl/cjk/cyr)
+- [x] F-11 tope 100 sub-sitemaps (collectSubSitemapPageUrls; e2e CLI loopback no viable: sandbox rompe TCP cross-process)
+- [x] F-12 technical -o fuera de cwd → rechazado, sin escritura
+- [x] F-13 template GitLab: dotenv solo en job concreto, sin "(Pro)" falso
+- [x] F-14 free-vs-pro.md "sin branding" + schema → JSON puro
 
 ## Cierre
 
-- [x] `npm run check` completo en verde (716 tests, exit 0)
-- [x] `python3 test_optimizer.py` en verde (verificado en F-10)
-- [x] Anexo de estado de remediación en docs/audits/auditoria-2026-07-31.md (§17)
-- [x] Nota "Verified" de free-vs-pro.md actualizada
-- [x] Revisión de gaps con sub-agente (1 loop, alineada)
-- [x] Commit final (anexo §17 `a4d06a4` + correcciones de revisión `3344456`)
-- [x] git status limpio; resumen al usuario (spec.md/todo.md no commiteados salvo petición)
-
-## Revisión de gaps (sub-agente) — completada 2026-08-01
-
-- [x] 1 defecto medio (F-09 llms-full files) + 6 menores corregidos en `3344456`
-- [x] `npm run check` re-corro en verde tras las correcciones (712 tests)
-- [x] Anexo §17 actualizado a 712 tests
-- [x] spec.md documenta el resultado de la revisión
-
-## Pasada de edge cases (2026-08-01) — completada en `1cfdf17`
-
-- [x] F-08: contenedores HTML (div/section/p/li) con links detectados (falso negativo real)
-- [x] F-09: escape de `[` por defensa + test de parse real sin links inyectados
-- [x] Probes sin acción: JSON corrupto en --compare, summary+errores, YAML template, paridad tab/emoji, CGNAT mapeado
-- [x] `npm run check` final en verde (716 tests)
+- [x] `node --test tests/audit-2026-07-31.e2e.test.js` en verde (25/25)
+- [x] `npm run check` completo en verde (742 tests, incluye suite nueva)
+- [x] Race de build encontrada y corregida (scripts/build.js filter + test invariante artifact.test.js + CHANGELOG + README badges)
+- [x] Actualizar informe §18 con resultado de la pasada (14/14 sostienen + hallazgo nuevo build race)
+- [x] Revisión de gaps con sub-agente (1 loop): 5 huecos accionables corregidos (F-04 negativo, F-12 positivo, F-01 esc(), F-10 valores absolutos, F-13 bloque robusto) + **residual F-05 real** corregido en producto (discoverFiles onMissingPath + audit exit 1) + root-skip + timeout 30s en spawns
+- [x] Gate final en verde (745 tests/112 suites)
+- [ ] git status limpio; resumen al usuario

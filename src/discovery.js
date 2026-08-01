@@ -141,6 +141,9 @@ function hasAllowedExtension(filename, allowedExtensions) {
  * @param {Set<string>} [options.allowedExtensions] - default: .md, .html, .htm
  * @param {string} [options.cwd] - defaults to process.cwd()
  * @param {object} [options.config] - parsed geo_config.json (for config.ignore)
+ * @param {(path: string) => void} [options.onMissingPath] - called with each
+ *   explicit input path that does not exist on disk. Sin callback, el
+ *   comportamiento es el histórico (skip silencioso en batch).
  * @returns {string[]} resolved absolute file paths, sorted
  * @throws {Error} if a path is a directory and !recursive
  */
@@ -151,6 +154,7 @@ export function discoverFiles(inputPaths, options = {}) {
     allowedExtensions = DEFAULT_EXTENSIONS,
     cwd = process.cwd(),
     config = {},
+    onMissingPath,
   } = options;
 
   // Compile ignore rules from .gitignore + config + CLI
@@ -184,7 +188,13 @@ export function discoverFiles(inputPaths, options = {}) {
     try {
       stat = fs.lstatSync(resolved);
     } catch {
-      // Non-existent path — skip in batch, but report
+      // Non-existent path — skip en batch, pero notificar al llamador
+      // (F-05 residual): un path explícito inexistente no debe pasar en
+      // silencio cuando hay otros archivos que sí se auditan — el gate
+      // quedaba en verde (exit 0, stderr vacío) con un path mal tipeado.
+      if (typeof onMissingPath === "function") {
+        onMissingPath(inputPath);
+      }
       continue;
     }
 

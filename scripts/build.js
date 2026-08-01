@@ -13,8 +13,15 @@ const PLACEHOLDER = "<<<LICENSING_HASH>>>";
 //    determinista, así que el overwrite en-place produce el mismo artefacto).
 mkdirSync(join(DIST_DIR, "bin"), { recursive: true });
 
-// 2. Copiar src/ directamente en dist/ (estructura plana idéntica a src/)
-cpSync(SRC_DIR, DIST_DIR, { recursive: true });
+// 2. Copiar src/ directamente en dist/ (estructura plana idéntica a src/),
+//    excluyendo integrity.js: su placeholder no debe quedar expuesto en
+//    dist/, ni siquiera momentáneamente. Los tests ejecutan builds
+//    concurrentes sobre el mismo dist/ (node --test corre archivos en
+//    paralelo) y, en la ventana entre este cp y la inyección del hash
+//    (paso 5), un build vecino podía copiar el placeholder encima del hash
+//    recién escrito — race observada en artifact.test.js. El paso 5 escribe
+//    dist/integrity.js una sola vez, con el hash real.
+cpSync(SRC_DIR, DIST_DIR, { recursive: true, filter: (src) => src !== "src/integrity.js" });
 
 // 3. Copiar bin/ a dist/bin/ y parchear rutas de importación relativas.
 //    bin/cli.js usa "../src/" para desarrollo local; en dist/bin/ los módulos

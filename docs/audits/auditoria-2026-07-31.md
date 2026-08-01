@@ -455,3 +455,27 @@ SHA de Actions.
 > [Plan 068 DEFERRED](../plans/068-license-signing.md) (triggers: 059
 > CONTINUE + 060 GO + canal de venta). La remediación completa se publicó
 > como geo-opt 2.3.2.
+
+## 18. Pasada de verificación e2e (2026-08-01, tarde)
+
+Verificación black-box de los 14 hallazgos contra `main` v2.3.2+
+(`7ebe7cd`), reproduciendo cada probe del informe vía CLI como subproceso
+(`tests/audit-2026-07-31.e2e.test.js`, 25 tests / 14 describes):
+
+| Resultado | Hallazgos |
+|---|---|
+| ✅ Sostienen los 14 fixes | F-01 (baseline malicioso → HTML sin `script`; la normalización NaN→0 elimina el payload), F-02/F-03 (blocked antes de conectar: 169.254.169.254, 100.64.0.1, `::ffff:7f00:1`, `::ffff:127.0.0.1`, fe90::1, febf::1), F-04 (forja funcional + honor-system documentado), F-05 (exit≠0 + stderr en JSON y texto), F-06 (band `production-ready` id estable / label "Strong Style Markers"), F-07 (statistics 0), F-08 (citations 0 + control positivo), F-09 (`](evil)` y `%20`), F-10 (paridad 23=23=23 rtl/cjk/cyr), F-11 (tope 100), F-12 (`-o` fuera de cwd rechazado), F-13 (dotenv job concreto), F-14 (schema JSON puro, docs "sin branding") |
+| 🐛 Hallazgo nuevo | Race de build en `scripts/build.js`: `cpSync` copiaba `src/integrity.js` (placeholder) a `dist/`; con builds concurrentes (node --test ejecuta archivos en paralelo: `integrity.test.js` + `artifact.test.js`), el placeholder podía quedar expuesto entre el copy y la inyección del hash, rompiendo el test de determinismo de forma flaky (741→742 tests al añadir la suite expuso el timing). **Corregido**: el cpSync excluye `integrity.js` y `dist/` solo recibe la versión con hash (paso 5). Test de invariante añadido en `artifact.test.js`. |
+| 🐛 Residual F-05 | `audit ok.md missing.md --format json` → **exit 0, stderr vacío** (path explícito inexistente descartado en silencio por `discoverFiles` cuando había otros archivos válidos — misma clase de fallo F-05: gate en verde con archivos fallidos). **Corregido**: `discoverFiles` acepta `onMissingPath` y `audit` diagnostica "file does not exist" en stderr y sale exit 1 en ambos formatos. Revisión independiente (sub-agente) también endureció la suite: control negativo F-04, control positivo F-12, camino `esc()` de F-01 vía finding hostil, F-10 con valores absolutos fijados (23/3), F-13 con extracción de bloque independiente del orden, skip root-safe para el fixture chmod-0, y timeout de 30 s en los spawns del CLI. |
+
+**Desviaciones de entorno documentadas**: el e2e CLI de F-11 con servidor
+loopback no es viable en este sandbox — TCP loopback entre procesos no
+entrega conexiones (servidor http/https en 127.0.0.1 recibe 0 conexiones de
+un proceso hijo; verificado 2026-08-01; mismo patrón que el EPROTO TLS del
+ciclo previo) y `technical --sitemap` exige `https://` incondicionalmente.
+La verificación usa `collectSubSitemapPageUrls` (la función del fix a la que
+delega el CLI) con fetch inyectable.
+
+**Gate final**: `npm run check` en verde (742 tests / 112 suites, python
+40/40, lint/format/changelog/publint/attw verdes). Conteo de tests de los
+README actualizado (716 → 742).

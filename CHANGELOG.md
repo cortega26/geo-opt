@@ -42,7 +42,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   exits non-zero on partial file failures even without `--threshold` (audit
   F-05): JSON mode was silent (exit 0, empty stderr) while dropping failed
   files, contradicting the README "diagnostics on stderr / non-zero exit
-  codes" contract.
+  codes" contract. Residual closed 2026-08-01 (verification pass): an explicit
+  path that does not exist was silently dropped when other files matched
+  (`audit ok.md missing.md` exited 0 with empty stderr); `discoverFiles` now
+  reports missing explicit paths via `onMissingPath` and `audit` diagnoses
+  them on stderr and exits non-zero, in both text and JSON modes.
 - The v2 observation engine no longer counts technical identifiers
   (versions, ports, endpoint IDs, `v22`) as statistics, and `hasSourcesSection`
   now requires a real heading with links below it instead of a global keyword
@@ -75,6 +79,31 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The GitLab CI template no longer declares a `dotenv` artifact on the hidden
   job (it failed jobs whose `extends` never created the file) and corrected
   the comments claiming `--recursive` needs a Pro license (audit F-13).
+
+### Build
+- `scripts/build.js` no longer copies `src/integrity.js` into `dist/` during
+  the copy step: the placeholder template is never exposed in `dist/`, not
+  even transiently, and the real SHA-256 hash is written exactly once. Test
+  files run builds concurrently over the same `dist/` (node --test parallel
+  files), and a concurrent copy of the placeholder could land on top of a
+  freshly written hash, making the artifact determinism test flaky
+  (observed 2026-08-01 verification pass).
+
+### Tests
+- New `tests/audit-2026-07-31.e2e.test.js`: black-box verification of the
+  14 audit findings (F-01…F-14) against the CLI as a subprocess (and the
+  real `fetchUrl`/`collectSubSitemapPageUrls` module entries for the SSRF
+  guards and the sitemap cap), reproducing each probe from
+  `docs/audits/auditoria-2026-07-31.md` and asserting the corrected
+  behavior holds on main. Review pass 2026-08-01 added: F-04 negative
+  control (Pro gate active without a key), F-12 positive control (in-CWD
+  writes still work), F-01 `esc()` path via a hostile finding message,
+  F-10 pinned absolute values (23/3), F-13 order-independent hidden-job
+  block extraction, the F-05 missing-file residual case, a root-safe skip
+  for the chmod-0 fixture, and a 30 s timeout on CLI spawns.
+- `artifact.test.js` pins the invariant that `dist/integrity.js` always
+  carries the injected SHA-256 hash in the `EXPECTED_HASH` assignment,
+  never the `<<<LICENSING_HASH>>>` template placeholder.
 
 ### Docs
 - `docs/free-vs-pro.md` now states the Pro verification model explicitly:
