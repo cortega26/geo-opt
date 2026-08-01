@@ -446,3 +446,12 @@ actualizó en cada commit (664 → 712).
 (F-04, requiere diseño de producto), knip (8 exports sin uso), re-verificación
 de CRAWLER_REGISTRY y de la registry de evidencia (requieren red), pin por
 SHA de Actions.
+
+> **Supersedido 2026-08-01:** el backlog P3 se cerró en `58c965d` (squash de
+> `chore/p3-cleanup`) — knip limpio (8 exports eliminados), Actions pineadas
+> a SHA, CRAWLER_REGISTRY (15/15 tokens vigentes) y evidence registry (GEO
+> KDD 2024 v3 y What Gets Cited v1 sin retracción) re-verificadas con red.
+> Único resto: la firma de claves Pro, convertida en
+> [Plan 068 DEFERRED](../plans/068-license-signing.md) (triggers: 059
+> CONTINUE + 060 GO + canal de venta). La remediación completa se publicó
+> como geo-opt 2.3.2.
