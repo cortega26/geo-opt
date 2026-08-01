@@ -1,13 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": [
-    "src/index.js",
-    "bin/cli.js",
-    "tests/**/*.test.{js,ts}",
-    "scripts/*.js"
-  ],
+  "entry": ["src/index.js", "tests/**/*.test.{js,ts}", "scripts/*.js"],
   "project": ["src/**/*.js", "bin/**/*.js", "scripts/**/*.js"],
-  "ignoreBinaries": ["python3"],
   "ignoreDependencies": [],
   "ignore": []
 }

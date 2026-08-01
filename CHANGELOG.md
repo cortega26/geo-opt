@@ -90,6 +90,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   (`production-ready`) stays stable in the JSON contract (audit F-06).
   README documents the known gaming vectors and the new
   `style-markers-gamed` adversarial fixture joins the regression corpus.
+- `CRAWLER_REGISTRY` re-verified against official sources (2026-08-01): all
+  15 tokens confirmed; `Meta-ExternalAgent` token normalized to the official
+  lowercase form (`meta-externalagent`); `anthropic-ai` documented as a
+  legacy token no longer listed in Anthropic's docs.
+- Evidence registry re-verified (2026-08-01): GEO KDD 2024 (arXiv
+  2311.09735, v3) and "What Gets Cited" (arXiv 2605.25517, v1) are both
+  live and unretracted; stale-evidence warnings reflect the fresh dates.
+
+### Chore
+- Removed 8 unused exports (knip): `VALID_FINDING_STATUSES`, the findings
+  `default` export, `TOOLTICIAN_BRANDING_MARKDOWN`/`HTML`,
+  `TELEMETRY_ENV_VAR`/`DO_NOT_TRACK_ENV_VAR`,
+  `maybePromptForTelemetryConsent`, `hasUriScheme` — none part of the
+  public barrel; knip config hints applied. The
+  `MODEL_VERSION_V2|MODEL_VERSION` duplicate is an intentional public
+  alias, now documented in code.
+- GitHub Actions pinned to commit SHAs (with tag comments) instead of
+  moving major tags: `checkout`, `setup-node`, `setup-python` v7 and
+  `semantic-release-action` v6.0.0.
 
 ### Fixed
 - Fixed the GitLab CI template include URL (wrong org in the `remote:`

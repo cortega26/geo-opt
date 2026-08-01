@@ -1,7 +1,7 @@
 import fs from "fs";
 import chalk from "chalk";
 
-export const CRAWLER_REGISTRY_VERSION = "2026-06-26";
+export const CRAWLER_REGISTRY_VERSION = "2026-08-01";
 
 const OPENAI_SOURCE = "https://developers.openai.com/api/docs/bots";
 const ANTHROPIC_SOURCE =
@@ -91,7 +91,7 @@ export const AI_CRAWLER_REGISTRY = Object.freeze([
     lastVerified: CRAWLER_REGISTRY_VERSION,
   },
   {
-    token: "Meta-ExternalAgent",
+    token: "meta-externalagent", // forma canónica oficial (case-insensitive en robots.txt)
     provider: "Meta",
     purpose: "training",
     robotsApplicable: true,
@@ -128,6 +128,10 @@ export const AI_CRAWLER_REGISTRY = Object.freeze([
     purpose: "legacy",
     robotsApplicable: null,
     officialSource: ANTHROPIC_SOURCE,
+    // Verificado 2026-08-01: la doc oficial de Anthropic (2026-04-07) ya no
+    // lista este token — solo ClaudeBot, Claude-SearchBot y Claude-User. Se
+    // conserva como legacy histórico (token pre-2025); robotsApplicable null
+    // significa que no participa en decisiones.
     lastVerified: CRAWLER_REGISTRY_VERSION,
   },
 ]);

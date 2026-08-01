@@ -1,7 +1,7 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-07-31 — plans 065–067 added (CI entry-asset hardening, agent-skill discoverability, quality-badge verification). Plan 058 factual product-truth reconciliation complete (2026-07-22); Plan 059 remains TODO pending owner start date. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Last reconciled:** 2026-08-01 — plans 065–068: 065–067 DONE (CI entry-asset hardening, agent-skill discoverability, quality-badge verification); 068 added as a DEFERRED license-signing spike (Ed25519 Pro keys only once a purchase channel exists; honor system documented in `docs/free-vs-pro.md`, audit F-04). Audit 2026-07-31 remediation fully merged to `main` (`dc48b64`). Plan 059 remains TODO pending owner start date. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
 **Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
@@ -54,6 +54,7 @@ or feature expansion.
 | Now       | Product-led validation | Truthful local-to-CI entry, then independent adoption/pain/WTP evidence | [058](archive/058-relaunch-community-validation.md) → [059](059-rebaseline-g1-evidence-cohort.md); 018 is historical context | A1/A2/A3 at day 90 |
 | Deferred  | Paid workflow / exceptional service | At most one evidenced self-service workflow; a service only on unsolicited inbound | [060](060-decide-community-pro-boundary.md), then [061](061-prepare-bounded-diagnostic-intake.md) only if separately triggered | 059 `CONTINUE`, capacity/economics |
 | Deferred  | Product-direction spikes | Baseline, frontmatter, and preflight only on their own real-workflow evidence | [062](062-spike-versioned-site-baselines.md), [063](063-normalize-generate-all-frontmatter.md), [064](064-spike-three-pillar-preflight.md) | independent demand; no sequence |
+| Deferred  | License enforcement | Signature-verifiable Pro keys only once a purchase channel exists (honor system documented as the current model) | [068](068-license-signing.md) | 059 `CONTINUE`; 060 GO; purchase channel |
 | Deferred  | Pro product suite  | Commercial work only after a viable paid workflow is evidenced | 018 S10–S15                     | after 060 separate decision |
 | Deferred  | Hosted product     | Workspace, history, monitoring                       | 018 S19+                        | repeated paid/recurrent workflow |
 | Deferred  | Evaluation         | Reproducible citation evaluation                     | 028                             | budget     |
@@ -376,6 +377,7 @@ dated social draft, passive metrics, or technical completeness as a business.
 | [062](062-spike-versioned-site-baselines.md) | DEFERRED | Design a baseline only after two independent reports of that job | 059 `CONTINUE`; specific repeated baseline pain |
 | [063](063-normalize-generate-all-frontmatter.md) | DEFERRED | Maintenance/DX correction only if a real workflow is blocked | documented workflow block or correctness priority |
 | [064](064-spike-three-pillar-preflight.md) | DEFERRED | Design a unified preflight only after two independent combined-workflow reports | 059 `CONTINUE`; specific repeated demand |
+| [068](068-license-signing.md) | DEFERRED | Signature-verifiable Pro keys (Ed25519) only once a purchase channel exists; honor system stays until then (audit F-04) | 059 `CONTINUE`; 060 GO; purchase channel |
 
 Only one plan may be in progress. The immediate execution order is 058, then
 059. At the end of a real 90-day distribution effort, `CONTINUE` permits only

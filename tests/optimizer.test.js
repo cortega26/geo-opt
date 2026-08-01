@@ -2184,9 +2184,19 @@ test("validateSourceRefs returns valid for known entries", () => {
 });
 
 test("staleEvidenceWarnings returns warnings for old entries", () => {
-  const warnings = staleEvidenceWarnings(1); // all entries are stale after 1 day
-  assert.ok(warnings.length > 0);
-  assert.ok(warnings.some((w) => w.includes("geo-kdd-2024")));
+  const warnings = staleEvidenceWarnings(1); // entradas con >1 día de antigüedad
+  // Mecanismo: las entradas re-verificadas el 2026-08-01 (geo-kdd-2024,
+  // what-gets-cited-2025) no generan warning; las de 2026-06-27 (docs de
+  // Google) sí.
+  assert.ok(warnings.length > 0, "some entries are older than 1 day");
+  assert.ok(
+    warnings.some((w) => w.includes("google-ai-guide-2025")),
+    "older entries still flagged"
+  );
+  assert.ok(
+    !warnings.some((w) => w.includes("geo-kdd-2024")),
+    "geo-kdd-2024 re-verified 2026-08-01 is not flagged"
+  );
 });
 
 test("scoreContent report includes findings with stable ruleIds", () => {

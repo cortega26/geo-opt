@@ -35,6 +35,9 @@ export const MODEL_VERSION_V2 = "2.1.0";
  * v1 remains available via `--model v1` and the legacy constant
  * `MODEL_VERSION_V1`. This is the scoring algorithm identity, NOT the package
  * version (`package.json`) nor the report contract version (`REPORT_VERSION`).
+ * NOTE: knip reports `MODEL_VERSION_V2|MODEL_VERSION` as a duplicate export —
+ * it is an intentional public alias (both constants are imported by the
+ * barrel, consumers and tests); do not merge them.
  */
 export const MODEL_VERSION = MODEL_VERSION_V2;
 
@@ -43,7 +46,7 @@ export const MODEL_VERSION = MODEL_VERSION_V2;
  */
 
 /** Valid finding severities/statuses. */
-export const VALID_FINDING_STATUSES = Object.freeze(["pass", "warn", "fail", "not_applicable"]);
+const VALID_FINDING_STATUSES = Object.freeze(["pass", "warn", "fail", "not_applicable"]);
 
 /**
  * @typedef {Object} Finding
@@ -668,14 +671,3 @@ export function mapObservationsToFindings(observations, profile = "editorial") {
 
   return findings;
 }
-
-export default {
-  REPORT_VERSION,
-  MODEL_VERSION,
-  MODEL_VERSION_V1,
-  MODEL_VERSION_V2,
-  createFinding,
-  buildReportMeta,
-  mapLegacyToFindings,
-  mapObservationsToFindings,
-};

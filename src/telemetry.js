@@ -26,8 +26,8 @@ export const TELEMETRY_SCHEMA_VERSION = 1;
 export const TELEMETRY_TRANSPORT_ENABLED = false;
 
 // Honor the cross-tool de facto standard plus a project-specific override.
-export const TELEMETRY_ENV_VAR = "GEO_OPT_TELEMETRY";
-export const DO_NOT_TRACK_ENV_VAR = "DO_NOT_TRACK";
+const TELEMETRY_ENV_VAR = "GEO_OPT_TELEMETRY";
+const DO_NOT_TRACK_ENV_VAR = "DO_NOT_TRACK";
 
 const STATE_KEY = "telemetryConsent";
 export const CONSENT_UNSET = "unset";
@@ -243,7 +243,12 @@ function sanitizeSeverityCounts(counts) {
  *
  * @returns {{ prompted: boolean, decision: string }}
  */
-export function maybePromptForTelemetryConsent(options = {}) {
+// Punto de cableado reservado para la activación de telemetría
+// (docs/telemetry.md, checklist de activación): la llamada se implementa
+// cuando TELEMETRY_TRANSPORT_ENABLED pase a true. Sin export a propósito
+// (limpieza knip P3) — se mantiene como símbolo privado de módulo.
+// eslint-disable-next-line no-unused-vars
+function maybePromptForTelemetryConsent(options = {}) {
   const status = resolveTelemetryStatus(options);
   if (!status.canPrompt) {
     return { prompted: false, decision: status.decision };

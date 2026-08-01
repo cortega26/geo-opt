@@ -20,7 +20,7 @@ export function normalizeHref(value) {
   return String(value ?? "").trim();
 }
 
-export function hasUriScheme(value) {
+function hasUriScheme(value) {
   return /^[a-z][a-z0-9+.-]*:/i.test(normalizeHref(value));
 }
 

@@ -24,18 +24,17 @@ export const EVIDENCE_REGISTRY = Object.freeze({
     title: "GEO: Generative Engine Optimization (KDD 2024)",
     url: "https://arxiv.org/abs/2311.09735",
     sourceType: "paper",
-    // NOTE: verificación externa pendiente (bloqueo de red en CI).
-    // El paper fundacional de KDD 2024 sigue siendo la referencia canónica;
-    // no se conoce retracción ni versión superadora. Re-verificar con acceso
-    // a red externa.
-    lastVerified: "2024-08-01",
+    // Verificado 2026-08-01 (arXiv): vigente, v3 (2024-06-28), aceptado en
+    // KDD 2024, sin retracción ni versión superadora.
+    lastVerified: "2026-08-01",
   },
   "what-gets-cited-2025": {
     id: "what-gets-cited-2025",
     title: "What Gets Cited: Competitive GEO in AI Answer Engines (arXiv 2026)",
     url: "https://arxiv.org/abs/2605.25517",
     sourceType: "paper",
-    lastVerified: "2026-06-27",
+    // Verificado 2026-08-01 (arXiv): vigente, v1 (2026-05-25), sin retracción.
+    lastVerified: "2026-08-01",
   },
   "google-ai-guide-2025": {
     id: "google-ai-guide-2025",

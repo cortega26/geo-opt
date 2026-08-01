@@ -4,9 +4,8 @@ import { cleanMarkdownToPlainText, cleanHtmlText, extractSections } from "./text
 import { extractPageMetadata } from "./llms-txt.js";
 import { getNoBrandingError, hasProEntitlement, LICENSE_ENV_VAR } from "./integrity.js";
 
-export const TOOLTICIAN_BRANDING_MARKDOWN =
-  "Optimized with [Tooltician](https://www.tooltician.com)";
-export const TOOLTICIAN_BRANDING_HTML =
+const TOOLTICIAN_BRANDING_MARKDOWN = "Optimized with [Tooltician](https://www.tooltician.com)";
+const TOOLTICIAN_BRANDING_HTML =
   '<div class="geo-signature"><p>Optimized with <a href="https://www.tooltician.com">Tooltician</a></p></div>';
 export const COMMUNITY_SCHEMA_TYPES = new Set(["article", "news-article", "faq", "product"]);
 export const PRO_SCHEMA_TYPES = new Set(["course", "event", "recipe", "howto"]);
