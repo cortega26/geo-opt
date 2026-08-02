@@ -36,6 +36,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   `100.64.0.0/10` (CGNAT) in `isPrivateIPv4`, and IPv4-mapped IPv6 literals
   (`::ffff:127.0.0.1`, `::ffff:7f00:1`) are re-validated as their underlying
   IPv4; IPv6 link-local now covers the full `fe80::/10` range (audit F-02/F-03).
+- The audit gate (`npm run audit:check`) now matches allowlisted advisories by
+  stable GHSA identity (advisory URL + package name) instead of npm's
+  renumbered numeric `source` and respelled version `range`, which churn
+  without the advisory changing (brace-expansion: source 1124334 → 1130591,
+  range `<=5.0.7` → `>=4.0.0 <5.0.8`). The installed-surface checks stay
+  strict: every reported vulnerable node must be a reviewed path whose version
+  in `package-lock.json` is exactly the reviewed one, so a different GHSA,
+  package, installed version, or dependency path still blocks CI. The
+  stale-entry warning fires only when the GHSA is absent from the report
+  entirely — an advisory that merely appears below the blocking threshold is
+  never reported as "likely fixed upstream" (Plan 069).
 
 ### Fixed
 - `audit` now writes per-file read errors to stderr in `--format json` too and
