@@ -13,6 +13,19 @@
 - **Depends on**: plans/069-match-audit-advisories-by-stable-identity.md and plans/070-make-evidence-freshness-tests-deterministic.md for a green baseline
 - **Category**: bug / dx
 - **Planned at**: commit `888d3e7`, 2026-08-02
+- **Executed at**: commits `f08577d` + `b6321b6` (2026-08-02) on branch
+  `advisor/071-repair-github-action`, approved by reviewer, squash-merged to
+  main as `eca2aa4` (2026-08-02, after release 2.3.4 `9cc6c22`). Deviations
+  recorded: README.md/README.es.md test-count badges updated 758→763→764
+  (required by `scripts/check-test-count.js`, part of done criterion "full
+  checks pass"; same pattern as Plans 069/070). Reviewer revision round:
+  hostile threshold/label inertness test added (the original suite covered
+  only a hostile path); verified live that all five input channels are inert
+  argv/data elements.
+  Pre-existing inconsistency flagged, not fixed (out of scope):
+  `tests/058-docs-claims.test.js` pins the prose "112 suites" while the live
+  `node --test` count is 145 — the README badge count (the gate-checked
+  figure) is correct.
 
 ## Why this matters
 
