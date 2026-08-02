@@ -13,6 +13,19 @@
 - **Depends on**: none
 - **Category**: tests / bug
 - **Planned at**: commit `888d3e7`, 2026-08-02
+- **Executed at**: commits `fee4936` + `acfb15e` + `af2a250` (2026-08-02) on
+  branch `advisor/070-deterministic-evidence-clock`, approved by reviewer,
+  squash-merged to main as `04fcd49` (2026-08-02, after release 2.3.3
+  `1163491`). Deviations recorded:
+  - `tests/058-plan-records.test.js` month-pinned regex (`2026-07-\d{2}`) was
+    broken by the 2026-08-02 index refresh (`plans/README.md`
+    "Last reconciled: 2026-08-02"); fixed with an intent-preserving ISO
+    lexical comparison (>= 2026-07-22) so the full gate (done criterion) passes.
+  - `tests/058-docs-claims.test.js` month-pinned regex (`2026-0[78]-\d{2}`)
+    would have failed the next legitimate `docs/architecture.md`
+    re-verification date (any month >= September); fixed with the same
+    intent-preserving comparison (reviewer revision round 2).
+  First fully green `npm run check` since `888d3e7`: 758 tests, exit 0.
 
 ## Why this matters
 

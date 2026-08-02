@@ -436,7 +436,7 @@ independent work.
 | Plan | Title | Cat | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
 | [069](069-match-audit-advisories-by-stable-identity.md) | Match accepted npm advisories by stable GHSA plus reviewed installed surface | security/dx | P1 | S | — | DONE (2026-08-02; squash-merged to main as `db423ac`) |
-| [070](070-make-evidence-freshness-tests-deterministic.md) | Inject a deterministic clock into evidence-freshness tests | tests/bug | P1 | S | — | TODO |
+| [070](070-make-evidence-freshness-tests-deterministic.md) | Inject a deterministic clock into evidence-freshness tests | tests/bug | P1 | S | — | DONE (2026-08-02; squash-merged to main as `04fcd49`) |
 | [071](071-repair-github-composite-action.md) | Execute GitHub Action inputs as safe argv | bug/dx | P1 | S | 069, 070 | TODO |
 | [072](072-correct-ci-wrapper-score-and-entitlements.md) | Report aggregate CI scores and truthful Community/Pro semantics | bug/docs | P1 | M | 071 | TODO |
 | [073](073-make-fetcher-tests-hermetic.md) | Make fetcher tests local, deterministic, and behavior-specific | tests | P1 | M | 069, 070 | TODO |
