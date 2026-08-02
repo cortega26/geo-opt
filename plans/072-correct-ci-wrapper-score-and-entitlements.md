@@ -13,6 +13,25 @@
 - **Depends on**: plans/071-repair-github-composite-action.md
 - **Category**: bug / docs / dx
 - **Planned at**: commit `888d3e7`, 2026-08-02
+- **Executed at**: commits `9cb0fbe` + `e04b7c1` + `028a731` (2026-08-02) on
+  branch `advisor/072-truthful-ci-wrappers`, approved by reviewer,
+  squash-merged to main as `8b2c3ad` (2026-08-02, after release 2.3.5
+  `ec94232`). Deviations recorded:
+  `tests/ci-action-shell.test.js` probe updated to the `--summary`/
+  `averageScore` contract (contract-change ripple);
+  `tests/058-docs-claims.test.js` suite-count pins 112→147 (README prose made
+  truthful — the live `node --test` count, resolving a pre-existing stale
+  claim); README badges 764→775→776→778 (check-test-count requirement).
+  Reviewer revision round 1: GitLab template exit masking found and fixed —
+  `eval ... | tee` ended with tee's exit (0), so failed audits (threshold
+  breach, per-file error) passed the job; replaced with redirect + `$?`
+  capture + replay + `exit $GEO_OPT_EXIT` (POSIX-portable), verified live
+  under `sh` with the real CLI. Reviewer revision round 2: `Number()`
+  coercion accepted `averageScore: null` (JSON-stringified NaN) and numeric
+  strings, silently fabricating score 0; both wrappers now guard with
+  `typeof s !== 'number' || !Number.isFinite(s)` (single-quoted JS inside the
+  double-quoted `node -e "..."` strings), verified live: null/string → exit 2
+  with explanation, real number → rounded score.
 
 ## Why this matters
 
