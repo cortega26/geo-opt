@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.4](https://github.com/cortega26/geo-opt/compare/v2.3.3...v2.3.4) (2026-08-02)
+
+
+### Bug Fixes
+
+* **test:** inject deterministic evidence clock and repair date-pinned gates (Plan 070) ([04fcd49](https://github.com/cortega26/geo-opt/commit/04fcd4936adc8524674c9f1124c91fa0c24b6ff2))
+
 ## [2.3.3](https://github.com/cortega26/geo-opt/compare/v2.3.2...v2.3.3) (2026-08-02)
 
 
