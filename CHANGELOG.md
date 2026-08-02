@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.5](https://github.com/cortega26/geo-opt/compare/v2.3.4...v2.3.5) (2026-08-02)
+
+
+### Bug Fixes
+
+* **ci:** execute composite action arguments safely (Plan 071) ([eca2aa4](https://github.com/cortega26/geo-opt/commit/eca2aa4fea73c41cc23e82d35f62dad93f208575))
+
 ## [2.3.4](https://github.com/cortega26/geo-opt/compare/v2.3.3...v2.3.4) (2026-08-02)
 
 
