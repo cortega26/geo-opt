@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.6](https://github.com/cortega26/geo-opt/compare/v2.3.5...v2.3.6) (2026-08-02)
+
+
+### Bug Fixes
+
+* **ci:** report aggregate audit scores and truthful entitlements in CI wrappers (Plan 072) ([8b2c3ad](https://github.com/cortega26/geo-opt/commit/8b2c3ad4abf1439a4ac72e2dea06367bec71d76c))
+
 ## [Unreleased]
 
 ### Fixed
