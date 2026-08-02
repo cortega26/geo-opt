@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.3](https://github.com/cortega26/geo-opt/compare/v2.3.2...v2.3.3) (2026-08-02)
+
+
+### Bug Fixes
+
+* **audit:** match allowlist exceptions by stable GHSA identity (Plan 069) ([db423ac](https://github.com/cortega26/geo-opt/commit/db423ac66a90bb92e5ae91de96bade65293bcd7e))
+
 ## [2.3.2](https://github.com/cortega26/geo-opt/compare/v2.3.1...v2.3.2) (2026-08-01)
 
 
