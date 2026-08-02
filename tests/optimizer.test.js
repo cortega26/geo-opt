@@ -2184,7 +2184,10 @@ test("validateSourceRefs returns valid for known entries", () => {
 });
 
 test("staleEvidenceWarnings returns warnings for old entries", () => {
-  const warnings = staleEvidenceWarnings(1); // entradas con >1 día de antigüedad
+  // Reloj fijo 2026-08-01T12:00Z, justo después de la re-verificación del
+  // 2026-08-01: la prueba no depende de la fecha de la máquina (Plan 070).
+  const now = new Date("2026-08-01T12:00:00Z");
+  const warnings = staleEvidenceWarnings(1, now); // entradas con >1 día de antigüedad
   // Mecanismo: las entradas re-verificadas el 2026-08-01 (geo-kdd-2024,
   // what-gets-cited-2025) no generan warning; las de 2026-06-27 (docs de
   // Google) sí.
@@ -2196,6 +2199,24 @@ test("staleEvidenceWarnings returns warnings for old entries", () => {
   assert.ok(
     !warnings.some((w) => w.includes("geo-kdd-2024")),
     "geo-kdd-2024 re-verified 2026-08-01 is not flagged"
+  );
+  // Contrato de límite: `ageDays > staleDays` (estricto), no `>=`. Una
+  // entrada con exactamente 1 día de antigüedad y staleDays=1 NO es stale.
+  const boundary = staleEvidenceWarnings(1, new Date("2026-08-02T00:00:00Z"));
+  assert.ok(
+    !boundary.some((w) => w.includes("geo-kdd-2024")),
+    "entry exactly staleDays old is not flagged (ageDays > staleDays)"
+  );
+  // Valores de reloj inválidos se rechazan con TypeError.
+  assert.throws(
+    () => staleEvidenceWarnings(1, "2026-08-01"),
+    /staleEvidenceWarnings.*`now` must be a valid Date/,
+    "string clock is rejected"
+  );
+  assert.throws(
+    () => staleEvidenceWarnings(1, new Date(NaN)),
+    /staleEvidenceWarnings.*`now` must be a valid Date/,
+    "invalid Date is rejected"
   );
 });
 

@@ -165,7 +165,7 @@ declare module "geo-opt" {
     missing: string[];
   };
 
-  export function staleEvidenceWarnings(staleDays?: number): string[];
+  export function staleEvidenceWarnings(staleDays?: number, now?: Date): string[];
 
   // ═══ Profiles ═══
   export type ProfileId =

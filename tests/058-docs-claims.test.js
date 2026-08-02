@@ -109,11 +109,12 @@ describe("Plan 058 §6.2 — architecture.md current-maturity is truthful", () =
   });
 
   it("was re-verified on or after 2026-07-22", () => {
-    assert.match(
-      read("docs/architecture.md"),
-      /Last verified:.*2026-0[78]-\d{2}/u,
-      "Last verified date is stale"
-    );
+    const text = read("docs/architecture.md");
+    const match = text.match(/Last verified:.*?(\d{4}-\d{2}-\d{2})/u);
+    assert.ok(match, "docs/architecture.md must carry a 'Last verified' date");
+    // ISO dates compare lexically; this stays robust to any future month
+    // and year instead of pinning the month.
+    assert.ok(match[1] >= "2026-07-22", `Last verified date ${match[1]} is before 2026-07-22`);
   });
 });
 

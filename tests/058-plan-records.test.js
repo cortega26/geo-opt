@@ -33,7 +33,11 @@ describe("Plan 058 §6.6 — plans/README.md marks Plan 058 DONE", () => {
 
   it("'Last reconciled' date is on or after 2026-07-22", () => {
     const text = read("plans/README.md");
-    assert.match(text, /Last reconciled:.*2026-07-\d{2}/u, "reconciliation date stale");
+    const match = text.match(/Last reconciled:.*?(\d{4}-\d{2}-\d{2})/u);
+    assert.ok(match, "plans/README.md must carry a 'Last reconciled' date");
+    // ISO dates compare lexically; this stays robust to future months and
+    // years instead of pinning the month.
+    assert.ok(match[1] >= "2026-07-22", `reconciliation date ${match[1]} is before 2026-07-22`);
   });
 });
 

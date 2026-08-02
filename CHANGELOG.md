@@ -97,6 +97,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - The GitLab CI template no longer declares a `dotenv` artifact on the hidden
   job (it failed jobs whose `extends` never created the file) and corrected
   the comments claiming `--recursive` needs a Pro license (audit F-13).
+- `staleEvidenceWarnings(staleDays, now)` now accepts an optional explicit
+  `Date` clock so tests no longer depend on the machine's current date;
+  callers that omit it still use the real current time (Plan 070).
+- The plan-records gate now accepts any reconciliation date on or after
+  2026-07-22 (was pinned to the 2026-07 month).
+- The docs-claims gate now accepts any "Last verified" date on or after
+  2026-07-22 (was pinned to the 2026-07/08 months).
 
 ### Build
 - `scripts/build.js` no longer copies `src/integrity.js` into `dist/` during

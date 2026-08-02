@@ -115,10 +115,16 @@ export function validateSourceRefs(sourceRefs) {
  * `staleDays` (default 180). Returns warnings for stale entries.
  *
  * @param {number} [staleDays=180]
+ * @param {Date} [now] - explicit clock for deterministic tests; defaults to
+ *   the real current time when omitted.
  * @returns {string[]}
  */
-export function staleEvidenceWarnings(staleDays = 180) {
-  const now = new Date();
+export function staleEvidenceWarnings(staleDays = 180, now = new Date()) {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
+    throw new TypeError(
+      "staleEvidenceWarnings: `now` must be a valid Date (defaults to the current time when omitted)"
+    );
+  }
   const warnings = [];
   for (const entry of Object.values(EVIDENCE_REGISTRY)) {
     const verified = new Date(entry.lastVerified);

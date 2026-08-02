@@ -238,6 +238,10 @@ const _evLabels: Readonly<Record<string, string>> = EVIDENCE_LABELS;
 const _validLabels: readonly string[] = VALID_EVIDENCE_LABELS;
 const _srcRefValidation: { valid: boolean; missing: string[] } = validateSourceRefs(["ref-1"]);
 const _staleWarnings: string[] = staleEvidenceWarnings(90);
+const _staleWarningsFixedClock: string[] = staleEvidenceWarnings(
+  90,
+  new Date("2026-08-01T12:00:00Z")
+);
 
 // --- Profiles ---
 const _pid: ProfileId = "documentation";
