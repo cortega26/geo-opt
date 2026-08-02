@@ -1,0 +1,16 @@
+{
+  "totalFiles": 1,
+  "succeeded": 1,
+  "failed": 0,
+  "averageScore": 88,
+  "medianScore": 88,
+  "minScore": 88,
+  "maxScore": 88,
+  "stdDev": 0,
+  "distribution": {
+    "excellent": 1,
+    "good": 0,
+    "needsWork": 0
+  },
+  "perFile": [{ "file": "readme.md", "status": "success", "score": 88 }]
+}

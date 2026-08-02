@@ -7,11 +7,11 @@ inputs:
     required: true
     default: "."
   threshold:
-    description: "Exit with code 1 if the score is below this value (Pro: combine with --recursive for site-wide gates)"
+    description: "Exit with code 1 if the score is below this value; combine with recursive for site-wide gates"
     required: false
     default: ""
   recursive:
-    description: "Recursively scan directories (requires Pro license for site-wide auditing)"
+    description: "Recursively scan directories for site-wide audits (Community feature, no license key required)"
     required: false
     default: "false"
   model:
@@ -23,7 +23,7 @@ inputs:
     required: false
     default: "GEO Score"
   license-key:
-    description: "Tooltician Pro license key (required for Pro features: recursive site audits, --no-branding)"
+    description: "Optional Tooltician Pro license key; only unlocks the Pro surfaces (standalone HTML reports and --no-branding)"
     required: false
     default: ""
 

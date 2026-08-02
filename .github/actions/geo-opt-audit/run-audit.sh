@@ -13,7 +13,7 @@ label_input="$GEO_OPT_INPUT_LABEL"
 
 # Build audit command as separate argv elements, expanded quoted so a path
 # with spaces, quotes, or shell metacharacters stays one inert argument
-args=(audit "$path_input" --format json --model "$model_input")
+args=(audit "$path_input" --summary --format json --model "$model_input")
 
 if [[ "$recursive_input" == "true" ]]; then
   args+=(--recursive)
@@ -30,18 +30,40 @@ OUTPUT=$(node "$cli_path" "${args[@]}" 2>"$RUNNER_TEMP/geo-opt-audit-stderr.txt"
 AUDIT_EXIT=${AUDIT_EXIT:-0}
 cat "$RUNNER_TEMP/geo-opt-audit-stderr.txt" >&2
 
-# Parse score from JSON (handles single-file and multi-file output)
+# Parse the aggregate score from summary JSON (--summary emits one object
+# with averageScore covering the whole audited set, not file zero). Missing
+# or non-numeric scores fail the step loudly instead of fabricating a zero:
+# a badge that says nothing truthful is worse than no badge (Plan 072).
+PARSE_FAILED=0
 SCORE=$(printf '%s\n' "$OUTPUT" | node -e "
   const chunks = [];
   process.stdin.on('data', c => chunks.push(c));
   process.stdin.on('end', () => {
+    let d;
     try {
-      const d = JSON.parse(chunks.join(''));
-      const s = Array.isArray(d) ? (d[0]?.effectiveScore ?? 0) : (d.effectiveScore ?? 0);
-      process.stdout.write(String(Math.round(s)));
-    } catch { process.stdout.write('0'); }
+      d = JSON.parse(chunks.join(''));
+    } catch (err) {
+      console.error('geo-opt action: audit output is not valid JSON: ' + err.message);
+      process.exit(2);
+    }
+    // typeof guard first: Number() would coerce null (JSON.stringify of NaN)
+    // to 0 and strings to numbers, silently fabricating a score. Single
+    // quotes inside this double-quoted node -e string survive bash.
+    const s = d?.averageScore;
+    if (typeof s !== 'number' || !Number.isFinite(s)) {
+      console.error('geo-opt action: audit summary has no numeric averageScore; cannot render a truthful badge');
+      process.exit(2);
+    }
+    process.stdout.write(String(Math.round(s)));
   });
-")
+") || PARSE_FAILED=$?
+
+if [ "$PARSE_FAILED" -ne 0 ]; then
+  # Never claim a score we do not have. Keep the audit output visible.
+  echo "passed=false" >> "$GITHUB_OUTPUT"
+  printf '%s\n' "$OUTPUT"
+  exit "$PARSE_FAILED"
+fi
 
 # Compute badge color
 COLOR="red"

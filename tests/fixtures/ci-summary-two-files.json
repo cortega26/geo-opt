@@ -1,0 +1,19 @@
+{
+  "totalFiles": 2,
+  "succeeded": 2,
+  "failed": 0,
+  "averageScore": 72.5,
+  "medianScore": 72.5,
+  "minScore": 55,
+  "maxScore": 90,
+  "stdDev": 17.5,
+  "distribution": {
+    "excellent": 1,
+    "good": 1,
+    "needsWork": 0
+  },
+  "perFile": [
+    { "file": "guide.md", "status": "success", "score": 55 },
+    { "file": "landing.md", "status": "success", "score": 90 }
+  ]
+}

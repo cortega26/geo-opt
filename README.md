@@ -15,7 +15,7 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="CI status"></a>
-  <img src="https://img.shields.io/badge/tests-764_passed-16a34a?logo=nodedotjs&logoColor=white" alt="764 tests passed">
+  <img src="https://img.shields.io/badge/tests-778_passed-16a34a?logo=nodedotjs&logoColor=white" alt="778 tests passed">
   <img src="https://img.shields.io/badge/branch_coverage-80%25-16a34a" alt="Branch coverage 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-types_included-3178C6?logo=typescript&logoColor=white" alt="TypeScript types included">
@@ -78,7 +78,7 @@ Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/ab
 - **One toolkit, the whole surface.** Audit, Schema.org JSON-LD for 8 types, `robots.txt`, `llms.txt`, `sitemap.xml`, technical SEO checks, and HTML reports — from a single CLI and a typed JavaScript library.
 - **CI-native.** Threshold-based quality gates with non-zero exit codes; machine-readable JSON on stdout, diagnostics on stderr. Drop it into GitHub Actions or GitLab CI in one step.
 - **Cross-runtime.** Canonical Node.js implementation plus a bundled Python 3 port for agent-driven workflows, kept honest by a shared conformance suite.
-- **Engineered to ship.** 764 tests across 112 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
+- **Engineered to ship.** 778 tests across 147 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
 
 ---
 
@@ -319,13 +319,19 @@ GitHub pipelines:
 - `path` — file or directory to audit (default: `.`).
 - `threshold` — exit with code 1 when the score is below this value, gating
   the pipeline (e.g. `70`).
+- `recursive` — set to `true` to scan directories recursively for site-wide
+  audits (Community feature, no license key required).
 - `model` — scoring model: `v2` (default, profile-aware) or `v1` (legacy).
+- `license-key` — optional; only unlocks the Pro surfaces (standalone HTML
+  reports and `--no-branding`).
 
 Outputs: `score` (0–100), `passed` (`true`/`false` — whether the threshold was
 met), `badge-url` (a shields.io badge URL for embedding in READMEs or PR
 comments), and `badge-markdown` (a ready-to-embed shields.io badge). The action
 audits content and gates on the CLI's exit code; it does not modify the
-repository.
+repository. For recursive audits, `score` is the aggregate average across the
+whole audited set (the same number the CLI reports with `audit --summary`), so
+the badge describes every file the gate covers, not a single file.
 
 A ready-to-use GitLab CI template ships in
 [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml).
@@ -521,7 +527,7 @@ The full opt-in telemetry design (currently dormant) is documented in [`docs/tel
 
 ```bash
 npm run check          # full suite: lint + format + JS tests + Python tests + conformance + typecheck + changelog
-npm test               # 764 tests · 112 suites · 0 failures (Node.js)
+npm test               # 778 tests · 147 suites · 0 failures (Node.js)
 npm run test:python    # Python compatibility port test suite (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier dry-run

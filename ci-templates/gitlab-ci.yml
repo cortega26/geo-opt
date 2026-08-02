@@ -49,7 +49,7 @@ geo-opt-audit:
   stage: test
   script:
     - |
-      ARGS="audit \"$GEO_OPT_PATH\" --format json --model $GEO_OPT_MODEL"
+      ARGS="audit \"$GEO_OPT_PATH\" --summary --format json --model $GEO_OPT_MODEL"
 
       if [ "$GEO_OPT_RECURSIVE" = "true" ]; then
         ARGS="$ARGS --recursive"
@@ -59,17 +59,38 @@ geo-opt-audit:
         ARGS="$ARGS --threshold $GEO_OPT_THRESHOLD"
       fi
 
-      eval "geo-opt $ARGS" | tee geo-opt-audit.json
+      # Run the audit, capture its exit status, then replay stdout: a bare
+      # `| tee` pipeline would end with tee's exit (0) and mask a failed
+      # audit (threshold breach, per-file error). Redirect + capture keeps
+      # both the artifact and the job log (Plan 072).
+      eval "geo-opt $ARGS" > geo-opt-audit.json
+      GEO_OPT_EXIT=$?
+      cat geo-opt-audit.json
 
-      # Extract score and generate badge URL for job annotation
+      # Extract the aggregate score from summary JSON (--summary above emits
+      # one object with averageScore covering the whole audited set, not file
+      # zero). Missing or non-numeric scores fail the job explicitly instead
+      # of fabricating a zero, and the || exit 1 guard makes that independent
+      # of shell errexit settings (Plan 072).
       SCORE=$(node -e "
         const fs = require('fs');
+        let d;
         try {
-          const d = JSON.parse(fs.readFileSync('geo-opt-audit.json','utf8'));
-          const s = Array.isArray(d) ? (d[0]?.effectiveScore ?? 0) : (d.effectiveScore ?? 0);
-          process.stdout.write(String(Math.round(s)));
-        } catch { process.stdout.write('0'); }
-      ")
+          d = JSON.parse(fs.readFileSync('geo-opt-audit.json','utf8'));
+        } catch (err) {
+          console.error('geo-opt GitLab template: audit output is not valid JSON: ' + err.message);
+          process.exit(2);
+        }
+        // typeof guard first: Number() would coerce null (JSON.stringify of
+        // NaN) to 0 and strings to numbers, silently fabricating a score.
+        // Single quotes survive the enclosing double-quoted node -e string.
+        const s = d?.averageScore;
+        if (typeof s !== 'number' || !Number.isFinite(s)) {
+          console.error('geo-opt GitLab template: audit summary has no numeric averageScore; cannot render a truthful badge');
+          process.exit(2);
+        }
+        process.stdout.write(String(Math.round(s)));
+      ") || exit 1
 
       COLOR=red
       [ "$SCORE" -ge 41 ] && COLOR=orange
@@ -85,6 +106,11 @@ geo-opt-audit:
 
       echo "GEO score: ${SCORE}/100"
       echo "Badge URL: ${BADGE_URL}"
+
+      # End with the audit's exit status so the job's pass/fail matches the
+      # CLI gate (POSIX-portable; PIPESTATUS is bash-only). If the score
+      # parse failed above, the || exit 1 guard already failed the job.
+      exit $GEO_OPT_EXIT
   artifacts:
     when: always
     reports:

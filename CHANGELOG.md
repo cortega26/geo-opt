@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **ci:** report truthful aggregate scores and entitlements in CI wrappers (Plan 072)
+- **ci:** propagate the audit exit status through the GitLab template so failed audits fail the job (Plan 072)
+- **ci:** reject non-numeric averageScore in CI wrappers instead of coercing it to a fabricated score (Plan 072)
+
 ## [2.3.5](https://github.com/cortega26/geo-opt/compare/v2.3.4...v2.3.5) (2026-08-02)
 
 

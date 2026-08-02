@@ -17,6 +17,9 @@ const helper = path.join(repoRoot, ".github/actions/geo-opt-audit/run-audit.sh")
 // action runs and observes the argument boundary with a probe CLI that
 // records its argv and mimics the audit JSON/exit contract.
 
+// The probe mimics `audit --summary --format json` (Plan 072): one aggregate
+// object whose averageScore the helper parses. The threshold/exit logic is
+// the real CLI's: exit 1 when any file falls below --threshold.
 const PROBE = [
   `import { writeFileSync } from "node:fs";`,
   `const args = process.argv.slice(2);`,
@@ -27,7 +30,7 @@ const PROBE = [
   `const score = 88;`,
   `const thresholdIndex = args.indexOf("--threshold");`,
   `const threshold = thresholdIndex === -1 ? NaN : Number(args[thresholdIndex + 1]);`,
-  `process.stdout.write(JSON.stringify({ effectiveScore: score }));`,
+  `process.stdout.write(JSON.stringify({ averageScore: score }));`,
   `if (!Number.isNaN(threshold) && score < threshold) process.exit(1);`,
   `process.exit(0);`,
 ].join("\n");
@@ -76,7 +79,15 @@ describe("Plan 071 — composite action argument boundary", () => {
     const plain = "docs/readme.md";
     const r = runAction({ path: plain });
     assert.strictEqual(r.status, 0);
-    assert.deepStrictEqual(r.argv, ["audit", plain, "--format", "json", "--model", "v2"]);
+    assert.deepStrictEqual(r.argv, [
+      "audit",
+      plain,
+      "--summary",
+      "--format",
+      "json",
+      "--model",
+      "v2",
+    ]);
     assert.match(r.outputs, /score=88/m);
     assert.match(r.outputs, /passed=true/m);
     assert.match(r.outputs, /badge-url=/m);
@@ -89,7 +100,15 @@ describe("Plan 071 — composite action argument boundary", () => {
     const r = runAction({ path: hostile });
     assert.strictEqual(r.status, 0);
     assert.ok(!existsSync(sentinel), "command-substitution payload must not execute");
-    assert.deepStrictEqual(r.argv, ["audit", hostile, "--format", "json", "--model", "v2"]);
+    assert.deepStrictEqual(r.argv, [
+      "audit",
+      hostile,
+      "--summary",
+      "--format",
+      "json",
+      "--model",
+      "v2",
+    ]);
     assert.match(r.outputs, /score=88/m);
     assert.match(r.outputs, /passed=true/m);
     assert.match(r.stderrLog, /probe-stderr-line/m, "stderr must stay on the stderr channel");
@@ -121,6 +140,7 @@ describe("Plan 071 — composite action argument boundary", () => {
     assert.deepStrictEqual(r.argv, [
       "audit",
       "docs/readme.md",
+      "--summary",
       "--format",
       "json",
       "--model",
@@ -135,6 +155,7 @@ describe("Plan 071 — composite action argument boundary", () => {
     assert.deepStrictEqual(r.argv, [
       "audit",
       "docs/readme.md",
+      "--summary",
       "--format",
       "json",
       "--model",

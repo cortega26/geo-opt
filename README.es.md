@@ -15,7 +15,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="Estado de CI"></a>
-  <img src="https://img.shields.io/badge/tests-764_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="764 tests pasados">
+  <img src="https://img.shields.io/badge/tests-778_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="778 tests pasados">
   <img src="https://img.shields.io/badge/cobertura_de_ramas-80%25-16a34a" alt="Cobertura de ramas 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-tipos_incluidos-3178C6?logo=typescript&logoColor=white" alt="Tipos TypeScript incluidos">
@@ -76,7 +76,7 @@ El modelo de puntuación está fundamentado en el [artículo GEO aceptado en KDD
 - 🧩 **Un solo toolkit, toda la superficie.** Auditoría, Schema.org JSON-LD para 8 tipos, `robots.txt`, `llms.txt`, `sitemap.xml`, comprobaciones técnicas de SEO y reportes HTML — desde una única CLI y una librería JavaScript tipada.
 - 🚦 **Nativo para CI.** Quality gates por umbral con códigos de salida distintos de cero; JSON legible por máquinas en stdout, diagnósticos en stderr. Se integra en GitHub Actions o GitLab CI en un solo paso.
 - 🤖 **Multirruntime.** Implementación canónica en Node.js más un port de Python 3 incluido para flujos de trabajo impulsados por agentes, mantenidos coherentes por una suite de conformance compartida.
-- ✅ **Diseñado para producción.** 764 tests en 112 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
+- ✅ **Diseñado para producción.** 778 tests en 147 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
 
 ---
 
@@ -299,14 +299,21 @@ para pipelines de GitHub:
 - `path` — archivo o directorio a auditar (predeterminado: `.`).
 - `threshold` — sale con código 1 cuando la puntuación está por debajo de este
   valor, bloqueando el pipeline (p. ej. `70`).
+- `recursive` — ponlo en `true` para escanear directorios recursivamente en
+  auditorías de sitio completo (función Community, sin clave de licencia).
 - `model` — modelo de puntuación: `v2` (predeterminado, con conciencia de
   perfil) o `v1` (legado).
+- `license-key` — opcional; solo desbloquea las superficies Pro (reportes HTML
+  independientes y `--no-branding`).
 
 Salidas: `score` (0–100), `passed` (`true`/`false` — si se cumplió el umbral),
 `badge-url` (una URL de badge de shields.io para incrustar en READMEs o
 comentarios de PR) y `badge-markdown` (un badge de shields.io listo para
 incrustar). La acción audita el contenido y actúa como gate según el código de
-salida de la CLI; no modifica el repositorio.
+salida de la CLI; no modifica el repositorio. En auditorías recursivas, `score`
+es el promedio agregado de todo el conjunto auditado (el mismo número que la
+CLI reporta con `audit --summary`), de modo que el badge describe todos los
+archivos que cubre el gate, no un solo archivo.
 
 En [`ci-templates/gitlab-ci.yml`](ci-templates/gitlab-ci.yml) hay una
 plantilla lista para GitLab CI.
@@ -503,7 +510,7 @@ El diseño completo de telemetría opt-in (actualmente inactivo) está documenta
 
 ```bash
 npm run check          # suite completa: lint + formato + tests JS + tests Python + conformance + typecheck + changelog
-npm test               # 764 tests · 112 suites · 0 fallos (Node.js)
+npm test               # 778 tests · 147 suites · 0 fallos (Node.js)
 npm run test:python    # suite de tests del port de compatibilidad Python (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier en modo dry-run

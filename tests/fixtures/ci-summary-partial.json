@@ -1,0 +1,19 @@
+{
+  "totalFiles": 2,
+  "succeeded": 1,
+  "failed": 1,
+  "averageScore": 55,
+  "medianScore": 55,
+  "minScore": 55,
+  "maxScore": 55,
+  "stdDev": 0,
+  "distribution": {
+    "excellent": 0,
+    "good": 1,
+    "needsWork": 0
+  },
+  "perFile": [
+    { "file": "guide.md", "status": "success", "score": 55 },
+    { "file": "broken.md", "status": "error", "score": null }
+  ]
+}

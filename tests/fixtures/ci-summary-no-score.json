@@ -1,0 +1,7 @@
+{
+  "totalFiles": 1,
+  "succeeded": 0,
+  "failed": 1,
+  "message": "No files could be audited.",
+  "perFile": [{ "file": "broken.md", "status": "error", "error": "ENOENT" }]
+}
