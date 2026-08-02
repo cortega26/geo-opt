@@ -1,12 +1,12 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-08-01 — plans 065–068: 065–067 DONE (CI entry-asset hardening, agent-skill discoverability, quality-badge verification); 068 added as a DEFERRED license-signing spike (Ed25519 Pro keys only once a purchase channel exists; honor system documented in `docs/free-vs-pro.md`, audit F-04). Audit 2026-07-31 remediation fully merged to `main` (`dc48b64`). Plan 059 remains TODO pending owner start date. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Last reconciled:** 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
 **Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
 **Pro gate:** P0 GO (038–040 done, 2026-06-28) ✓  
-**Business gate:** ACTIVE (Plan 058 factual truth/onboarding → Plan 059 90-day product-led adoption validation; Plan 018 is historical context, not the execution master)
+**Business gate:** ACTIVE (Plan 058 factual truth/onboarding → Plans 071/072 CI entry repair → Plan 059 90-day product-led adoption validation; Plan 018 is historical context, not the execution master)
 
 This file is the single source of truth for current execution order. Individual
 plan files are self-contained handoffs; `plans/archive/` is historical evidence
@@ -26,8 +26,8 @@ Documentation ownership, status meanings and reconciliation rules live in
 - Update this index and the plan status in the same change that completes,
   blocks, defers or supersedes work.
 - `DONE` plans move to `archive/`; partial and deferred plans remain active.
-- No public npm release, v2 default switch or Pro implementation may cross its
-  named gate.
+- No public npm release, future scoring-default change, or Pro implementation
+  may cross its named gate.
 
 Statuses: `READY`, `TODO`, `IN PROGRESS`, `PARTIAL`, `BLOCKED`, `DEFERRED`,
 `DONE`, `SUPERSEDED`, `REJECTED`.
@@ -51,7 +51,7 @@ or feature expansion.
 | ~~Now~~   | ~~Pro differentiation~~ | ~~Compelling upgrade from Community → Pro~~         | ~~038–040~~                     | P0 ✓      |
 | ~~Next~~  | ~~Product correctness~~ | ~~Defensible structured data and `llms.txt` behavior~~ | ~~024–025~~                  | T1 ✓      |
 | ~~Now~~   | ~~Technical expansion~~ | ~~Sitemap/remote audit, repository readiness~~    | ~~023~~                         | done ✓    |
-| Now       | Product-led validation | Truthful local-to-CI entry, then independent adoption/pain/WTP evidence | [058](archive/058-relaunch-community-validation.md) → [059](059-rebaseline-g1-evidence-cohort.md); 018 is historical context | A1/A2/A3 at day 90 |
+| Now       | Product-led validation | Truthful local-to-CI entry, then independent adoption/pain/WTP evidence | [058](archive/058-relaunch-community-validation.md) → 071 → 072 → [059](059-rebaseline-g1-evidence-cohort.md); 018 is historical context | CI entry executable/truthful, then A1/A2/A3 at day 90 |
 | Deferred  | Paid workflow / exceptional service | At most one evidenced self-service workflow; a service only on unsolicited inbound | [060](060-decide-community-pro-boundary.md), then [061](061-prepare-bounded-diagnostic-intake.md) only if separately triggered | 059 `CONTINUE`, capacity/economics |
 | Deferred  | Product-direction spikes | Baseline, frontmatter, and preflight only on their own real-workflow evidence | [062](062-spike-versioned-site-baselines.md), [063](063-normalize-generate-all-frontmatter.md), [064](064-spike-three-pillar-preflight.md) | independent demand; no sequence |
 | Deferred  | License enforcement | Signature-verifiable Pro keys only once a purchase channel exists (honor system documented as the current model) | [068](068-license-signing.md) | 059 `CONTINUE`; 060 GO; purchase channel |
@@ -73,7 +73,7 @@ T0 (029–034) COMPLETE ✓
         │       │
         │       └── 024 (structured data) DONE ── 025 (llms artifacts) DONE
         │
-        ├── Product-led track (058 DONE → 059 TODO) ACTIVE
+        ├── Product-led track (058 DONE → 071 → 072 → 059 TODO) ACTIVE
         │       │
         │       ├── historical context: 018 and Pro dossier (parked)
         │       ├── CONTINUE (A1 + A2 + A3) → 060 paid-workflow evaluation
@@ -371,7 +371,7 @@ dated social draft, passive metrics, or technical completeness as a business.
 | --- | --- | --- | --- |
 | [057](057-positioning-and-defect-reporting.md) | DEFERRED | Keep the three-pillar umbrella factual; keep defect reporting separate | 058 for positioning; actual DX need for Part B |
 | [058](archive/058-relaunch-community-validation.md) | DONE | Corrected runtime/documentation truth and established a narrow local-to-CI entry (2026-07-22) | none |
-| [059](059-rebaseline-g1-evidence-cohort.md) | TODO | Run a capped 90-day product-led test and record A1/A2/A3 decision | 058; owner start date and discoverability surface |
+| [059](059-rebaseline-g1-evidence-cohort.md) | TODO | Run a capped 90-day product-led test and record A1/A2/A3 decision | 058; 071 and 072 DONE; owner start date and discoverability surface |
 | [060](060-decide-community-pro-boundary.md) | DEFERRED | Evaluate one paid workflow only if product-led evidence and economics justify it | 059 `CONTINUE`; named WTP; capacity model |
 | [061](061-prepare-bounded-diagnostic-intake.md) | DEFERRED | Consider a bounded human service only as unsolicited-inbound exception | 059 `CONTINUE`; inbound; owner choice/capacity/economics |
 | [062](062-spike-versioned-site-baselines.md) | DEFERRED | Design a baseline only after two independent reports of that job | 059 `CONTINUE`; specific repeated baseline pain |
@@ -379,8 +379,9 @@ dated social draft, passive metrics, or technical completeness as a business.
 | [064](064-spike-three-pillar-preflight.md) | DEFERRED | Design a unified preflight only after two independent combined-workflow reports | 059 `CONTINUE`; specific repeated demand |
 | [068](068-license-signing.md) | DEFERRED | Signature-verifiable Pro keys (Ed25519) only once a purchase channel exists; honor system stays until then (audit F-04) | 059 `CONTINUE`; 060 GO; purchase channel |
 
-Only one plan may be in progress. The immediate execution order is 058, then
-059. At the end of a real 90-day distribution effort, `CONTINUE` permits only
+Only one plan may be in progress. Plan 058 is complete; the immediate product
+execution order is 071, then 072, then 059. At the end of a real 90-day
+distribution effort, `CONTINUE` permits only
 the narrow review in 060; `PARTIAL` permits one evidence-backed onboarding or
 positioning adjustment; `MAINTENANCE` freezes commercial and feature expansion
 for six months. `DISTRIBUTION INCOMPLETE` is not a market verdict. These plans
@@ -423,6 +424,85 @@ evidence):
 - **GitHub Action end-to-end smoke test in a scratch public repo**:
   deferred to post-065 execution; out of scope for the plan itself.
 
+### Advisor deep audit — 2026-08-02 (implementation handoffs 069–091)
+
+Deep whole-repository audit at commit `888d3e7`. The maintainer selected every
+net-positive finding for implementation planning. These 23 plans are
+self-contained handoffs; none authorizes source changes merely by existing.
+Dependencies, not numeric order alone, determine readiness. The one-active-plan
+operating rule still applies unless the maintainer explicitly parallelizes
+independent work.
+
+| Plan | Title | Cat | Priority | Effort | Depends on | Status |
+|---|---|---|---|---|---|---|
+| [069](069-match-audit-advisories-by-stable-identity.md) | Match accepted npm advisories by stable GHSA plus reviewed installed surface | security/dx | P1 | S | — | DONE (2026-08-02; squash-merged to main as `db423ac`) |
+| [070](070-make-evidence-freshness-tests-deterministic.md) | Inject a deterministic clock into evidence-freshness tests | tests/bug | P1 | S | — | TODO |
+| [071](071-repair-github-composite-action.md) | Execute GitHub Action inputs as safe argv | bug/dx | P1 | S | 069, 070 | TODO |
+| [072](072-correct-ci-wrapper-score-and-entitlements.md) | Report aggregate CI scores and truthful Community/Pro semantics | bug/docs | P1 | M | 071 | TODO |
+| [073](073-make-fetcher-tests-hermetic.md) | Make fetcher tests local, deterministic, and behavior-specific | tests | P1 | M | 069, 070 | TODO |
+| [074](074-cover-https-ip-pinning.md) | Deterministically cover TLS hostname verification and vetted-IP pinning | security/tests | P1 | M | 073 | TODO |
+| [075](075-enforce-remote-hop-policy.md) | Apply HTTPS/origin policy to roots, redirects, robots, sitemaps, and pages | security | P1 | L | 073, 074 | TODO |
+| [076](076-bound-sitemap-url-accumulation.md) | Bound total retained sitemap page URLs | security/perf | P1 | M | 075 | TODO |
+| [077](077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | TODO |
+| [078](078-fix-robots-group-and-query-matching.md) | Combine equally specific robots groups and include query strings | bug | P2 | M | 073 | TODO |
+| [079](079-honor-fetcher-user-agent.md) | Honor and validate the public fetcher user-agent option | bug/api | P2 | S | 073 | TODO |
+| [080](080-redact-source-content-from-summaries.md) | Remove audited source bodies from serialized summaries | privacy/bug | P1 | S | — | TODO |
+| [081](081-reconcile-public-types-and-exports.md) | Synchronize runtime exports, declarations, profiles, and batch signatures | api/types | P1 | M | — | TODO |
+| [082](082-enforce-jsonld-validation-results.md) | Return structured validation results and fail invalid JSON-LD | bug/api | P1 | M | 081 | TODO |
+| [083](083-close-symlink-write-escapes.md) | Route every Node/Python artifact destination through atomic symlink-safe writes | security | P1 | L | — | TODO |
+| [084](084-align-python-artifact-contracts.md) | Align documented Python schema/llms artifact outcomes with Node | bug/docs | P2 | M | 083 | TODO |
+| [085](085-remove-v2-predictive-wording.md) | Remove remaining ranking/citation/discovery predictions from v2 copy | product-truth | P1 | M | — | TODO |
+| [086](086-lint-javascript-tests.md) | Restore JavaScript test files to the ESLint gate | dx/tests | P2 | S | 069, 070 | TODO |
+| [087](087-run-the-js-suite-once-per-gate.md) | Verify tests and badges from one suite/coverage run | perf/dx | P2 | M | 073, 086 | TODO |
+| [088](088-make-stat-attribution-linear.md) | Retain statistic offsets and remove quadratic rescans | perf | P3 | S | — | TODO |
+| [089](089-prepare-v2-documents-once.md) | Reuse one prepared document across v2 profile/observation/scoring | perf/architecture | P3 | L | 088 | TODO |
+| [090](090-render-python-audits-without-rescoring.md) | Render stored Python reports instead of rereading/rescoring | perf/architecture | P3 | M | 084 | TODO |
+| [091](091-correct-default-model-documentation.md) | Make normative current docs consistently name v2 as default | docs | P2 | S | 085 | TODO |
+
+Recommended execution waves:
+
+1. **Restore trust in gates and entry path:** 069 → 070 → 071 → 072. Plan 059
+   must not start before 071 and 072 are DONE.
+2. **Characterize before network hardening:** 073 → 074 → 075, then 076;
+   after 073, 077–079 are independent of one another except for overlaps that
+   must be rebased through the one-active-plan rule.
+3. **High-value independent contracts/security:** 080, 081 → 082, 083 → 084,
+   and 085. These can be scheduled around the network chain by leverage.
+4. **Tooling and performance:** 086 → 087; 088 → 089; 084 → 090; 085 → 091.
+
+Dependency summary:
+
+```text
+069 + 070 ──┬──> 071 ──> 072 ──> 059
+            ├──> 073 ──> 074 ──> 075 ──> 076
+            │       ├──> 077
+            │       ├──> 078
+            │       ├──> 079
+            │       └──> 087 <── 086
+            └──> 086
+
+081 ──> 082          083 ──> 084 ──> 090
+088 ──> 089          085 ──> 091
+080 independent
+```
+
+Reconciliation with completed history:
+
+- Archived Plan 065 pinned static CI asset fields; 071/072 cover executable
+  argv behavior and aggregate semantics it did not test.
+- Archived Plan 031 synchronized the then-current API; 081 adds a durable
+  runtime/declaration parity gate after new exports and `service` drifted.
+- Archived Plan 043 and audit F-12 guarded parents/known targets; 083 closes
+  final-destination symlink and backup gaps across all Node/Python writers.
+- Archived Plan 049 intended to lint tests, but `package.json` no longer does;
+  086 restores that executable gate against the verified 15-error baseline.
+- Archived Plan 067 established badge checks; 087 reuses one run rather than
+  removing either badge invariant.
+
+All 23 current findings were selected and planned. No finding from this audit
+was rejected. Historical rejected/deferred decisions elsewhere in this index
+remain in force unless a plan explicitly presents new evidence.
+
 ### Solo-founder operating guardrails
 
 - Cap Plan 059 at one focused day per week for 90 calendar days.
@@ -443,8 +523,8 @@ evidence):
 - **023:** DONE. Pure local HTML observations, CLI `technical`, sitemap parsing,
   remote URL/sitemap audit and `src/fetcher.js` SSRF-guarded network boundary
   landed. Python intentionally has no `technical` subcommand per the capability
-  matrix. Remaining drift is public documentation: `docs/architecture.md` still
-  contains stale wording about no supported `technical` CLI command.
+  matrix. The former stale architecture wording about no supported `technical`
+  CLI was reconciled on 2026-07-22.
 - **024:** DONE (Q0+P0 delivered structured-data correctness; archived).
 - **025:** DONE (artifact hardening completed after 024; archived).
 - **026:** SUPERSEDED — became rule-pack direction but low demand; archived.

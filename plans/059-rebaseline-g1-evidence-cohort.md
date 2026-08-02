@@ -7,9 +7,10 @@
 > feedback. Do not cold-message prospects, require sales calls, add telemetry,
 > solicit service work, or store personal/customer data in this repository.
 >
-> **Drift check (run first):** `git diff --stat b2e6055..HEAD -- README.md
+> **Drift check (run first):** `git diff --stat 888d3e7..HEAD -- README.md
 > README.es.md docs/free-vs-pro.md docs/architecture.md
 > .agents/skills/geo-optimization/SKILL.md plans/058-relaunch-community-validation.md
+> .github/actions/geo-opt-audit/action.yml ci-templates/gitlab-ci.yml
 > plans/business/funnel-and-metrics.md plans/business/strategy.md
 > plans/business/offers-and-packaging.md plans/README.md`
 
@@ -18,10 +19,10 @@
 - **Priority:** P1
 - **Effort:** M (capped at one day/week for 90 calendar days)
 - **Risk:** LOW
-- **Depends on:** Plan 058 complete; an owner-approved start date and at least
-  one available discoverability surface
+- **Depends on:** Plan 058 complete; Plans 071 and 072 DONE; an owner-approved
+  start date and at least one available discoverability surface
 - **Category:** product-led validation / distribution
-- **Planned against:** `b2e6055`, revised 2026-07-22
+- **Planned against:** `888d3e7`, revised 2026-08-02
 - **Status:** TODO
 
 ## Decision to test
@@ -79,10 +80,13 @@ when the promised discoverability assets were never actually available.
 
 ## Work plan
 
-1. **Open the experiment honestly.** Record a start date, owner, selected job,
-   available discoverability surface, and the exact entry asset in the funnel
-   record. If no public/durable surface can be used, record `DISTRIBUTION NOT
-   STARTED`; do not begin the 90-day clock or infer no demand.
+1. **Open the experiment honestly.** Confirm Plans 071 and 072 are DONE so the
+   documented GitHub Action executes paths correctly and reports the aggregate
+   audited set with truthful entitlement copy. Then record a start date, owner,
+   selected job, available discoverability surface, and exact entry asset in
+   the funnel record. If either CI plan is incomplete or no public/durable
+   surface can be used, record `DISTRIBUTION NOT STARTED`; do not begin the
+   90-day clock or infer no demand.
 
 2. **Ship the smallest durable entry path.** Make one canonical asset and one
    CI/pre-merge example available through an owner-approved product surface.
@@ -140,6 +144,7 @@ when the promised discoverability assets were never actually available.
 - [ ] A truthful entry asset and CI/pre-merge path were available before the
       observation clock began, or the record states why distribution did not
       start.
+- [ ] Plans 071 and 072 are DONE before the start date.
 - [ ] The experiment stayed within one day/week and did not rely on founder
       LinkedIn reach, direct sales, or hidden telemetry.
 - [ ] A1, A2, and A3 are logged separately using aggregate/redacted evidence.
