@@ -63,6 +63,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   never reported as "likely fixed upstream" (Plan 069).
 
 ### Fixed
+- The GitHub composite action (`geo-opt-audit`) now delivers every input to
+  the CLI through environment variables and builds `argv` as a quoted Bash
+  array: paths with spaces, quotes, or shell metacharacters arrive as one
+  inert argument instead of being word-split, and `model`, `threshold`, and
+  `label` values can no longer inject shell syntax through `run:`
+  interpolation. The exact helper the action executes is covered by a new
+  argument-boundary regression suite (`tests/ci-action-shell.test.js`) that
+  observes the argv the CLI actually receives (Plan 071).
 - `audit` now writes per-file read errors to stderr in `--format json` too and
   exits non-zero on partial file failures even without `--threshold` (audit
   F-05): JSON mode was silent (exit 0, empty stderr) while dropping failed
@@ -122,6 +130,10 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   (observed 2026-08-01 verification pass).
 
 ### Tests
+- `tests/ci-action-shell.test.js` also pins hostile `threshold` and `label`
+  values as inert single argv/data elements — a future unquoted
+  `--threshold` expansion would corrupt both the argument boundary and the
+  gate exit status (Plan 071 follow-up).
 - New `tests/audit-2026-07-31.e2e.test.js`: black-box verification of the
   14 audit findings (F-01…F-14) against the CLI as a subprocess (and the
   real `fetchUrl`/`collectSubSitemapPageUrls` module entries for the SSRF

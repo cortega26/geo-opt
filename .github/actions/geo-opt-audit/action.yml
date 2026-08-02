@@ -54,63 +54,15 @@ runs:
       shell: bash
       env:
         TOOLTICIAN_LICENSE_KEY: ${{ inputs.license-key }}
+        GEO_OPT_CLI_PATH: ${{ github.action_path }}/../../../bin/cli.js
+        GEO_OPT_INPUT_PATH: ${{ inputs.path }}
+        GEO_OPT_INPUT_MODEL: ${{ inputs.model }}
+        GEO_OPT_INPUT_RECURSIVE: ${{ inputs.recursive }}
+        GEO_OPT_INPUT_THRESHOLD: ${{ inputs.threshold }}
+        GEO_OPT_INPUT_LABEL: ${{ inputs.label }}
       run: |
-        CLI="node ${{ github.action_path }}/../../../bin/cli.js"
-
-        # Build audit command
-        ARGS="audit \"${{ inputs.path }}\" --format json --model ${{ inputs.model }}"
-
-        if [[ "${{ inputs.recursive }}" == "true" ]]; then
-          ARGS="$ARGS --recursive"
-        fi
-
-        if [[ -n "${{ inputs.threshold }}" ]]; then
-          ARGS="$ARGS --threshold ${{ inputs.threshold }}"
-        fi
-
-        # Run audit; capture stdout and exit code separately, keep stderr
-        # visible in the job log without polluting the parsed stdout. The
-        # stderr file lives in $RUNNER_TEMP so the repo is never modified.
-        OUTPUT=$($CLI $ARGS 2>"$RUNNER_TEMP/geo-opt-audit-stderr.txt") || AUDIT_EXIT=$?
-        AUDIT_EXIT=${AUDIT_EXIT:-0}
-        cat "$RUNNER_TEMP/geo-opt-audit-stderr.txt" >&2
-
-        # Parse score from JSON (handles single-file and multi-file output)
-        SCORE=$(echo "$OUTPUT" | node -e "
-          const chunks = [];
-          process.stdin.on('data', c => chunks.push(c));
-          process.stdin.on('end', () => {
-            try {
-              const d = JSON.parse(chunks.join(''));
-              const s = Array.isArray(d) ? (d[0]?.effectiveScore ?? 0) : (d.effectiveScore ?? 0);
-              process.stdout.write(String(Math.round(s)));
-            } catch { process.stdout.write('0'); }
-          });
-        ")
-
-        # Compute badge color
-        COLOR="red"
-        if   [ "$SCORE" -ge 90 ]; then COLOR="brightgreen"
-        elif [ "$SCORE" -ge 76 ]; then COLOR="green"
-        elif [ "$SCORE" -ge 61 ]; then COLOR="yellow"
-        elif [ "$SCORE" -ge 41 ]; then COLOR="orange"
-        fi
-
-        LABEL_ENC=$(echo "${{ inputs.label }}" | sed 's/ /_/g')
-        BADGE_URL="https://img.shields.io/badge/${LABEL_ENC}-${SCORE}%2F100-${COLOR}"
-        BADGE_MD="![${{ inputs.label }}](${BADGE_URL})"
-
-        echo "score=${SCORE}"        >> "$GITHUB_OUTPUT"
-        echo "badge-url=${BADGE_URL}" >> "$GITHUB_OUTPUT"
-        echo "badge-markdown=${BADGE_MD}" >> "$GITHUB_OUTPUT"
-
-        if [ "$AUDIT_EXIT" -eq 0 ]; then
-          echo "passed=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "passed=false" >> "$GITHUB_OUTPUT"
-        fi
-
-        # Re-print the audit output; stderr was already streamed above
-        echo "$OUTPUT"
-
-        exit $AUDIT_EXIT
+        # Inputs are delivered as environment variables (data, never shell
+        # source) and argv is built inside run-audit.sh as a quoted Bash
+        # array, so paths with spaces, quotes, or shell metacharacters stay
+        # inert single arguments (Plan 071).
+        bash "${{ github.action_path }}/run-audit.sh"

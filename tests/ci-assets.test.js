@@ -33,31 +33,57 @@ describe("Plan 065 — CI entry assets", () => {
   });
 
   it("GitLab template and GitHub action parse effectiveScore, not score", () => {
-    const rels = ["ci-templates/gitlab-ci.yml", ".github/actions/geo-opt-audit/action.yml"];
-    for (const rel of rels) {
-      const text = read(rel);
-      assert.ok(text.includes("effectiveScore"), `${rel} should read effectiveScore`);
-      assert.ok(!text.includes("?.score "), `${rel} should not access the broken score field`);
-    }
+    const template = read("ci-templates/gitlab-ci.yml");
+    const helper = read(".github/actions/geo-opt-audit/run-audit.sh");
+    assert.ok(template.includes("effectiveScore"), "GitLab template should read effectiveScore");
+    assert.ok(
+      !template.includes("?.score "),
+      "GitLab template should not access the broken score field"
+    );
+    assert.ok(helper.includes("effectiveScore"), "action helper should read effectiveScore");
+    assert.ok(
+      !helper.includes("?.score "),
+      "action helper should not access the broken score field"
+    );
   });
 
   it("GitHub action forces JSON mode and isolates stderr from the repo", () => {
     const action = read(".github/actions/geo-opt-audit/action.yml");
+    const helper = read(".github/actions/geo-opt-audit/run-audit.sh");
     assert.ok(
-      action.includes("--format json"),
-      "action should audit in JSON mode so the score parse has machine-readable stdout"
+      helper.includes("--format json"),
+      "action helper should audit in JSON mode so the score parse has machine-readable stdout"
     );
     assert.ok(
       !action.includes("inputs.format"),
       "action should not declare or use a dead format input"
     );
     assert.ok(
-      action.includes("$RUNNER_TEMP"),
-      "action should capture stderr outside the repo working directory"
+      helper.includes("$RUNNER_TEMP"),
+      "action helper should capture stderr outside the repo working directory"
     );
     assert.ok(
-      !action.includes("2>audit-stderr.txt"),
-      "action should not write stderr into the repository"
+      !helper.includes("2>audit-stderr.txt"),
+      "action helper should not write stderr into the repository"
+    );
+  });
+
+  it("GitHub action builds argv as a Bash array from env data, never shell source", () => {
+    const action = read(".github/actions/geo-opt-audit/action.yml");
+    const helper = read(".github/actions/geo-opt-audit/run-audit.sh");
+    assert.ok(
+      action.includes("run-audit.sh"),
+      "action should delegate to the shared runner script"
+    );
+    assert.ok(!action.includes("$ARGS"), "action should not expand a scalar ARGS string");
+    assert.ok(helper.includes("args=("), "helper should build argv as a Bash array");
+    assert.ok(
+      helper.includes('"${args[@]}"'),
+      "helper should expand the array with quotes so hostile input stays inert"
+    );
+    assert.ok(
+      !helper.includes("${{ inputs."),
+      "helper must never interpolate input values into shell source"
     );
   });
 
