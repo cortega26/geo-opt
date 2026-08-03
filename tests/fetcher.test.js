@@ -450,6 +450,20 @@ describe("fetchUrl — redirects", () => {
     assert.ok(result.html.includes("Final"));
   });
 
+  it("cadena de 5 redirects completa dentro de un presupuesto ajustado", async () => {
+    // El presupuesto compartido (Plan 077) no debe romper las cadenas
+    // rápidas: una cadena local entera cabe holgadamente en 2s.
+    const started = Date.now();
+    const result = await fetchUrl(`${baseUrl}/five-redirects`, {
+      ...LOCALHOST_OPTS,
+      timeoutMs: 2_000,
+    });
+    const elapsed = Date.now() - started;
+    assert.equal(result.statusCode, 200);
+    assert.ok(result.html.includes("Final"));
+    assert.ok(elapsed < 2_000, `cadena rápida excedió el presupuesto (${elapsed}ms)`);
+  });
+
   it("rechaza cadena de 6 redirects (excede max depth)", async () => {
     await assert.rejects(
       () => fetchUrl(`${baseUrl}/six-redirects`, LOCALHOST_OPTS),
@@ -765,6 +779,102 @@ describe("fetchUrl — timeouts", () => {
       const elapsed = Date.now() - started;
       assert.ok(elapsed >= 800, `timeout total disparado demasiado pronto (${elapsed}ms)`);
       assert.ok(elapsed < 5_000, `timeout total tardó demasiado (${elapsed}ms)`);
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  it("timeout total: cadena de redirects individualmente rápidos pero acumulativamente lentos comparte el presupuesto", async () => {
+    // Cada hop tarda 400ms < presupuesto (1000ms), pero la suma de los 4
+    // (3 redirects + respuesta final) es 1600ms > presupuesto. El timeout
+    // total es UNA fecha límite para toda la transacción (Plan 077): la
+    // cadena debe rechazar cerca del presupuesto original, no tras
+    // multiplicarlo por el número de hops.
+    const s = await startServer((req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      setTimeout(() => {
+        if (url.pathname === "/slow-chain-1") {
+          res.writeHead(302, { Location: "/slow-chain-2" });
+        } else if (url.pathname === "/slow-chain-2") {
+          res.writeHead(302, { Location: "/slow-chain-3" });
+        } else if (url.pathname === "/slow-chain-3") {
+          res.writeHead(302, { Location: "/slow-final" });
+        } else {
+          res.writeHead(200, { "Content-Type": "text/html" });
+        }
+        res.end("<html>final</html>");
+      }, 400);
+    });
+
+    try {
+      const budget = 1_000;
+      const started = Date.now();
+      await assert.rejects(
+        () => fetchUrl(`${s.baseUrl}/slow-chain-1`, { allowLocalhost: true, timeoutMs: budget }),
+        /Request total timeout after 1000ms/
+      );
+      const elapsed = Date.now() - started;
+      // Generoso: ni disparado antes de la primera mitad del presupuesto ni
+      // con el presupuesto renovado por hop (que habría tardado ~1600ms).
+      assert.ok(elapsed >= 500, `timeout total disparado demasiado pronto (${elapsed}ms)`);
+      assert.ok(elapsed < 2_500, `timeout total tardó demasiado (${elapsed}ms)`);
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  it("timeout total: presupuesto agotado antes del siguiente hop", async () => {
+    // El primer hop consume el 90% del presupuesto y el segundo tarda más
+    // de lo que queda: debe rechazar al alcanzar la fecha límite compartida
+    // (o de inmediato si ya la excedió), nunca con un presupuesto renovado.
+    const s = await startServer((req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const delay = url.pathname === "/almost-exhausted" ? 900 : 300;
+      setTimeout(() => {
+        if (url.pathname === "/almost-exhausted") {
+          res.writeHead(302, { Location: "/slow-tail" });
+        } else {
+          res.writeHead(200, { "Content-Type": "text/html" });
+        }
+        res.end("<html>final</html>");
+      }, delay);
+    });
+
+    try {
+      const budget = 1_000;
+      const started = Date.now();
+      await assert.rejects(
+        () =>
+          fetchUrl(`${s.baseUrl}/almost-exhausted`, {
+            allowLocalhost: true,
+            timeoutMs: budget,
+          }),
+        /Request total timeout after 1000ms/
+      );
+      const elapsed = Date.now() - started;
+      assert.ok(elapsed >= 500, `timeout total disparado demasiado pronto (${elapsed}ms)`);
+      assert.ok(elapsed < 2_000, `timeout total tardó demasiado (${elapsed}ms)`);
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  it("timeout total: presupuesto mínimo aborta durante DNS/conexión", async () => {
+    // Un presupuesto de 10ms se agota antes de recibir ningún byte: la
+    // fecha límite cubre también las fases de DNS y conexión, no solo la
+    // espera de respuesta ya conectada.
+    const s = await startServer(() => {
+      // Nunca responde — el abort debe venir del presupuesto total.
+    });
+
+    try {
+      const started = Date.now();
+      await assert.rejects(
+        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: 10 }),
+        /Request total timeout after 10ms/
+      );
+      const elapsed = Date.now() - started;
+      assert.ok(elapsed < 1_000, `timeout total tardó demasiado (${elapsed}ms)`);
     } finally {
       await stopServer(s);
     }

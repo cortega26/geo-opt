@@ -466,7 +466,9 @@ function createPlainAgent(hostname, resolvedIp, port) {
  * @param {boolean} [options.allowHttp=true] — permite hops http: (CLI: solo con --allow-http)
  * @param {boolean} [options.allowCrossOrigin=true] — permite hops fuera del root origin
  * @param {string|null} [options.rootOrigin] — origin raíz que deben respetar todos los hops
- * @param {number} [options.totalTimeoutMs]
+ * @param {number} [options.totalTimeoutMs] — presupuesto total de la transacción
+ * @param {number} [options.deadlineMs] — fecha límite absoluta compartida por
+ *   todos los hops (Plan 077); si se omite, se deriva de totalTimeoutMs
  * @param {number} [options.responseTimeoutMs]
  * @param {number} [options.maxResponseSize]
  * @param {number} [options.maxRedirects]
@@ -481,6 +483,7 @@ async function performRequest(url, options = {}) {
     allowCrossOrigin = true,
     rootOrigin = null,
     totalTimeoutMs = TOTAL_TIMEOUT_MS,
+    deadlineMs = null,
     responseTimeoutMs = RESPONSE_TIMEOUT_MS,
     maxResponseSize = MAX_RESPONSE_SIZE,
     maxRedirects = MAX_REDIRECTS,
@@ -504,25 +507,55 @@ async function performRequest(url, options = {}) {
     throw err;
   }
 
-  // 1. Resolver y validar IP
-  const { address: resolvedIp } = await resolveAndValidateHost(
-    hostname,
-    allowPrivate,
-    allowLocalhost
-  );
+  // 1. Fecha límite compartida (Plan 077): una sola transacción pública
+  //    (fetchUrl) tiene un solo presupuesto total a través de TODOS los
+  //    hops. Cada recursión de redirect recibe la misma deadlineMs absoluta
+  //    y arma su timer con el tiempo restante — el presupuesto NO se
+  //    renueva por hop. Si el presupuesto ya se agotó, abortar de inmediato
+  //    sin resolver ni conectar.
+  const deadline = deadlineMs ?? Date.now() + totalTimeoutMs;
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    throw new Error(`Request total timeout after ${totalTimeoutMs}ms`);
+  }
 
-  // 2. Crear agente con IP pre-resuelta (mitigación de DNS rebinding)
+  // 2. Timer total: se arma ANTES de resolver DNS y conectar para que la
+  //    fecha límite cubra también esas fases; si dispara durante la
+  //    resolución, el check posterior cierra la transacción en cuanto esta
+  //    termine. El timeout de respuesta (post-conexión) queda subordinado
+  //    por construcción: este timer dispara antes cuando el tiempo restante
+  //    es menor que responseTimeoutMs.
+  const totalController = new globalThis.AbortController();
+  const totalTimer = setTimeout(() => {
+    totalController.abort();
+  }, remaining);
+
+  // 3. Resolver y validar IP
+  let resolvedIp;
+  try {
+    ({ address: resolvedIp } = await resolveAndValidateHost(
+      hostname,
+      allowPrivate,
+      allowLocalhost
+    ));
+  } catch (error) {
+    clearTimeout(totalTimer);
+    throw error;
+  }
+
+  // El presupuesto se agotó mientras se resolvía el host: el timer ya
+  // abortó el controller; cerrar con el error de timeout total.
+  if (totalController.signal.aborted) {
+    clearTimeout(totalTimer);
+    throw new Error(`Request total timeout after ${totalTimeoutMs}ms`);
+  }
+
+  // 4. Crear agente con IP pre-resuelta (mitigación de DNS rebinding)
   const agent = isHttps
     ? createSecureAgent(hostname, resolvedIp, port)
     : createPlainAgent(hostname, resolvedIp, port);
 
   const httpMod = isHttps ? https : http;
-
-  // 3. Timeout total y de respuesta
-  const totalController = new globalThis.AbortController();
-  const totalTimer = setTimeout(() => {
-    totalController.abort();
-  }, totalTimeoutMs);
 
   let responseTimer;
 
@@ -584,7 +617,10 @@ async function performRequest(url, options = {}) {
           }
 
           clearTimeout(totalTimer);
-          // Re-validar el destino del redirect contra SSRF guards
+          // Re-validar el destino del redirect contra SSRF guards. La
+          // recursión hereda la MISMA fecha límite absoluta (deadlineMs vía
+          // ...options) y arma un timer con el tiempo restante — el
+          // presupuesto total no se renueva por hop (Plan 077).
           performRequest(redirectUrl, {
             ...options,
             redirectDepth: redirectDepth + 1,
@@ -800,7 +836,9 @@ export function checkRobotsRule(url, groups, userAgent) {
  * @param {boolean} [options.allowHttp=true] — permite el esquema http: (por defecto, compat)
  * @param {boolean} [options.allowCrossOrigin=true] — permite hops fuera del root origin (por defecto, compat)
  * @param {string|null} [options.rootOrigin=null] — origin raíz; si se omite, el de esta URL
- * @param {number} [options.timeoutMs=TOTAL_TIMEOUT_MS] — timeout total
+ * @param {number} [options.timeoutMs=TOTAL_TIMEOUT_MS] — timeout total de la
+ *   transacción completa (DNS, redirects y body) con UNA fecha límite
+ *   compartida entre todos los hops
  * @param {number} [options.maxSize=MAX_RESPONSE_SIZE] — tamaño máximo de respuesta
  * @param {string} [options.userAgent=USER_AGENT] — User-Agent header
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
@@ -836,6 +874,11 @@ export async function fetchUrl(url, options = {}) {
   // sub-sitemaps descubiertos).
   const effectiveRootOrigin = rootOrigin ?? origin;
 
+  // Fecha límite única de la transacción (Plan 077): se calcula al entrar
+  // (antes de adquirir slots de rate limiting, que también consumen
+  // presupuesto) y se propaga a cada hop de redirect vía performRequest.
+  const deadlineMs = Date.now() + timeoutMs;
+
   // Rate limiting: adquirir slots
   await hostSemaphoreFor(origin).acquire();
   await globalSemaphore.acquire();
@@ -848,6 +891,7 @@ export async function fetchUrl(url, options = {}) {
       allowCrossOrigin,
       rootOrigin: effectiveRootOrigin,
       totalTimeoutMs: timeoutMs,
+      deadlineMs,
       maxResponseSize: maxSize,
     });
     return result;

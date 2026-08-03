@@ -945,7 +945,11 @@ declare module "geo-opt" {
      * fetched; the CLI pins it to the root sitemap's origin in sitemap mode.
      */
     rootOrigin?: string;
-    /** Total request timeout in milliseconds (default: 30_000). */
+    /**
+     * Total request timeout in milliseconds (default: 30_000) covering the
+     * whole transaction — DNS/connect, headers, body, and every redirect
+     * hop — as one shared deadline, not a per-hop budget.
+     */
     timeoutMs?: number;
     /** Maximum response body size in bytes (default: 2_097_152). */
     maxSize?: number;
