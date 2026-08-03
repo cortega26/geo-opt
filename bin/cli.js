@@ -1359,6 +1359,10 @@ program
   .option("--allow-private", "Allow connections to private IP ranges")
   .option("--allow-localhost", "Allow connections to loopback addresses")
   .option("--allow-http", "Allow connections to public HTTP URLs (not recommended)")
+  .option(
+    "--allow-cross-origin",
+    "Allow redirects, sub-sitemaps, and pages to leave the root origin (not recommended)"
+  )
   .option("--no-robots", "Skip robots.txt check in sitemap mode")
   .action((files, options, cmd) => {
     const config = resolveConfig(cmd);
@@ -1424,10 +1428,16 @@ program
       }
 
       // Los flags de red no aplican a modo local
-      if (options.allowPrivate || options.allowLocalhost || options.allowHttp || options.noRobots) {
+      if (
+        options.allowPrivate ||
+        options.allowLocalhost ||
+        options.allowHttp ||
+        options.allowCrossOrigin ||
+        options.noRobots
+      ) {
         console.warn(
           chalk.yellow(
-            "Warning: --allow-private, --allow-localhost, --allow-http, and --no-robots have no effect in local file mode."
+            "Warning: --allow-private, --allow-localhost, --allow-http, --allow-cross-origin, and --no-robots have no effect in local file mode."
           )
         );
       }
@@ -1635,11 +1645,20 @@ async function handleRemoteTechnical(options) {
   const allowPrivate = options.allowPrivate || false;
   const allowLocalhost = options.allowLocalhost || false;
   const allowHttp = options.allowHttp || false;
+  const allowCrossOrigin = options.allowCrossOrigin || false;
   const checkRobots = options.robots !== false;
 
+  // Política de hop única para TODOS los hops remotos (Plan 075): esquema y
+  // origin. El opt-in de HTTP es --allow-http; el de cross-origin es
+  // --allow-cross-origin. Por compatibilidad, --allow-private y
+  // --allow-localhost siguen liberando también el esquema en modo --url
+  // (comportamiento previo); en modo --sitemap el esquema de los URLs
+  // descubiertos solo se libera con --allow-http explícito.
   const fetchOptions = {
     allowPrivate,
     allowLocalhost,
+    allowHttp: allowHttp || allowPrivate || allowLocalhost,
+    allowCrossOrigin,
     timeoutMs: timeoutSecs * 1000,
     maxSize,
   };
@@ -1718,6 +1737,25 @@ async function handleRemoteTechnical(options) {
     const sitemapParsed = new URL(sitemapUrl);
     const origin = sitemapParsed.origin;
 
+    // El origin del sitemap raíz rige TODOS los hops de este modo: robots.txt,
+    // sitemap raíz (incluidos sus redirects), sub-sitemaps anidados y páginas
+    // descubiertas. Cualquier salto a otro origin se rechaza salvo
+    // --allow-cross-origin (Plan 075).
+    //
+    // Esquema estricto en este modo: allowHttp se fija SOLO con --allow-http
+    // explícito. fetchOptions (modo --url) conserva la compatibilidad
+    // histórica de que --allow-private/--allow-localhost liberan también el
+    // esquema; aquí no se propaga: los URLs descubiertos (sub-sitemaps y
+    // páginas) requieren el opt-in de HTTP nombrado.
+    const sitemapFetchOptions = {
+      ...fetchOptions,
+      allowHttp,
+      rootOrigin: origin,
+      // El sitemap puede ser grande
+      maxSize: Math.max(fetchOptions.maxSize, 10_485_760), // 10 MB para sitemaps
+    };
+    const pageFetchOptions = { ...fetchOptions, allowHttp, rootOrigin: origin };
+
     // 1. Fetch y parsear robots.txt
     let robotsGroups = [];
     if (checkRobots) {
@@ -1725,7 +1763,7 @@ async function handleRemoteTechnical(options) {
         console.log(chalk.dim(`Fetching robots.txt from ${origin}...`));
       }
       try {
-        const robots = await fetchRobotsTxt(origin, fetchOptions);
+        const robots = await fetchRobotsTxt(origin, sitemapFetchOptions);
         robotsGroups = robots.groups;
         if (format !== "json") {
           console.log(chalk.dim(`  Parsed ${robotsGroups.length} robots.txt group(s).`));
@@ -1742,11 +1780,7 @@ async function handleRemoteTechnical(options) {
       console.log(chalk.dim(`Fetching sitemap ${sitemapUrl}...`));
     }
     clearRobotsCache(); // Limpiar caché del robots.txt para no interferir
-    const sitemapResult = await fetchUrl(sitemapUrl, {
-      ...fetchOptions,
-      // El sitemap puede ser grande
-      maxSize: Math.max(fetchOptions.maxSize, 10_485_760), // 10 MB para sitemaps
-    });
+    const sitemapResult = await fetchUrl(sitemapUrl, sitemapFetchOptions);
 
     // 3. Parsear sitemap
     const parsed = parseSitemapXml(sitemapResult.html);
@@ -1779,10 +1813,7 @@ async function handleRemoteTechnical(options) {
       // testearse sin red.
       const { pageUrls } = await collectSubSitemapPageUrls(parsed.sitemapUrls, {
         fetchFn: (url, opts) => fetchUrl(url, opts),
-        fetchOptions: {
-          ...fetchOptions,
-          maxSize: Math.max(fetchOptions.maxSize, 10_485_760),
-        },
+        fetchOptions: sitemapFetchOptions,
         onInfo: format !== "json" ? (m) => console.log(chalk.dim(m)) : undefined,
         onWarn: format !== "json" ? (m) => console.warn(chalk.yellow(m)) : undefined,
       });
@@ -1833,7 +1864,7 @@ async function handleRemoteTechnical(options) {
         process.stderr.write(`\r  Fetching ${fetched}/${toFetch.length}...`);
       }
       try {
-        const { html, statusCode, finalUrl } = await fetchUrl(url, fetchOptions);
+        const { html, statusCode, finalUrl } = await fetchUrl(url, pageFetchOptions);
         const report = auditTechnicalHtml(html, { sourceUrl: finalUrl });
         results.push({
           target: url,

@@ -475,6 +475,253 @@ describe("fetchUrl — redirects", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Hop scheme & origin policy (Plan 075)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("fetchUrl — hop scheme & origin policy (Plan 075)", () => {
+  // Dos origins locales (puertos distintos): A es el root de la auditoría,
+  // B el destino cross-origin. B cuenta requests para probar que un hop
+  // rechazado nunca llega a conectar.
+  let serverA, serverB, baseUrlA, baseUrlB, requestsB;
+
+  before(async () => {
+    requestsB = 0;
+    const sA = await startServer((req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      if (url.pathname === "/same-origin-redirect") {
+        res.writeHead(302, { Location: `${baseUrlA}/final` });
+        res.end();
+      } else if (url.pathname === "/cross-origin-redirect") {
+        res.writeHead(302, { Location: `${baseUrlB}/page` });
+        res.end();
+      } else if (url.pathname === "/redirect-to-private") {
+        res.writeHead(301, { Location: "http://10.0.0.1/blocked" });
+        res.end();
+      } else {
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>origin-a</p></body></html>");
+      }
+    });
+    const sB = await startServer((req, res) => {
+      requestsB += 1;
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      if (url.pathname === "/sub-sitemap.xml") {
+        res.writeHead(200, { "Content-Type": "application/xml" });
+        res.end(
+          `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${baseUrlB}/page</loc></url></urlset>`
+        );
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end("<html><body><p>origin-b</p></body></html>");
+    });
+    serverA = sA.server;
+    baseUrlA = sA.baseUrl;
+    serverB = sB.server;
+    baseUrlB = sB.baseUrl;
+  });
+
+  after(async () => {
+    await stopServer(serverA);
+    await stopServer(serverB);
+  });
+
+  it("rechaza URL raíz http: con allowHttp:false antes de conectar (0 requests)", async () => {
+    const before = requestsB;
+    await guardRejects(
+      fetchUrl(`${baseUrlB}/page`, { allowLocalhost: true, allowHttp: false }),
+      "Hop policy: HTTP scheme blocked"
+    );
+    assert.equal(requestsB - before, 0, "el hop rechazado por esquema no debe conectar");
+  });
+
+  it("permite http: con allowHttp:true (compatibilidad de librería)", async () => {
+    const result = await fetchUrl(`${baseUrlB}/page`, { allowLocalhost: true, allowHttp: true });
+    assert.equal(result.statusCode, 200);
+    assert.ok(result.html.includes("origin-b"));
+  });
+
+  it("rechaza redirect cross-origin con rootOrigin sin --allow-cross-origin (0 requests al destino)", async () => {
+    const before = requestsB;
+    await guardRejects(
+      fetchUrl(`${baseUrlA}/cross-origin-redirect`, {
+        allowLocalhost: true,
+        allowHttp: true,
+        allowCrossOrigin: false,
+        rootOrigin: baseUrlA,
+      }),
+      "Hop policy: cross-origin blocked"
+    );
+    assert.equal(requestsB - before, 0, "el hop cross-origin rechazado no debe conectar");
+  });
+
+  it("sigue redirect cross-origin con allowCrossOrigin:true", async () => {
+    const result = await fetchUrl(`${baseUrlA}/cross-origin-redirect`, {
+      allowLocalhost: true,
+      allowHttp: true,
+      allowCrossOrigin: true,
+      rootOrigin: baseUrlA,
+    });
+    assert.equal(result.statusCode, 200);
+    assert.ok(result.html.includes("origin-b"));
+    assert.ok(result.finalUrl.includes("/page"));
+  });
+
+  it("sigue redirect same-origin sin allowCrossOrigin (el root origin no restringe dentro de él)", async () => {
+    const result = await fetchUrl(`${baseUrlA}/same-origin-redirect`, {
+      allowLocalhost: true,
+      allowHttp: true,
+      allowCrossOrigin: false,
+      rootOrigin: baseUrlA,
+    });
+    assert.equal(result.statusCode, 200);
+    assert.ok(result.finalUrl.includes("/final"));
+  });
+
+  it("rechaza URL raíz cross-origen con rootOrigin fijo (caso página de sitemap) sin conectar", async () => {
+    // Simula el modo --sitemap del CLI: fetchUrl recibe una página de otro
+    // origin con rootOrigin = origin del sitemap raíz.
+    const before = requestsB;
+    await guardRejects(
+      fetchUrl(`${baseUrlB}/page`, {
+        allowLocalhost: true,
+        allowHttp: true,
+        allowCrossOrigin: false,
+        rootOrigin: baseUrlA,
+      }),
+      "Hop policy: cross-origin blocked"
+    );
+    assert.equal(requestsB - before, 0, "la página cross-origin rechazada no debe conectar");
+  });
+
+  it("deriva el root origin de la URL raíz cuando no se pasa rootOrigin", async () => {
+    // Sin rootOrigin explícito (modo --url del CLI), el root es la propia
+    // URL: un redirect a otro origin se rechaza igual con allowCrossOrigin:false.
+    const before = requestsB;
+    await guardRejects(
+      fetchUrl(`${baseUrlA}/cross-origin-redirect`, {
+        allowLocalhost: true,
+        allowHttp: true,
+        allowCrossOrigin: false,
+      }),
+      "Hop policy: cross-origin blocked"
+    );
+    assert.equal(requestsB - before, 0);
+  });
+
+  it("los guards SSRF siguen ganando incluso con ambos opt-ins activos", async () => {
+    // allowHttp + allowCrossOrigin activos no debilitan el bloqueo de IPs:
+    // el redirect a 10.0.0.1 se rechaza en la validación de IP, no por
+    // política de esquema/origin.
+    await guardRejects(
+      fetchUrl(`${baseUrlA}/redirect-to-private`, {
+        allowLocalhost: true,
+        allowHttp: true,
+        allowCrossOrigin: true,
+      }),
+      "blocked: 10.0.0.1"
+    );
+  });
+
+  it("fetchRobotsTxt PROPAGA el rechazo de política (ERR_HOP_POLICY) sin cachearlo", async () => {
+    clearRobotsCache();
+    // origin http + allowHttp:false → el hop de robots.txt se rechaza por
+    // política y el error se PROPAGA (no se degrada en silencio como los
+    // fallos de red): el llamador debe poder avisar y reintentar con el
+    // opt-in. El resultado vacío NO se cachea en el camino del throw.
+    const strictOpts = { allowLocalhost: true, allowHttp: false, allowCrossOrigin: false };
+    await assert.rejects(fetchRobotsTxt(baseUrlA, strictOpts), (err) => {
+      assert.ok(
+        err instanceof Error && err.message.includes("Hop policy"),
+        `esperaba rechazo de política, recibí: ${err.message}`
+      );
+      assert.equal(err.code, "ERR_HOP_POLICY", "el error debe llevar el código estable");
+      return true;
+    });
+
+    // Reintento con la misma política estricta: vuelve a rechazar (prueba
+    // que el vacío del primer fallo no quedó cacheado).
+    await assert.rejects(fetchRobotsTxt(baseUrlA, strictOpts), (err) => {
+      assert.equal(err?.code, "ERR_HOP_POLICY");
+      return true;
+    });
+
+    // Reintento con el opt-in: fetchea de verdad (la política pasa y el
+    // servidor local responde el HTML por defecto).
+    clearRobotsCache();
+    const fresh = await fetchRobotsTxt(baseUrlA, {
+      allowLocalhost: true,
+      allowHttp: true,
+      allowCrossOrigin: true,
+    });
+    assert.ok(Array.isArray(fresh.groups));
+  });
+
+  it("sub-sitemap cross-origin se rechaza en el flujo de sitemap (0 requests al segundo origin)", async () => {
+    const { collectSubSitemapPageUrls } = await import("../src/sitemap.js");
+    const strict = {
+      allowLocalhost: true,
+      allowHttp: true,
+      allowCrossOrigin: false,
+      rootOrigin: baseUrlA,
+    };
+    const before = requestsB;
+    const warnings = [];
+    const { pageUrls, fetched } = await collectSubSitemapPageUrls(
+      [{ loc: `${baseUrlB}/sub-sitemap.xml` }],
+      {
+        fetchFn: fetchUrl,
+        fetchOptions: strict,
+        onWarn: (m) => warnings.push(m),
+      }
+    );
+    assert.equal(pageUrls.length, 0);
+    assert.equal(requestsB - before, 0, "el sub-sitemap cross-origin no debe conectarse");
+    assert.ok(
+      warnings.some((w) => w.includes("Failed to fetch sub-sitemap")),
+      `esperaba warning de fetch fallido, recibí: ${warnings.join("; ")}`
+    );
+
+    // Con allowCrossOrigin:true el mismo flujo extrae las páginas del
+    // sub-sitemap de B.
+    const allowed = await collectSubSitemapPageUrls([{ loc: `${baseUrlB}/sub-sitemap.xml` }], {
+      fetchFn: fetchUrl,
+      fetchOptions: { ...strict, allowCrossOrigin: true },
+    });
+    assert.deepEqual(allowed.pageUrls, [`${baseUrlB}/page`]);
+  });
+
+  it("sub-sitemap http: se rechaza por esquema bajo política estricta (0 requests)", async () => {
+    const { collectSubSitemapPageUrls } = await import("../src/sitemap.js");
+    // Variación estricta en el esquema: allowHttp:false hace que el loc
+    // http:// del sub-sitemap se rechace antes de cualquier conexión.
+    const strict = {
+      allowLocalhost: true,
+      allowHttp: false,
+      allowCrossOrigin: false,
+      rootOrigin: baseUrlA,
+    };
+    const before = requestsB;
+    const warnings = [];
+    const { pageUrls, fetched } = await collectSubSitemapPageUrls(
+      [{ loc: `${baseUrlB}/sub-sitemap.xml` }],
+      {
+        fetchFn: fetchUrl,
+        fetchOptions: strict,
+        onWarn: (m) => warnings.push(m),
+      }
+    );
+    assert.equal(pageUrls.length, 0);
+    assert.equal(fetched, 1, "el sub-sitemap se intenta una vez y falla por política");
+    assert.equal(requestsB - before, 0, "el sub-sitemap http rechazado no debe conectarse");
+    assert.ok(
+      warnings.some((w) => w.includes("Failed to fetch sub-sitemap")),
+      `esperaba warning de fetch fallido, recibí: ${warnings.join("; ")}`
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Timeouts
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1186,5 +1433,230 @@ describe("fetchUrl — HTTPS certificate & IP pinning (Plan 074)", () => {
     );
     // El request debe apuntar a la IP ya validada (sin segunda resolución DNS).
     assert.ok(source.includes("hostname: resolvedIp"), "el request debe conectar a la IP validada");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Hop policy sobre HTTPS (Plan 075) — downgrade y cross-origin con el agente TLS
+// real, usando los fixtures de tests/fixtures/tls/ y el subproceso fetch-child.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("fetchUrl — hop scheme & origin policy over HTTPS (Plan 075)", () => {
+  let localhostResolvesToLoopback = false;
+
+  before(async () => {
+    try {
+      const v4 = await dns.resolve4("localhost");
+      localhostResolvesToLoopback = v4.includes("127.0.0.1");
+    } catch {
+      localhostResolvesToLoopback = false;
+    }
+  });
+
+  it("redirect HTTPS same-origin se sigue con la política estricta por defecto", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip("localhost no resuelve a 127.0.0.1 en este runner; se omite el caso same-origin");
+      return;
+    }
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-localhost-server-key.pem"),
+      fixture("TEST-ONLY-localhost-server-cert.pem"),
+      (req, res) => {
+        const url = new URL(req.url, `https://${req.headers.host}`);
+        if (url.pathname === "/redirect") {
+          res.writeHead(302, { Location: "/final" });
+          res.end();
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>same-origin-https</p></body></html>");
+      }
+    );
+    try {
+      // El subproceso usa allowHttp:false y allowCrossOrigin:false por defecto:
+      // un redirect https→https del mismo origin debe pasar la política.
+      const child = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_URL: `https://localhost:${s.port}/redirect`,
+      });
+      assert.equal(
+        child.code,
+        0,
+        `el redirect same-origin HTTPS debía seguirse. stdout: ${child.out} stderr: ${child.err}`
+      );
+      const payload = JSON.parse(child.out);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.statusCode, 200);
+      assert.equal(payload.finalUrl, `https://localhost:${s.port}/final`);
+    } finally {
+      await stopServer(s.server);
+    }
+  });
+
+  it("HTTPS→HTTP downgrade rechazado por defecto (0 requests al destino http); --allow-http lo permite", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip("localhost no resuelve a 127.0.0.1 en este runner; se omite el caso de downgrade");
+      return;
+    }
+    let httpRequests = 0;
+    const httpTarget = await startServer((_req, res) => {
+      httpRequests += 1;
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end("<html><body><p>downgraded</p></body></html>");
+    });
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-localhost-server-key.pem"),
+      fixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        res.writeHead(302, { Location: `http://127.0.0.1:${httpTarget.port}/final` });
+        res.end();
+      }
+    );
+    try {
+      // Política estricta (por defecto): el hop http:// se rechaza antes de
+      // conectar; el servidor http no recibe ningún request.
+      const child = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_URL: `https://localhost:${s.port}/downgrade`,
+      });
+      assert.equal(
+        child.code,
+        1,
+        `el downgrade debía rechazarse. stdout: ${child.out} stderr: ${child.err}`
+      );
+      const payload = JSON.parse(child.out);
+      assert.ok(
+        payload.error.includes("HTTP scheme"),
+        `el error debe nombrar el esquema bloqueado, recibí: ${payload.error}`
+      );
+      assert.equal(httpRequests, 0, "el destino http del downgrade no debe recibir requests");
+
+      // Opt-ins explícitos: el downgrade necesita --allow-http (esquema). En
+      // la web real un downgrade https→http del mismo host:port solo necesita
+      // --allow-http (la política de origin compara la autoridad, no el
+      // esquema); este fixture cambia además host/puerto, así que el caso
+      // permitido pasa también --allow-cross-origin. SSRF sigue aplicando.
+      const childAllowed = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_URL: `https://localhost:${s.port}/downgrade`,
+        TLS_TEST_ALLOW_HTTP: "1",
+        TLS_TEST_ALLOW_CROSS_ORIGIN: "1",
+      });
+      assert.equal(
+        childAllowed.code,
+        0,
+        `con los opt-ins el downgrade debía seguirse. stdout: ${childAllowed.out} stderr: ${childAllowed.err}`
+      );
+      const allowedPayload = JSON.parse(childAllowed.out);
+      assert.equal(allowedPayload.ok, true);
+      assert.equal(allowedPayload.statusCode, 200);
+      assert.equal(
+        httpRequests,
+        1,
+        "con los opt-ins el destino http recibe exactamente un request"
+      );
+    } finally {
+      await stopServer(s.server);
+      await stopServer(httpTarget);
+    }
+  });
+
+  it("redirect HTTPS cross-origin rechazado por defecto (0 requests al segundo origin); el opt-in lo permite", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip("localhost no resuelve a 127.0.0.1 en este runner; se omite el caso cross-origin");
+      return;
+    }
+    let crossRequests = 0;
+    const target = await startTlsServer(
+      fixture("TEST-ONLY-localhost-server-key.pem"),
+      fixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        crossRequests += 1;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>cross-origin-https</p></body></html>");
+      }
+    );
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-localhost-server-key.pem"),
+      fixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        // Puertos distintos ⇒ origins distintos para la política (el origin
+        // incluye el puerto). El segundo servidor usa el mismo cert localhost.
+        res.writeHead(302, { Location: `https://localhost:${target.port}/final` });
+        res.end();
+      }
+    );
+    try {
+      const child = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_URL: `https://localhost:${s.port}/redirect`,
+      });
+      assert.equal(
+        child.code,
+        1,
+        `el hop cross-origin debía rechazarse. stdout: ${child.out} stderr: ${child.err}`
+      );
+      const payload = JSON.parse(child.out);
+      assert.ok(
+        payload.error.includes("cross-origin"),
+        `el error debe nombrar el salto cross-origin, recibí: ${payload.error}`
+      );
+      assert.equal(crossRequests, 0, "el segundo origin no debe recibir requests");
+
+      const childAllowed = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_URL: `https://localhost:${s.port}/redirect`,
+        TLS_TEST_ALLOW_CROSS_ORIGIN: "1",
+      });
+      assert.equal(
+        childAllowed.code,
+        0,
+        `con allowCrossOrigin el hop debía seguirse. stdout: ${childAllowed.out} stderr: ${childAllowed.err}`
+      );
+      const allowedPayload = JSON.parse(childAllowed.out);
+      assert.equal(allowedPayload.statusCode, 200);
+      assert.ok(allowedPayload.finalUrl.includes(`:${target.port}/final`));
+      assert.equal(crossRequests, 1, "con allowCrossOrigin el segundo origin recibe un request");
+    } finally {
+      await stopServer(s.server);
+      await stopServer(target.server);
+    }
+  });
+
+  it("fetchRobotsTxt: 404 sobre https bajo política estricta degrada a grupos vacíos sin lanzar", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip("localhost no resuelve a 127.0.0.1 en este runner; se omite el caso robots 404");
+      return;
+    }
+    // El servidor responde 404 a /robots.txt. Con la política estricta
+    // (allowHttp:false, allowCrossOrigin:false) el hop https del mismo
+    // origin pasa la política y el 404 es un fallo HTTP: fetchRobotsTxt
+    // debe degradar a grupos vacíos SIN lanzar (la degradación silenciosa
+    // queda reservada a los fallos de red/HTTP; los rechazos de política
+    // son los que se propagan).
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-localhost-server-key.pem"),
+      fixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not Found");
+      }
+    );
+    try {
+      const child = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_ROBOTS_ORIGIN: `https://localhost:${s.port}`,
+      });
+      assert.equal(
+        child.code,
+        0,
+        `el 404 debía degradar sin lanzar. stdout: ${child.out} stderr: ${child.err}`
+      );
+      const payload = JSON.parse(child.out);
+      assert.equal(payload.ok, true);
+      assert.equal(payload.groups, 0, "grupos vacíos por el 404");
+    } finally {
+      await stopServer(s.server);
+    }
   });
 });

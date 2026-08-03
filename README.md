@@ -15,7 +15,7 @@ The AI-discoverability toolkit — part of the [Tooltician](https://tooltician.c
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="CI status"></a>
-  <img src="https://img.shields.io/badge/tests-788_passed-16a34a?logo=nodedotjs&logoColor=white" alt="788 tests passed">
+  <img src="https://img.shields.io/badge/tests-810_passed-16a34a?logo=nodedotjs&logoColor=white" alt="810 tests passed">
   <img src="https://img.shields.io/badge/branch_coverage-80%25-16a34a" alt="Branch coverage 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-types_included-3178C6?logo=typescript&logoColor=white" alt="TypeScript types included">
@@ -78,7 +78,7 @@ Scoring is grounded in the [GEO paper accepted at KDD 2024](https://arxiv.org/ab
 - **One toolkit, the whole surface.** Audit, Schema.org JSON-LD for 8 types, `robots.txt`, `llms.txt`, `sitemap.xml`, technical SEO checks, and HTML reports — from a single CLI and a typed JavaScript library.
 - **CI-native.** Threshold-based quality gates with non-zero exit codes; machine-readable JSON on stdout, diagnostics on stderr. Drop it into GitHub Actions or GitLab CI in one step.
 - **Cross-runtime.** Canonical Node.js implementation plus a bundled Python 3 port for agent-driven workflows, kept honest by a shared conformance suite.
-- **Engineered to ship.** 788 tests across 149 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
+- **Engineered to ship.** 810 tests across 153 suites, CI on Node 22 & 24, TypeScript declarations verified by a consumer-compilation fixture, and an enforced changelog policy.
 
 ---
 
@@ -200,6 +200,12 @@ node bin/cli.js technical public/index.html
 # Remote URL audit with private-IP and DNS-rebinding protection
 node bin/cli.js technical --url https://example.com/article
 ```
+
+Remote mode applies one hop policy to every network request — the root URL, each redirect, `robots.txt`, nested sitemaps, and discovered pages:
+
+- **HTTPS-only** by default; `--allow-http` is the opt-in for intentional HTTP.
+- **Same-origin only** by default: redirects, sub-sitemaps, and pages must stay on the root site; `--allow-cross-origin` is the opt-in for valid cross-origin crawling.
+- Policy rejection happens **before** any DNS resolution or connection, and SSRF/IP guards always win — no opt-in weakens IP validation or TLS verification.
 
 ### Report *(Pro)*
 
@@ -343,7 +349,7 @@ A ready-to-use GitLab CI template ships in
 | Command | Tier | Description |
 |---|---|---|
 | `audit [files...]` | Free + Pro | Score content; supports `--recursive`, `--format json`, `--summary`, `--threshold <n>`, `--model v2` |
-| `technical [files...]` | Free + Pro | Audit HTML for technical SEO/GEO fundamentals; local files offline, `--url`/`--sitemap` for remote with SSRF guards |
+| `technical [files...]` | Free + Pro | Audit HTML for technical SEO/GEO fundamentals; local files offline, `--url`/`--sitemap` for remote with SSRF guards; remote hops are HTTPS-only and same-origin by default (`--allow-http`/`--allow-cross-origin` opt-ins) |
 | `schema <file> <type>` | Free + Pro | Print generated JSON-LD to stdout. Community types: `article`, `news-article`, `faq`, `product`. Pro types: `course`, `event`, `recipe`, `howto` |
 | `validate <file>` | Free + Pro | Inspect and verify JSON-LD blocks in Markdown or HTML |
 | `inject <file> <type>` | Free + Pro | Write JSON-LD into file(s); supports `--dry-run`, `--backup`, `--recursive`. `--no-branding` is Pro |
@@ -514,7 +520,7 @@ Python port's scripts work from the copied directory.
 |---|---|
 | Content never leaves your machine | Every audit, schema generation, and validation runs entirely in-process |
 | No telemetry by default | The transport switch is hard-disabled; no prompt appears and nothing is sent |
-| No silent network calls | Outbound requests happen only when you explicitly opt in with `technical --url`/`--sitemap`, and are guarded against SSRF, DNS rebinding, and private-IP access |
+| No silent network calls | Outbound requests happen only when you explicitly opt in with `technical --url`/`--sitemap`, and are guarded against SSRF, DNS rebinding, and private-IP access. Every remote hop — redirects, `robots.txt`, nested sitemaps, pages — is HTTPS-only and same-origin unless you opt in with `--allow-http`/`--allow-cross-origin` |
 | `DO_NOT_TRACK` respected | The CLI checks the environment variable and stays silent when set |
 | Reminders are local and disableable | `node bin/cli.js config set reminders false` — permanent and immediate |
 | Machine output on stdout, diagnostics on stderr | Safe to pipe `--format json` output to other tools without noise |
@@ -527,7 +533,7 @@ The full opt-in telemetry design (currently dormant) is documented in [`docs/tel
 
 ```bash
 npm run check          # full suite: lint + format + JS tests + Python tests + conformance + typecheck + changelog
-npm test               # 788 tests · 149 suites · 0 failures (Node.js)
+npm test               # 810 tests · 153 suites · 0 failures (Node.js)
 npm run test:python    # Python compatibility port test suite (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier dry-run

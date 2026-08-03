@@ -344,6 +344,62 @@ async function resolveAndValidateHost(hostname, allowPrivate, allowLocalhost) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Hop scheme & origin policy (Plan 075)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Política de esquema y origin aplicada a CADA hop de red (URL raíz, destino
+ * de cada redirect, robots.txt, sub-sitemaps y páginas descubiertas) ANTES
+ * de cualquier resolución DNS o conexión.
+ *
+ * Dos dimensiones independientes:
+ *  - Esquema: por defecto solo https: (allowHttp abre http:).
+ *  - Origin: si rootOrigin está definido, todos los hops deben mantener la
+ *    autoridad (host:port) de ese root salvo allowCrossOrigin. La
+ *    comparación es por autoridad y NO incluye el esquema: un downgrade
+ *    https→http del mismo host:port es el mismo sitio y su único opt-in es
+ *    allowHttp; un cambio de host o de puerto es un salto cross-origin y
+ *    necesita allowCrossOrigin.
+ *
+ * Los rechazos nombran la clase de hop rechazada (downgrade HTTP o salto
+ * cross-origin) sin volcar la URL completa (path/query) al mensaje.
+ *
+ * @param {URL} parsed — URL del hop ya parseada (valida el caller)
+ * @param {object} policy
+ * @param {boolean} [policy.allowHttp=false] — permite el esquema http:
+ * @param {boolean} [policy.allowCrossOrigin=false] — permite hops fuera del root origin
+ * @param {string|null} [policy.rootOrigin=null] — origin raíz de la auditoría; null = sin restricción
+ * @returns {{ blocked: boolean, reason?: string }}
+ */
+function checkHopPolicy(
+  parsed,
+  { allowHttp = false, allowCrossOrigin = false, rootOrigin = null } = {}
+) {
+  if (!allowHttp && parsed.protocol !== "https:") {
+    return {
+      blocked: true,
+      reason: `Hop policy: HTTP scheme blocked for ${parsed.host} — use --allow-http`,
+    };
+  }
+  if (rootOrigin && !allowCrossOrigin) {
+    let rootHost = null;
+    try {
+      rootHost = new URL(rootOrigin).host;
+    } catch {
+      // rootOrigin malformado: fail-closed, el hop no sale del root.
+      rootHost = rootOrigin;
+    }
+    if (parsed.host !== rootHost) {
+      return {
+        blocked: true,
+        reason: `Hop policy: cross-origin blocked for ${parsed.host} (root ${rootHost}) — use --allow-cross-origin`,
+      };
+    }
+  }
+  return { blocked: false };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Custom agents (DNS rebinding mitigation)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -399,13 +455,17 @@ function createPlainAgent(hostname, resolvedIp, port) {
 
 /**
  * Realiza un request HTTP(S) con timeouts, control de tamaño y seguimiento
- * de redirects. Cada redirect se re-valida contra los SSRF guards.
+ * de redirects. Cada redirect se re-valida contra los SSRF guards y contra la
+ * política de esquema/origin (Plan 075) antes de conectar.
  *
  * @param {string} url — URL absoluta
  * @param {object} options
  * @param {number} [options.redirectDepth] — profundidad de redirect actual
  * @param {boolean} [options.allowPrivate]
  * @param {boolean} [options.allowLocalhost]
+ * @param {boolean} [options.allowHttp=true] — permite hops http: (CLI: solo con --allow-http)
+ * @param {boolean} [options.allowCrossOrigin=true] — permite hops fuera del root origin
+ * @param {string|null} [options.rootOrigin] — origin raíz que deben respetar todos los hops
  * @param {number} [options.totalTimeoutMs]
  * @param {number} [options.responseTimeoutMs]
  * @param {number} [options.maxResponseSize]
@@ -417,6 +477,9 @@ async function performRequest(url, options = {}) {
     redirectDepth = 0,
     allowPrivate = false,
     allowLocalhost = false,
+    allowHttp = true,
+    allowCrossOrigin = true,
+    rootOrigin = null,
     totalTimeoutMs = TOTAL_TIMEOUT_MS,
     responseTimeoutMs = RESPONSE_TIMEOUT_MS,
     maxResponseSize = MAX_RESPONSE_SIZE,
@@ -427,6 +490,19 @@ async function performRequest(url, options = {}) {
   const hostname = parsed.hostname;
   const port = parsed.port || (parsed.protocol === "https:" ? 443 : 80);
   const isHttps = parsed.protocol === "https:";
+
+  // Política de esquema/origin: el rechazo ocurre aquí, antes de DNS y
+  // conexión, para la URL raíz y para cada destino de redirect (la
+  // recursión de redirects vuelve a pasar por esta función). El código
+  // estable ERR_HOP_POLICY permite a los llamadores distinguir un rechazo
+  // de política (que debe propagarse) de un fallo de red/HTTP (que puede
+  // degradarse, p. ej. en fetchRobotsTxt).
+  const hopPolicy = checkHopPolicy(parsed, { allowHttp, allowCrossOrigin, rootOrigin });
+  if (hopPolicy.blocked) {
+    const err = new Error(hopPolicy.reason);
+    err.code = "ERR_HOP_POLICY";
+    throw err;
+  }
 
   // 1. Resolver y validar IP
   const { address: resolvedIp } = await resolveAndValidateHost(
@@ -594,9 +670,18 @@ const robotsCache = new Map();
 /**
  * Obtiene y parsea el robots.txt de un origin.
  *
+ * Degradación: si el robots.txt no se puede obtener por un fallo de
+ * red/HTTP (404, DNS, timeout), asumimos acceso total y retornamos grupos
+ * vacíos. Los rechazos de la POLÍTICA de esquema/origin (Plan 075) NO se
+ * degradan: se propagan con error.code === "ERR_HOP_POLICY" para que el
+ * llamador pueda avisar (el CLI lo reporta como warning) y reintentar con
+ * el opt-in correspondiente. El resultado vacío no se cachea en ese caso:
+ * un reintento con el opt-in debe fetchear fresco.
+ *
  * @param {string} origin — e.g. "https://example.com"
  * @param {object} options — opciones de fetch
  * @returns {Promise<{ groups: Array, raw: string }>}
+ * @throws {Error} con code "ERR_HOP_POLICY" si la política bloquea el hop
  */
 export async function fetchRobotsTxt(origin, options = {}) {
   const cached = robotsCache.get(origin);
@@ -609,8 +694,14 @@ export async function fetchRobotsTxt(origin, options = {}) {
   let result;
   try {
     result = await fetchUrl(robotsUrl, options);
-  } catch {
-    // Si el robots.txt no se puede obtener, asumimos acceso total
+  } catch (error) {
+    // Degradación silenciosa SOLO para fallos de red/HTTP. Un rechazo de
+    // política tragado haría indistinguible un robots.txt bloqueado de uno
+    // inexistente — el bug que este fix cierra — así que se propaga sin
+    // cachear el resultado vacío.
+    if (error?.code === "ERR_HOP_POLICY") {
+      throw error;
+    }
     const empty = { groups: [], raw: "" };
     robotsCache.set(origin, empty);
     return empty;
@@ -693,12 +784,22 @@ export function checkRobotsRule(url, groups, userAgent) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Fetch público con rate limiting y SSRF guards.
+ * Fetch público con rate limiting, SSRF guards y política de esquema/origin
+ * (Plan 075).
+ *
+ * Compatibilidad de la librería: los valores por defecto mantienen el
+ * comportamiento histórico (http: permitido, hops cross-origin permitidos).
+ * El CLI remoto pasa los valores estrictos: allowHttp=false y
+ * allowCrossOrigin=false para que TODOS los hops (raíz, redirects, robots,
+ * sub-sitemaps, páginas) respeten el mismo policy.
  *
  * @param {string} url — URL absoluta (http: o https:)
  * @param {object} [options]
  * @param {boolean} [options.allowPrivate=false] — permite IPs privadas
  * @param {boolean} [options.allowLocalhost=false] — permite loopback
+ * @param {boolean} [options.allowHttp=true] — permite el esquema http: (por defecto, compat)
+ * @param {boolean} [options.allowCrossOrigin=true] — permite hops fuera del root origin (por defecto, compat)
+ * @param {string|null} [options.rootOrigin=null] — origin raíz; si se omite, el de esta URL
  * @param {number} [options.timeoutMs=TOTAL_TIMEOUT_MS] — timeout total
  * @param {number} [options.maxSize=MAX_RESPONSE_SIZE] — tamaño máximo de respuesta
  * @param {string} [options.userAgent=USER_AGENT] — User-Agent header
@@ -708,6 +809,9 @@ export async function fetchUrl(url, options = {}) {
   const {
     allowPrivate = false,
     allowLocalhost = false,
+    allowHttp = true,
+    allowCrossOrigin = true,
+    rootOrigin = null,
     timeoutMs = TOTAL_TIMEOUT_MS,
     maxSize = MAX_RESPONSE_SIZE,
   } = options;
@@ -727,6 +831,10 @@ export async function fetchUrl(url, options = {}) {
   }
 
   const origin = parsed.origin;
+  // El root de esta cadena de hops es esta misma URL salvo que el llamador
+  // imponga otro (p. ej. el origin del sitemap raíz para páginas y
+  // sub-sitemaps descubiertos).
+  const effectiveRootOrigin = rootOrigin ?? origin;
 
   // Rate limiting: adquirir slots
   await hostSemaphoreFor(origin).acquire();
@@ -736,6 +844,9 @@ export async function fetchUrl(url, options = {}) {
     const result = await performRequest(url, {
       allowPrivate,
       allowLocalhost,
+      allowHttp,
+      allowCrossOrigin,
+      rootOrigin: effectiveRootOrigin,
       totalTimeoutMs: timeoutMs,
       maxResponseSize: maxSize,
     });

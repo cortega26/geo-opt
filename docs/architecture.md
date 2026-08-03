@@ -1,7 +1,7 @@
 # Architecture, contracts and runtime capabilities
 
 **Status:** normative current-state document
-**Last verified:** 2026-07-22 (Plan 058 factual reconciliation)
+**Last verified:** 2026-08-03 (Plan 075 hop policy)
 
 The modular JavaScript implementation under `src/` is the canonical runtime for
 the `geo-opt` command-line interface and library. A Python 3 compatibility port
@@ -24,7 +24,11 @@ the current execution roadmap and architecture gate in the local
   citation outcomes. The v2 *contract* (finding/version/type shapes) is
   stabilized through roadmap gate T0 (closed 2026-06-27).
 - The `technical` CLI command audits HTML for technical SEO/GEO fundamentals,
-  locally offline or against remote URLs/sitemaps with SSRF guards.
+  locally offline or against remote URLs/sitemaps with SSRF guards. Remote
+  mode applies one scheme/origin policy to every network hop (root URL,
+  redirects, `robots.txt`, nested sitemaps, discovered pages): HTTPS-only and
+  root-origin-only by default, with `--allow-http` and `--allow-cross-origin`
+  as the explicit opt-ins (Plan 075).
 - Supported runtimes are Node.js 22 LTS and Node.js 24 LTS. Node.js 20 reached
   EOL on 2026-03-24 and is no longer a supported target.
 
@@ -154,6 +158,10 @@ policy, or `llms.txt` content — the committed contracts for `equivalent` and
   Existing violations are tracked by plan 030 and should not be copied.
 - JSON stdout is one machine-readable document and diagnostics stay on stderr.
 - Processing is local by default; network behavior requires explicit opt-in.
+- Every remote hop flows through the same scheme/origin policy before DNS or
+  connection; HTTP and cross-origin hops need their explicit opt-ins
+  (`--allow-http`, `--allow-cross-origin`), and no opt-in weakens IP
+  validation or TLS verification (Plan 075).
 - Node.js is canonical. Cross-runtime guarantees exist only in the capability
   matrix and conformance tests.
 - Report-contract, scoring-model and package versions are separate identities.

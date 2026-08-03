@@ -15,7 +15,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="Estado de CI"></a>
-  <img src="https://img.shields.io/badge/tests-788_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="788 tests pasados">
+  <img src="https://img.shields.io/badge/tests-810_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="810 tests pasados">
   <img src="https://img.shields.io/badge/cobertura_de_ramas-80%25-16a34a" alt="Cobertura de ramas 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-tipos_incluidos-3178C6?logo=typescript&logoColor=white" alt="Tipos TypeScript incluidos">
@@ -76,7 +76,7 @@ El modelo de puntuación está fundamentado en el [artículo GEO aceptado en KDD
 - 🧩 **Un solo toolkit, toda la superficie.** Auditoría, Schema.org JSON-LD para 8 tipos, `robots.txt`, `llms.txt`, `sitemap.xml`, comprobaciones técnicas de SEO y reportes HTML — desde una única CLI y una librería JavaScript tipada.
 - 🚦 **Nativo para CI.** Quality gates por umbral con códigos de salida distintos de cero; JSON legible por máquinas en stdout, diagnósticos en stderr. Se integra en GitHub Actions o GitLab CI en un solo paso.
 - 🤖 **Multirruntime.** Implementación canónica en Node.js más un port de Python 3 incluido para flujos de trabajo impulsados por agentes, mantenidos coherentes por una suite de conformance compartida.
-- ✅ **Diseñado para producción.** 788 tests en 149 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
+- ✅ **Diseñado para producción.** 810 tests en 153 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
 
 ---
 
@@ -179,6 +179,12 @@ node bin/cli.js technical public/index.html
 # Auditoría de URL remota con protección contra IPs privadas y DNS rebinding
 node bin/cli.js technical --url https://ejemplo.com/articulo
 ```
+
+El modo remoto aplica una única política de hops a cada petición de red — la URL raíz, cada redirect, `robots.txt`, los sub-sitemaps anidados y las páginas descubiertas:
+
+- **Solo HTTPS** por defecto; `--allow-http` es el opt-in para HTTP intencional.
+- **Solo mismo origin** por defecto: redirects, sub-sitemaps y páginas deben mantenerse en el sitio raíz; `--allow-cross-origin` es el opt-in para crawling cross-origin válido.
+- El rechazo de política ocurre **antes** de cualquier resolución DNS o conexión, y los guards SSRF/IP siempre ganan — ningún opt-in debilita la validación de IPs ni la verificación TLS.
 
 ### Reportar *(Pro)*
 
@@ -325,7 +331,7 @@ plantilla lista para GitLab CI.
 | Comando | Nivel | Descripción |
 |---|---|---|
 | `audit [archivos...]` | Free + Pro | Puntúa contenido; admite `--recursive`, `--format json`, `--summary`, `--threshold <n>`, `--model v2` |
-| `technical [archivos...]` | Free + Pro | Audita HTML buscando fundamentos técnicos de SEO/GEO; archivos locales sin red, `--url`/`--sitemap` para remoto con protecciones SSRF |
+| `technical [archivos...]` | Free + Pro | Audita HTML buscando fundamentos técnicos de SEO/GEO; archivos locales sin red, `--url`/`--sitemap` para remoto con protecciones SSRF; los hops remotos son solo HTTPS y mismo origin por defecto (opt-ins `--allow-http`/`--allow-cross-origin`) |
 | `schema <archivo> <tipo>` | Free + Pro | Imprime el JSON-LD generado en stdout. Tipos Community: `article`, `news-article`, `faq`, `product`. Tipos Pro: `course`, `event`, `recipe`, `howto` |
 | `validate <archivo>` | Free + Pro | Inspecciona y verifica bloques JSON-LD en Markdown o HTML |
 | `inject <archivo> <tipo>` | Free + Pro | Escribe el JSON-LD en el archivo; admite `--dry-run`, `--backup`, `--recursive`. `--no-branding` es Pro |
@@ -497,7 +503,7 @@ Python funcionan desde el directorio copiado.
 |---|---|
 | El contenido nunca sale de tu máquina | Cada auditoría, generación de schema y validación se ejecuta completamente en proceso |
 | Sin telemetría por defecto | El interruptor de transporte está deshabilitado; no aparece ningún aviso y no se envía nada |
-| Sin llamadas de red silenciosas | Las solicitudes salientes solo ocurren cuando las habilitas explícitamente con `technical --url`/`--sitemap`, y están protegidas contra SSRF, DNS rebinding y acceso a IPs privadas |
+| Sin llamadas de red silenciosas | Las solicitudes salientes solo ocurren cuando las habilitas explícitamente con `technical --url`/`--sitemap`, y están protegidas contra SSRF, DNS rebinding y acceso a IPs privadas. Cada hop remoto — redirects, `robots.txt`, sub-sitemaps, páginas — es solo HTTPS y mismo origin salvo que optes con `--allow-http`/`--allow-cross-origin` |
 | `DO_NOT_TRACK` respetado | La CLI verifica la variable de entorno y permanece silenciosa cuando está activa |
 | Los recordatorios son locales y desactivables | `node bin/cli.js config set reminders false` — permanente e inmediato |
 | Salida de máquina en stdout, diagnósticos en stderr | Seguro para redirigir la salida `--format json` a otras herramientas sin ruido |
@@ -510,7 +516,7 @@ El diseño completo de telemetría opt-in (actualmente inactivo) está documenta
 
 ```bash
 npm run check          # suite completa: lint + formato + tests JS + tests Python + conformance + typecheck + changelog
-npm test               # 788 tests · 149 suites · 0 fallos (Node.js)
+npm test               # 810 tests · 153 suites · 0 fallos (Node.js)
 npm run test:python    # suite de tests del port de compatibilidad Python (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier en modo dry-run

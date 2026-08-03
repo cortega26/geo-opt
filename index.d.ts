@@ -926,6 +926,25 @@ declare module "geo-opt" {
     allowPrivate?: boolean;
     /** Allow connections to loopback addresses (127.0.0.0/8, ::1). Implies allowPrivate. */
     allowLocalhost?: boolean;
+    /**
+     * Allow the http: scheme for this fetch and every hop it follows
+     * (redirects, robots.txt, nested sitemaps, discovered pages). Default
+     * `true` for library compatibility; the CLI passes `false` unless
+     * `--allow-http` is given.
+     */
+    allowHttp?: boolean;
+    /**
+     * Allow redirects and discovered URLs to leave `rootOrigin`. Default
+     * `true` for library compatibility; the CLI passes `false` unless
+     * `--allow-cross-origin` is given.
+     */
+    allowCrossOrigin?: boolean;
+    /**
+     * Origin that every hop of this fetch must stay within when
+     * `allowCrossOrigin` is false. Defaults to the origin of the URL being
+     * fetched; the CLI pins it to the root sitemap's origin in sitemap mode.
+     */
+    rootOrigin?: string;
     /** Total request timeout in milliseconds (default: 30_000). */
     timeoutMs?: number;
     /** Maximum response body size in bytes (default: 2_097_152). */

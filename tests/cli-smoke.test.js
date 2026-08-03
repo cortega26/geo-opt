@@ -9,6 +9,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync, spawn } from "node:child_process";
+import dns from "node:dns/promises";
 import {
   chmodSync,
   existsSync,
@@ -20,6 +21,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
+import https from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const __dirname = new URL(".", import.meta.url).pathname;
@@ -1094,6 +1096,438 @@ describe("CLI technical --sitemap", () => {
       "json",
     ]);
     assert.notEqual(status, 0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Technical audit — hop scheme & origin policy (Plan 075)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Fixtures TLS de test (Plan 074): CA y certificados para localhost. */
+const TLS_FIXTURES_DIR = join(repoRoot, "tests", "fixtures", "tls");
+
+function tlsFixture(name) {
+  return readFileSync(join(TLS_FIXTURES_DIR, name), "utf8");
+}
+
+/** Servidor HTTPS local con los fixtures de test (mismo patrón que fetcher.test.js). */
+function startTlsServer(keyPem, certPem, handler) {
+  return new Promise((resolve, reject) => {
+    const server = https.createServer({ key: keyPem, cert: certPem }, handler);
+    server.listen(0, "127.0.0.1", () => {
+      resolve({ server, port: server.address().port });
+    });
+    server.on("error", reject);
+  });
+}
+
+describe("CLI technical — hop policy (Plan 075)", () => {
+  // Dos origins locales (puertos distintos): A es el root de la auditoría,
+  // B el destino cross-origin. B cuenta requests: un hop rechazado por
+  // política nunca debe llegar a conectar.
+  let serverA, serverB, baseUrlA, baseUrlB, requestsB;
+
+  before(async () => {
+    requestsB = 0;
+    serverA = createServer((req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      if (url.pathname === "/cross-origin-redirect") {
+        res.writeHead(302, { Location: `${baseUrlB}/page` });
+        res.end();
+        return;
+      }
+      if (url.pathname === "/same-origin-redirect") {
+        res.writeHead(302, { Location: `${baseUrlA}/final` });
+        res.end();
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(
+        '<!DOCTYPE html><html lang="en"><head><title>Origin A</title></head><body><h1>A</h1></body></html>'
+      );
+    });
+    serverB = createServer((req, res) => {
+      requestsB += 1;
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(
+        '<!DOCTYPE html><html lang="en"><head><title>Origin B</title></head><body><h1>B</h1></body></html>'
+      );
+    });
+    await new Promise((resolve, reject) => {
+      serverA.listen(0, "127.0.0.1", () => {
+        const port = serverA.address().port;
+        baseUrlA = `http://127.0.0.1:${port}`;
+        resolve();
+      });
+      serverA.on("error", reject);
+    });
+    await new Promise((resolve, reject) => {
+      serverB.listen(0, "127.0.0.1", () => {
+        const port = serverB.address().port;
+        baseUrlB = `http://127.0.0.1:${port}`;
+        resolve();
+      });
+      serverB.on("error", reject);
+    });
+  });
+
+  after(() => {
+    serverA?.close();
+    serverB?.close();
+  });
+
+  it("--help documenta --allow-cross-origin y --allow-http como opt-ins", () => {
+    const { status, stdout } = run(["technical", "--help"]);
+    assert.equal(status, 0);
+    assert.ok(
+      stdout.includes("--allow-cross-origin"),
+      "el help de technical debe listar --allow-cross-origin"
+    );
+    assert.ok(stdout.includes("--allow-http"), "el help de technical debe listar --allow-http");
+  });
+
+  it("--url: redirect cross-origin falla por defecto sin tocar el segundo origin", async () => {
+    const before = requestsB;
+    const { status, stdout } = await runAsync([
+      "technical",
+      "--url",
+      `${baseUrlA}/cross-origin-redirect`,
+      "--format",
+      "json",
+      "--allow-localhost",
+    ]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.status, "error");
+    assert.ok(
+      parsed.error.includes("cross-origin"),
+      `esperaba error de política cross-origin, recibí: ${parsed.error}`
+    );
+    assert.equal(requestsB - before, 0, "el hop cross-origin rechazado no debe conectar");
+  });
+
+  it("--url: --allow-cross-origin permite el redirect cross-origin", async () => {
+    const before = requestsB;
+    const { status, stdout } = await runAsync([
+      "technical",
+      "--url",
+      `${baseUrlA}/cross-origin-redirect`,
+      "--format",
+      "json",
+      "--allow-localhost",
+      "--allow-cross-origin",
+    ]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.status, "success");
+    assert.ok(
+      parsed.observations.title.values.includes("Origin B"),
+      `el título esperado era "Origin B", recibí: ${JSON.stringify(parsed.observations?.title?.values)}`
+    );
+    assert.equal(requestsB - before, 1, "con el opt-in el segundo origin recibe un request");
+  });
+
+  it("--url: redirect same-origin se sigue sin --allow-cross-origin", async () => {
+    const { status, stdout } = await runAsync([
+      "technical",
+      "--url",
+      `${baseUrlA}/same-origin-redirect`,
+      "--format",
+      "json",
+      "--allow-localhost",
+    ]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.status, "success");
+    assert.ok(
+      parsed.observations.title.values.includes("Origin A"),
+      `el título esperado era "Origin A", recibí: ${JSON.stringify(parsed.observations?.title?.values)}`
+    );
+  });
+});
+
+describe("CLI technical --sitemap — hop policy (Plan 075)", () => {
+  let localhostResolvesToLoopback = false;
+
+  before(async () => {
+    try {
+      const v4 = await dns.resolve4("localhost");
+      localhostResolvesToLoopback = v4.includes("127.0.0.1");
+    } catch {
+      localhostResolvesToLoopback = false;
+    }
+  });
+
+  it("--sitemap: página cross-origin falla por defecto; --allow-cross-origin la permite", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip(
+        "localhost no resuelve a 127.0.0.1 en este runner; se omite el caso sitemap cross-origin"
+      );
+      return;
+    }
+
+    let pageRequests = 0;
+    // El servidor de páginas y el del sitemap escuchan en puertos distintos:
+    // origins distintos para la política (el origin incluye el puerto). El
+    // CLI hijo confía en la CA de test vía NODE_EXTRA_CA_CERTS.
+    const pageServer = await startTlsServer(
+      tlsFixture("TEST-ONLY-localhost-server-key.pem"),
+      tlsFixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        pageRequests += 1;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(
+          '<!DOCTYPE html><html lang="en"><head><title>Cross Page</title></head><body><h1>P</h1></body></html>'
+        );
+      }
+    );
+    const sitemapServer = await startTlsServer(
+      tlsFixture("TEST-ONLY-localhost-server-key.pem"),
+      tlsFixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        res.writeHead(200, { "Content-Type": "application/xml" });
+        res.end(
+          `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://localhost:${pageServer.port}/page</loc></url></urlset>`
+        );
+      }
+    );
+    const env = {
+      ...process.env,
+      NODE_EXTRA_CA_CERTS: join(TLS_FIXTURES_DIR, "TEST-ONLY-ca-cert.pem"),
+    };
+    const sitemapUrl = `https://localhost:${sitemapServer.port}/sitemap.xml`;
+
+    try {
+      // Por defecto: la página cross-origin se reporta como error sin
+      // contactar el segundo origin (el sitemap raíz sí se audita).
+      const blocked = await runAsync(
+        [
+          "technical",
+          "--sitemap",
+          sitemapUrl,
+          "--format",
+          "json",
+          "--allow-localhost",
+          "--no-robots",
+        ],
+        { env }
+      );
+      assert.equal(blocked.status, 0);
+      const blockedParsed = JSON.parse(blocked.stdout);
+      assert.equal(blockedParsed.status, "error");
+      assert.ok(
+        blockedParsed.error.includes("cross-origin"),
+        `esperaba error de política cross-origin, recibí: ${blockedParsed.error}`
+      );
+      assert.equal(pageRequests, 0, "la página cross-origin no debe recibir requests");
+
+      // Con --allow-cross-origin la página se audita.
+      const allowed = await runAsync(
+        [
+          "technical",
+          "--sitemap",
+          sitemapUrl,
+          "--format",
+          "json",
+          "--allow-localhost",
+          "--no-robots",
+          "--allow-cross-origin",
+        ],
+        { env }
+      );
+      assert.equal(allowed.status, 0);
+      const allowedParsed = JSON.parse(allowed.stdout);
+      assert.equal(allowedParsed.status, "success");
+      assert.ok(
+        allowedParsed.observations.title.values.includes("Cross Page"),
+        `el título esperado era "Cross Page", recibí: ${JSON.stringify(
+          allowedParsed.observations?.title?.values
+        )}`
+      );
+      assert.equal(pageRequests, 1, "con el opt-in la página recibe exactamente un request");
+    } finally {
+      pageServer?.server.close();
+      sitemapServer?.server.close();
+    }
+  });
+
+  it("--sitemap: el esquema http de páginas descubiertas exige --allow-http (los flags de IP no lo liberan)", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip(
+        "localhost no resuelve a 127.0.0.1 en este runner; se omite el caso de esquema estricto"
+      );
+      return;
+    }
+
+    let pageRequests = 0;
+    // Página http:// en un servidor plano (puerto distinto del sitemap TLS).
+    // El modo --sitemap es estricto en esquema: ni --allow-localhost ni
+    // --allow-cross-origin liberan http; solo --allow-http lo hace (Plan 075).
+    const pageServer = await new Promise((resolve, reject) => {
+      const server = createServer((_req, res) => {
+        pageRequests += 1;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(
+          '<!DOCTYPE html><html lang="en"><head><title>Http Page</title></head><body><h1>H</h1></body></html>'
+        );
+      });
+      server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port }));
+      server.on("error", reject);
+    });
+    const sitemapServer = await startTlsServer(
+      tlsFixture("TEST-ONLY-localhost-server-key.pem"),
+      tlsFixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        res.writeHead(200, { "Content-Type": "application/xml" });
+        res.end(
+          `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>http://127.0.0.1:${pageServer.port}/page</loc></url></urlset>`
+        );
+      }
+    );
+    const env = {
+      ...process.env,
+      NODE_EXTRA_CA_CERTS: join(TLS_FIXTURES_DIR, "TEST-ONLY-ca-cert.pem"),
+    };
+    const sitemapUrl = `https://localhost:${sitemapServer.port}/sitemap.xml`;
+
+    try {
+      // Sin --allow-http, con --allow-localhost y --allow-cross-origin: el
+      // hop http:// se rechaza por esquema ANTES del check de origin y sin
+      // conectar al servidor de páginas.
+      const strict = await runAsync(
+        [
+          "technical",
+          "--sitemap",
+          sitemapUrl,
+          "--format",
+          "json",
+          "--allow-localhost",
+          "--no-robots",
+          "--allow-cross-origin",
+        ],
+        { env }
+      );
+      assert.equal(strict.status, 0);
+      const strictParsed = JSON.parse(strict.stdout);
+      assert.equal(strictParsed.status, "error");
+      assert.ok(
+        strictParsed.error.includes("HTTP scheme"),
+        `esperaba rechazo de esquema HTTP, recibí: ${strictParsed.error}`
+      );
+      assert.equal(pageRequests, 0, "la página http no debe recibir requests sin --allow-http");
+
+      // Con --allow-http (y el --allow-cross-origin ya presente) la página
+      // http se audita.
+      const allowed = await runAsync(
+        [
+          "technical",
+          "--sitemap",
+          sitemapUrl,
+          "--format",
+          "json",
+          "--allow-localhost",
+          "--no-robots",
+          "--allow-cross-origin",
+          "--allow-http",
+        ],
+        { env }
+      );
+      assert.equal(allowed.status, 0);
+      const allowedParsed = JSON.parse(allowed.stdout);
+      assert.equal(allowedParsed.status, "success");
+      assert.ok(
+        allowedParsed.observations.title.values.includes("Http Page"),
+        `el título esperado era "Http Page", recibí: ${JSON.stringify(
+          allowedParsed.observations?.title?.values
+        )}`
+      );
+      assert.equal(pageRequests, 1, "con --allow-http la página recibe exactamente un request");
+    } finally {
+      pageServer.server.close();
+      sitemapServer?.server.close();
+    }
+  });
+
+  it("--sitemap: el rechazo de política de robots.txt se reporta como warning y la auditoría continúa", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip(
+        "localhost no resuelve a 127.0.0.1 en este runner; se omite el caso del warning de robots"
+      );
+      return;
+    }
+
+    // Origin A: /robots.txt hace 302 cross-origin a origin B (donde viven
+    // las reglas reales). La política bloquea el hop a B — B no recibe
+    // NINGÚN request — y fetchRobotsTxt PROPAGA el rechazo (ERR_HOP_POLICY)
+    // en lugar de tragárselo: el CLI lo reporta como warning en stderr y
+    // continúa la auditoría con acceso total (comportamiento previo).
+    let robotsTargetRequests = 0;
+    const targetServer = await startTlsServer(
+      tlsFixture("TEST-ONLY-localhost-server-key.pem"),
+      tlsFixture("TEST-ONLY-localhost-server-cert.pem"),
+      (_req, res) => {
+        robotsTargetRequests += 1;
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("User-agent: *\nDisallow: /private\n");
+      }
+    );
+    const sitemapServer = await startTlsServer(
+      tlsFixture("TEST-ONLY-localhost-server-key.pem"),
+      tlsFixture("TEST-ONLY-localhost-server-cert.pem"),
+      (req, res) => {
+        const url = new URL(req.url, `https://${req.headers.host}`);
+        if (url.pathname === "/robots.txt") {
+          res.writeHead(302, { Location: `https://localhost:${targetServer.port}/robots.txt` });
+          res.end();
+          return;
+        }
+        if (url.pathname === "/sitemap.xml") {
+          res.writeHead(200, { "Content-Type": "application/xml" });
+          res.end(
+            `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://localhost:${sitemapServer.port}/page</loc></url></urlset>`
+          );
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(
+          '<!DOCTYPE html><html lang="en"><head><title>Robots Warning Page</title></head><body><h1>R</h1></body></html>'
+        );
+      }
+    );
+    const env = {
+      ...process.env,
+      NODE_EXTRA_CA_CERTS: join(TLS_FIXTURES_DIR, "TEST-ONLY-ca-cert.pem"),
+    };
+    const sitemapUrl = `https://localhost:${sitemapServer.port}/sitemap.xml`;
+
+    try {
+      // Formato texto: el warning de política va a stderr (diagnóstico);
+      // el reporte de la página auditada sale por stdout.
+      const run = await runAsync(["technical", "--sitemap", sitemapUrl, "--allow-localhost"], {
+        env,
+      });
+      assert.equal(run.status, 0);
+      assert.equal(
+        robotsTargetRequests,
+        0,
+        "el robots.txt cross-origin no debe recibir requests (hop bloqueado)"
+      );
+      assert.ok(
+        run.stderr.includes("Could not fetch robots.txt"),
+        `esperaba el warning de robots.txt, stderr: ${run.stderr.slice(0, 800)}`
+      );
+      assert.ok(
+        run.stderr.includes("cross-origin"),
+        `el warning debe nombrar la política cross-origin, stderr: ${run.stderr.slice(0, 800)}`
+      );
+      assert.ok(
+        run.stdout.includes("Robots Warning Page"),
+        `la página debe auditarse igualmente, stdout: ${run.stdout.slice(0, 800)}`
+      );
+    } finally {
+      sitemapServer?.server.close();
+      targetServer?.server.close();
+    }
   });
 });
 

@@ -29,6 +29,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Security
 
+- **feat:** enforce one scheme/origin policy on every remote hop — root URL, redirects, `robots.txt`, nested sitemaps, and discovered pages are HTTPS-only and root-origin-only by default, rejected before DNS/connect; `--allow-http` is the only HTTP opt-in for sitemap-discovered hops and `--allow-cross-origin` the only cross-origin opt-in (the legacy `--url` exception where IP flags also admit HTTP remains unchanged); SSRF/IP guards and TLS verification are never weakened (Plan 075)
+- **fix:** a `robots.txt` hop rejected by the hop policy is now reported via the CLI warning (with the policy reason) instead of being silently swallowed as "no robots.txt"; 404/network failures still degrade to full access (Plan 075)
 - **test:** deterministic local-TLS coverage for the HTTPS agent path — trusted test CA, SNI/Host identity, vetted-IP socket target, and fail-closed hostname-mismatch/untrusted-cert cases (Plan 074)
 
 ## [2.3.5](https://github.com/cortega26/geo-opt/compare/v2.3.4...v2.3.5) (2026-08-02)
