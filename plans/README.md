@@ -1,7 +1,7 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-08-03 — reconcile at `0006bb1`. Plans 069–075 verified DONE (spot-checked at HEAD: GHSA keying, injected clock, safe argv wrapper, aggregate `effectiveScore` semantics, hermetic fetcher suite, TLS pinning fixtures, `checkHopPolicy`/`ERR_HOP_POLICY`). All TODOs 076–091 re-verified at HEAD and their "Planned at" refreshed to `0006bb1`; no finding disappeared. Notable refreshes: 085's top v2 band label was already fixed in passing (F-06) — 3 of 4 bands still predict; 086's lint baseline moved to 10 errors in 5 files (Plan 069 added `check-audit.test.js`; 073/075 grew fetcher/sitemap tests) and was re-captured. Prior: 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Last reconciled:** 2026-08-03 — reconcile at `0006bb1`. Plans 069–075 verified DONE (spot-checked at HEAD: GHSA keying, injected clock, safe argv wrapper, aggregate `effectiveScore` semantics, hermetic fetcher suite, TLS pinning fixtures, `checkHopPolicy`/`ERR_HOP_POLICY`). Plan 076 executed, APPROVED, and squash-merged to main as `aa7738a` (page-URL retention hard-capped at 50,000 unique URLs with dedupe, first-seen ordering, one truncation warning, and shared root+child budget before robots evaluation; 818/155 tests green). All TODOs 076–091 re-verified at HEAD and their "Planned at" refreshed to `0006bb1`; no finding disappeared. Notable refreshes: 085's top v2 band label was already fixed in passing (F-06) — 3 of 4 bands still predict; 086's lint baseline moved to 10 errors in 5 files (Plan 069 added `check-audit.test.js`; 073/075 grew fetcher/sitemap tests) and was re-captured. Prior: 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
 **Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
@@ -443,7 +443,7 @@ independent work.
 | [073](archive/073-make-fetcher-tests-hermetic.md) | Make fetcher tests local, deterministic, and behavior-specific | tests | P1 | M | 069, 070 | DONE (2026-08-02; squash-merged to main as `92af2d9`) |
 | [074](archive/074-cover-https-ip-pinning.md) | Deterministically cover TLS hostname verification and vetted-IP pinning | security/tests | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `e6e418d`) |
 | [075](archive/075-enforce-remote-hop-policy.md) | Apply HTTPS/origin policy to roots, redirects, robots, sitemaps, and pages | security | P1 | L | 073, 074 | DONE (2026-08-03; squash-merged to main as `2ab56ed`) |
-| [076](076-bound-sitemap-url-accumulation.md) | Bound total retained sitemap page URLs | security/perf | P1 | M | 075 | TODO |
+| [076](archive/076-bound-sitemap-url-accumulation.md) | Bound total retained sitemap page URLs | security/perf | P1 | M | 075 | DONE (2026-08-03; squash-merged to main as `aa7738a`) |
 | [077](077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | TODO |
 | [078](078-fix-robots-group-and-query-matching.md) | Combine equally specific robots groups and include query strings | bug | P2 | M | 073 | TODO |
 | [079](079-honor-fetcher-user-agent.md) | Honor and validate the public fetcher user-agent option | bug/api | P2 | S | 073 | TODO |
@@ -535,7 +535,7 @@ remain in force unless a plan explicitly presents new evidence.
 
 ## Completed history
 
-Plans 001–017, 019–021, 023–026, 029–056, 058, 065–067, 069–075 are
+Plans 001–017, 019–021, 023–026, 029–056, 058, 065–067, 069–076 are
 completed and stored under [`archive/`](archive/). The prior audit register is
 [`archive/audit-findings-2026-06-25.md`](archive/audit-findings-2026-06-25.md).
 Historical pre-current-roadmap plans live under
