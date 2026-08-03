@@ -28,8 +28,68 @@ function readSrc(name) {
   return readFileSync(path.join(repoRoot, "src", name), "utf8");
 }
 
+/** Espera síncrona breve para reintentos (bloquea el event loop ~ms, solo en tests). */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Detecta si una lectura de dist/ es un snapshot completo de la escritura de
+ * un build vecino (que ya terminó). Un prefijo de una escritura a medias
+ * viola invariantes deterministas del propio build: dist/integrity.js siempre
+ * lleva el hash inyectado y nunca el placeholder; dist/licensing.js es copia
+ * exacta de src/licensing.js; el resto de los módulos JS de dist/ terminan
+ * en "}" (el build los escribe completos de una sola vez).
+ */
+function isCompleteDistRead(name, content) {
+  if (name === "integrity.js") {
+    // El placeholder en la ASIGNACIÓN const EXPECTED_HASH es lo que el build
+    // reemplaza; el literal de comparación en runtime sí permanece, así que
+    // se verifica la forma de asignación completa, no el placeholder desnudo.
+    return (
+      /const EXPECTED_HASH = "[0-9a-f]{64}"/.test(content) &&
+      !content.includes('const EXPECTED_HASH = "<<<LICENSING_HASH>>>"')
+    );
+  }
+  if (name === "licensing.js") {
+    return content === readSrc("licensing.js");
+  }
+  // Cualquier otro módulo JS de dist/ (p. ej. bin/cli.js, index.js): el build
+  // lo escribe completo de una vez (cpSync/writeFileSync), así que un
+  // snapshot válido termina en "}". Un prefijo de una escritura a medias no
+  // puede terminar en "}" (cortaría dentro de la última sentencia), con lo
+  // que una lectura parcial no vacía también se reintenta.
+  return content.trimEnd().endsWith("}");
+}
+
+/**
+ * Lee un archivo de dist/ con reintento limitado: un build de otro archivo de
+ * test puede estar escribiendo dist/ en paralelo (node --test corre los
+ * archivos en procesos/threads separados) y el lock de scripts/build.js
+ * serializa los BUILDS, no las LECTURAS. Si la lectura cae en la ventana de
+ * escritura de un build vecino, readFileSync lanza EACCES/ENOENT (este
+ * sandbox) o devuelve contenido a medias (CI). Tras agotar los intentos se
+ * devuelve el contenido leído para que las aserciones reales sigan fallando
+ * con su mensaje diagnóstico. Happy path: una sola lectura, cero overhead.
+ */
 function readDist(name) {
-  return readFileSync(path.join(repoRoot, "dist", name), "utf8");
+  const maxAttempts = 10;
+  for (let attempt = 1; ; attempt += 1) {
+    let content;
+    try {
+      content = readFileSync(path.join(repoRoot, "dist", name), "utf8");
+    } catch (err) {
+      if ((err.code !== "EACCES" && err.code !== "ENOENT") || attempt >= maxAttempts) {
+        throw err;
+      }
+      sleepSync(100);
+      continue;
+    }
+    if (isCompleteDistRead(name, content) || attempt >= maxAttempts) {
+      return content;
+    }
+    sleepSync(100);
+  }
 }
 
 // Los tests se agrupan en describe porque sus subtests son secuenciales por defecto,

@@ -197,12 +197,12 @@ describe("Plan 058 §6.2 — README test-count badge is internally consistent", 
     const n = badgeNumber(text);
     assert.match(
       text,
-      new RegExp(`${n} tests across 147 suites`, "u"),
+      new RegExp(`${n} tests across 148 suites`, "u"),
       "highlights line must match badge number"
     );
     assert.match(
       text,
-      new RegExp(`${n} tests · 147 suites`, "u"),
+      new RegExp(`${n} tests · 148 suites`, "u"),
       "dev section must match badge number"
     );
   });
@@ -212,12 +212,12 @@ describe("Plan 058 §6.2 — README test-count badge is internally consistent", 
     const n = badgeNumber(text);
     assert.match(
       text,
-      new RegExp(`${n} tests en 147 suites`, "u"),
+      new RegExp(`${n} tests en 148 suites`, "u"),
       "highlights line must match badge number"
     );
     assert.match(
       text,
-      new RegExp(`${n} tests · 147 suites`, "u"),
+      new RegExp(`${n} tests · 148 suites`, "u"),
       "dev section must match badge number"
     );
   });

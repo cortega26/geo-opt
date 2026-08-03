@@ -21,9 +21,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **fix:** fetcher connects IPv6-literal URLs via the vetted address (was getaddrinfo ENOTFOUND on Node 22+ because the bracketed hostname leaked into the request)
 - **test:** bracket IPv6 hosts in fetcher test server URLs (Plan 073)
 - **test:** make fetcher tests hermetic (local servers only) and behavior-specific (Plan 073)
+- **test:** retry dist/ reads and staging copies when a neighbor test build is mid-write (the build lock serializes builds, not reads; EACCES/ENOENT and partial-content flake)
+- **test:** close the partial-read window for the remaining dist/ modules (bin/cli.js, index.js) with a closing-brace completeness predicate
 - **ci:** report truthful aggregate scores and entitlements in CI wrappers (Plan 072)
 - **ci:** propagate the audit exit status through the GitLab template so failed audits fail the job (Plan 072)
 - **ci:** reject non-numeric averageScore in CI wrappers instead of coercing it to a fabricated score (Plan 072)
+
+### Security
+
+- **test:** deterministic local-TLS coverage for the HTTPS agent path — trusted test CA, SNI/Host identity, vetted-IP socket target, and fail-closed hostname-mismatch/untrusted-cert cases (Plan 074)
 
 ## [2.3.5](https://github.com/cortega26/geo-opt/compare/v2.3.4...v2.3.5) (2026-08-02)
 

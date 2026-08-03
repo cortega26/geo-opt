@@ -7,8 +7,13 @@
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import dns from "node:dns/promises";
+import { readFileSync } from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 
 import {
   fetchUrl,
@@ -83,6 +88,93 @@ function stopServer(serverOrHandle) {
 after(async () => {
   await Promise.allSettled([...activeServers.values()].map(stopServer));
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Fixtures TLS de test (Plan 074) — ver tests/fixtures/tls/README.md
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Directorio de fixtures TLS de test (CA, certificados, subproceso). */
+const FIXTURES_DIR = fileURLToPath(new URL("./fixtures/tls/", import.meta.url));
+
+/** Subproceso que ejecuta el fetchUrl real contra un servidor HTTPS local. */
+const TLS_CHILD_SCRIPT = `${FIXTURES_DIR}fetch-child.mjs`;
+
+/**
+ * Lee un fixture PEM del directorio tests/fixtures/tls/.
+ * @param {string} name — nombre de archivo, p. ej. "TEST-ONLY-ca-cert.pem"
+ * @returns {string} contenido PEM
+ */
+function fixture(name) {
+  return readFileSync(`${FIXTURES_DIR}${name}`, "utf8");
+}
+
+/**
+ * Igual que startServer pero para HTTPS con certificados de test: crea un
+ * https.Server con { key, cert } y rastrea sus sockets de la misma forma,
+ * de modo que la limpieza de seguridad (stopServer / after global) también
+ * lo cierre.
+ *
+ * @param {string} keyPem — clave privada de test (PEM)
+ * @param {string} certPem — certificado de test (PEM)
+ * @param {object} handler — función (req, res) => void
+ * @param {string} [host="127.0.0.1"] — dirección a la que escuchar
+ * @returns {Promise<{ server: https.Server, sockets: Set, port: number, baseUrl: string }>}
+ */
+function startTlsServer(keyPem, certPem, handler, host = "127.0.0.1") {
+  return new Promise((resolve, reject) => {
+    const server = https.createServer({ key: keyPem, cert: certPem }, handler);
+    const sockets = new Set();
+    server.on("connection", (socket) => {
+      sockets.add(socket);
+      socket.on("close", () => sockets.delete(socket));
+    });
+    server.listen(0, host, () => {
+      const port = server.address().port;
+      const urlHost = host.includes(":") ? `[${host}]` : host;
+      const handle = { server, sockets, port, baseUrl: `https://${urlHost}:${port}` };
+      activeServers.set(server, handle);
+      resolve(handle);
+    });
+    server.on("error", reject);
+  });
+}
+
+/**
+ * Ejecuta el subproceso TLS de test (tests/fixtures/tls/fetch-child.mjs) con
+ * entorno extra (p. ej. NODE_EXTRA_CA_CERTS) y resuelve al cerrar con
+ * { code, out, err }. El subproceso imprime un JSON en stdout:
+ * code 0 = fetch exitoso, 1 = fetch rechazado, 2+ = error del subproceso.
+ *
+ * @param {object} extraEnv — variables de entorno adicionales para el hijo
+ * @param {number} [timeoutMs=30_000] — tope; si el hijo no cierra, se mata
+ * @returns {Promise<{ code: number, out: string, err: string }>}
+ */
+function runTlsChild(extraEnv, timeoutMs = 30_000) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [TLS_CHILD_SCRIPT], {
+      env: { ...process.env, ...extraEnv },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (chunk) => (out += chunk));
+    child.stderr.on("data", (chunk) => (err += chunk));
+    const watchdog = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(
+        new Error(`subproceso TLS agotó el tiempo (${timeoutMs}ms). stderr: ${err.slice(-500)}`)
+      );
+    }, timeoutMs);
+    child.on("error", (error) => {
+      clearTimeout(watchdog);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(watchdog);
+      resolve({ code, out, err });
+    });
+  });
+}
 
 /**
  * Verifica que el fetch fue rechazado por la política SSRF (guard) y no por
@@ -906,5 +998,193 @@ describe("SSRF guards — audit F-02/F-03", () => {
     // El guard rechaza en validación, antes de cualquier conexión: el puerto
     // es irrelevante, así que no depende de que ::1 esté disponible.
     await guardRejects(fetchUrl("http://[::1]:1/"), "blocked: ::1");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HTTPS — validación de certificados y pinning de IP (Plan 074)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Cubre la propiedad de seguridad más importante del fetcher: conectarse a la
+// IP pre-resuelta y verificada (mitigación de DNS rebinding) mientras se valida
+// TLS para el hostname original (SNI + Host). Los fixtures viven en
+// tests/fixtures/tls/ (ver su README para regeneración y expiración).
+
+describe("fetchUrl — HTTPS certificate & IP pinning (Plan 074)", () => {
+  let trustedServer;
+  let trustedUrl;
+  let seen;
+  let localhostResolvesToLoopback = false;
+
+  before(async () => {
+    // Estos tests resuelven el hostname "localhost" de verdad; si el runner no
+    // lo resuelve a 127.0.0.1 (p. ej. /etc/hosts alterado) se omiten, igual
+    // que los tests IPv6 cuando ::1 no está disponible.
+    try {
+      const v4 = await dns.resolve4("localhost");
+      localhostResolvesToLoopback = v4.includes("127.0.0.1");
+    } catch {
+      localhostResolvesToLoopback = false;
+    }
+    if (!localhostResolvesToLoopback) return;
+
+    seen = { host: null, remoteAddress: null, sni: null };
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-localhost-server-key.pem"),
+      fixture("TEST-ONLY-localhost-server-cert.pem"),
+      (req, res) => {
+        seen.host = req.headers.host;
+        seen.remoteAddress = req.socket.remoteAddress;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>tls-pin-ok</p></body></html>");
+      }
+    );
+    s.server.on("secureConnection", (socket) => {
+      seen.sni = socket.servername;
+    });
+    trustedServer = s;
+    trustedUrl = `https://localhost:${s.port}/tls-pin`;
+  });
+
+  after(async () => {
+    if (trustedServer) await stopServer(trustedServer.server);
+  });
+
+  it("TLS positivo: CA de test confiable y hostname en el certificado (subproceso con NODE_EXTRA_CA_CERTS)", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip("localhost no resuelve a 127.0.0.1 en este runner; se omite el caso TLS positivo");
+      return;
+    }
+    const child = await runTlsChild({
+      NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+      TLS_TEST_URL: trustedUrl,
+    });
+    assert.equal(
+      child.code,
+      0,
+      `el subproceso TLS debía salir con 0. stdout: ${child.out} stderr: ${child.err}`
+    );
+    const payload = JSON.parse(child.out);
+    assert.equal(payload.ok, true);
+    assert.equal(payload.statusCode, 200);
+    assert.equal(payload.finalUrl, trustedUrl);
+    // El servidor (proceso principal) observa la identidad original:
+    assert.equal(
+      seen.host,
+      `localhost:${trustedServer.port}`,
+      "el Host header debe ser el hostname original"
+    );
+    assert.equal(seen.sni, "localhost", "el SNI debe ser el hostname original");
+    assert.equal(
+      seen.remoteAddress,
+      "127.0.0.1",
+      "el socket debe llegar a la IP pre-resuelta (loopback)"
+    );
+  });
+
+  it("TLS negativo: hostname no presente en el certificado → rechaza (ERR_TLS_CERT_ALTNAME_INVALID)", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip("localhost no resuelve a 127.0.0.1 en este runner; se omite el caso de mismatch");
+      return;
+    }
+    // El servidor presenta un cert firmado por la CA de test pero para
+    // example.test: con la CA confiada, el único motivo de fallo es la
+    // verificación de hostname (no la confianza), aislando esa dimensión.
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-mismatch-server-key.pem"),
+      fixture("TEST-ONLY-mismatch-server-cert.pem"),
+      (_req, res) => {
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>should-not-arrive</p></body></html>");
+      }
+    );
+    try {
+      const child = await runTlsChild({
+        NODE_EXTRA_CA_CERTS: `${FIXTURES_DIR}TEST-ONLY-ca-cert.pem`,
+        TLS_TEST_URL: `https://localhost:${s.port}/mismatch`,
+      });
+      assert.equal(child.code, 1, "el fetch con hostname no cubierto debía rechazarse");
+      const payload = JSON.parse(child.out);
+      assert.equal(payload.ok, false);
+      assert.equal(
+        payload.code,
+        "ERR_TLS_CERT_ALTNAME_INVALID",
+        `esperaba fallo de verificación de hostname, recibí: ${payload.code} — ${payload.error}`
+      );
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  it("TLS negativo: certificado no confiable (autofirmado) → rechaza sin debilitar TLS", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip(
+        "localhost no resuelve a 127.0.0.1 en este runner; se omite el caso de cert no confiable"
+      );
+      return;
+    }
+    const s = await startTlsServer(
+      fixture("TEST-ONLY-untrusted-server-key.pem"),
+      fixture("TEST-ONLY-untrusted-server-cert.pem"),
+      (_req, res) => {
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>should-not-arrive</p></body></html>");
+      }
+    );
+    try {
+      // Corre en el proceso principal SIN la CA de test: la única forma de que
+      // llegue al servidor es que alguien desactive la verificación en
+      // producción, y ese sería exactamente el bug que queremos detectar.
+      await assert.rejects(
+        fetchUrl(`https://localhost:${s.port}/untrusted`, LOCALHOST_OPTS),
+        (err) => {
+          const failClosedCodes = [
+            "DEPTH_ZERO_SELF_SIGNED_CERT",
+            "SELF_SIGNED_CERT_IN_CHAIN",
+            "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+          ];
+          assert.ok(
+            failClosedCodes.includes(err.code) ||
+              /self[- ]signed|unable to verify|certificate/i.test(err.message),
+            `esperaba rechazo de verificación TLS, recibí code=${err.code} message=${err.message}`
+          );
+          return true;
+        }
+      );
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  it("TLS contrato de fuente: rejectUnauthorized=true, resolución antes de conectar, request a la IP validada", () => {
+    const source = readFileSync(new URL("../src/fetcher.js", import.meta.url), "utf8");
+    // El agente HTTPS debe fijar los tres pins y nunca desactivar la verificación.
+    assert.ok(
+      source.includes("rejectUnauthorized: true"),
+      "el agente seguro debe exigir verificación TLS"
+    );
+    assert.ok(
+      !source.includes("rejectUnauthorized: false"),
+      "no debe existir un modo sin verificación TLS"
+    );
+    assert.ok(source.includes("servername: hostname"), "el SNI debe ser el hostname original");
+    assert.ok(source.includes("host: resolvedIp"), "el agente debe conectar a la IP pre-resuelta");
+    // La resolución/validación debe preceder a la creación del agente (conexión).
+    // Se busca la llamada (no la definición de la función) anclando la búsqueda
+    // después de la línea de resolución.
+    const resolveIndex = source.indexOf("await resolveAndValidateHost");
+    const agentCallIndex = source.indexOf(
+      "createSecureAgent(hostname, resolvedIp, port)",
+      resolveIndex
+    );
+    assert.ok(
+      resolveIndex !== -1 && agentCallIndex !== -1,
+      "no se encontraron los puntos de anclaje del contrato de fuente"
+    );
+    assert.ok(
+      resolveIndex < agentCallIndex,
+      "la resolución y validación de IP debe preceder a la creación del agente"
+    );
+    // El request debe apuntar a la IP ya validada (sin segunda resolución DNS).
+    assert.ok(source.includes("hostname: resolvedIp"), "el request debe conectar a la IP validada");
   });
 });

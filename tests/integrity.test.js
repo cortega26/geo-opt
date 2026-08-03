@@ -26,6 +26,62 @@ function runDriver(driverCode, cwd) {
   return spawnSync(process.execPath, [driverPath], { cwd, encoding: "utf8" });
 }
 
+/** Espera síncrona breve para reintentos (bloquea el event loop ~ms, solo en tests). */
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Detecta si staging es un snapshot completo de dist/ tras la escritura de un
+ * build vecino: cpSync puede terminar con éxito copiando un archivo a medias
+ * (CI) o fallar con EACCES/ENOENT (este sandbox) si cae en la ventana de
+ * escritura. Los invariantes son deterministas: dist/integrity.js siempre
+ * lleva el hash inyectado (nunca el placeholder) y dist/licensing.js es copia
+ * exacta de src/licensing.js.
+ */
+function distSnapshotIsComplete() {
+  try {
+    const integrity = readFileSync(join(stagingDir, "integrity.js"), "utf8");
+    if (!/const EXPECTED_HASH = "[0-9a-f]{64}"/.test(integrity)) return false;
+    // El literal de comparación en runtime sí conserva el placeholder; la
+    // ASIGNACIÓN const EXPECTED_HASH es la que el build reemplaza.
+    if (integrity.includes('const EXPECTED_HASH = "<<<LICENSING_HASH>>>"')) return false;
+    return (
+      readFileSync(join(stagingDir, "licensing.js"), "utf8") ===
+      readFileSync(join(repoRoot, "src", "licensing.js"), "utf8")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Copia dist/ al directorio de staging con reintento limitado: un build de
+ * otro archivo de test puede estar escribiendo dist/ en paralelo y el lock de
+ * scripts/build.js serializa los BUILDS, no las copias/lecturas. Tras agotar
+ * los intentos se acepta el snapshot aunque sea incompleto, para que las
+ * aserciones reales del test sigan fallando con su mensaje diagnóstico.
+ * Happy path: un solo intento, cero overhead.
+ */
+function copyDistToStaging() {
+  const maxAttempts = 10;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      cpSync(join(repoRoot, "dist"), stagingDir, { recursive: true });
+    } catch (err) {
+      if ((err.code !== "EACCES" && err.code !== "ENOENT") || attempt >= maxAttempts) {
+        throw err;
+      }
+      sleepSync(100);
+      continue;
+    }
+    if (distSnapshotIsComplete() || attempt >= maxAttempts) {
+      return;
+    }
+    sleepSync(100);
+  }
+}
+
 let stagingDir;
 
 beforeEach(() => {
@@ -42,7 +98,7 @@ describe("integrity — verificación de hash en staging", () => {
     assert.strictEqual(buildResult.status, 0, `Build falló:\n${buildResult.stderr}`);
 
     // Copiar dist/ a staging para aislar la importación de builds concurrentes
-    cpSync(join(repoRoot, "dist"), stagingDir, { recursive: true });
+    copyDistToStaging();
     const integrityPath = join(stagingDir, "integrity.js");
 
     const driver = `
@@ -64,7 +120,7 @@ console.log(isFallback ? "TAMPERED" : "OK");
     assert.strictEqual(buildResult.status, 0, `Build falló:\n${buildResult.stderr}`);
 
     // Copia dist/ al directorio de staging
-    cpSync(join(repoRoot, "dist"), stagingDir, { recursive: true });
+    copyDistToStaging();
 
     // Modifica staging/integrity.js para embeber un hash incorrecto
     const integrityPath = join(stagingDir, "integrity.js");
@@ -94,7 +150,7 @@ console.log(result === false ? "TAMPERED_OK" : "UNEXPECTED:" + result);
     assert.strictEqual(buildResult.status, 0, `Build falló:\n${buildResult.stderr}`);
 
     // Copia dist/ pero omite licensing.js para simular archivo ilegible
-    cpSync(join(repoRoot, "dist"), stagingDir, { recursive: true });
+    copyDistToStaging();
     rmSync(join(stagingDir, "licensing.js"));
 
     const integrityPath = join(stagingDir, "integrity.js");
