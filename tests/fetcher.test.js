@@ -859,10 +859,11 @@ describe("fetchUrl — timeouts", () => {
     }
   });
 
-  it("timeout total: presupuesto mínimo aborta durante DNS/conexión", async () => {
-    // Un presupuesto de 10ms se agota antes de recibir ningún byte: la
-    // fecha límite cubre también las fases de DNS y conexión, no solo la
-    // espera de respuesta ya conectada.
+  it("timeout total: el timer armado aborta antes de recibir headers", async () => {
+    // El presupuesto (200ms) es suficiente para pasar el check de entrada
+    // (overhead medido ~5ms): el abort debe venir del TIMER armado, no del
+    // throw de entrada. Si este test reporta elapsed < 150, el abort viene
+    // del camino equivocado — NO aflojar el límite, reportar.
     const s = await startServer(() => {
       // Nunca responde — el abort debe venir del presupuesto total.
     });
@@ -870,11 +871,34 @@ describe("fetchUrl — timeouts", () => {
     try {
       const started = Date.now();
       await assert.rejects(
-        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: 10 }),
-        /Request total timeout after 10ms/
+        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: 200 }),
+        /Request total timeout after 200ms/
       );
       const elapsed = Date.now() - started;
+      assert.ok(elapsed >= 150, `timeout total disparado demasiado pronto (${elapsed}ms)`);
       assert.ok(elapsed < 1_000, `timeout total tardó demasiado (${elapsed}ms)`);
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  it("timeout total: presupuesto agotado antes de entrar lanza de inmediato", async () => {
+    // Un presupuesto de 1ms se consume en la adquisición del rate-limiter:
+    // el check de entrada (remaining <= 0) lanza SIN armar el timer ni
+    // conectar. La aserción aguanta ambos caminos (throw de entrada o timer
+    // de 1ms): el mensaje es el mismo y elapsed queda por debajo de 50ms.
+    const s = await startServer(() => {
+      // Nunca responde — el abort debe venir del presupuesto total.
+    });
+
+    try {
+      const started = Date.now();
+      await assert.rejects(
+        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: 1 }),
+        /Request total timeout after 1ms/
+      );
+      const elapsed = Date.now() - started;
+      assert.ok(elapsed < 50, `timeout total tardó demasiado (${elapsed}ms)`);
     } finally {
       await stopServer(s);
     }

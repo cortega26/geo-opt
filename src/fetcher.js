@@ -560,136 +560,147 @@ async function performRequest(url, options = {}) {
   let responseTimer;
 
   return new Promise((resolve, reject) => {
-    const req = httpMod.request(
-      {
-        // Conectar a la IP ya validada (resolvedIp) y no al hostname original:
-        // para literales IPv6 parsed.hostname trae brackets ("[::1]") y
-        // getaddrinfo falla con ENOTFOUND; para hostnames se elimina la segunda
-        // resolución (refuerza la mitigación de DNS rebinding).
-        hostname: resolvedIp,
-        port,
-        path: parsed.pathname + parsed.search,
-        method: "GET",
-        agent,
-        signal: totalController.signal,
-        // Si Node omite el agente custom (hostname literal), el SNI debe seguir
-        // siendo el nombre original; el agente ya lo fija en tls.connect.
-        ...(isHttps ? { servername: hostname } : {}),
-        headers: {
-          "User-Agent": USER_AGENT,
-          Host: parsed.host,
-          Accept: "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8",
+    try {
+      const req = httpMod.request(
+        {
+          // Conectar a la IP ya validada (resolvedIp) y no al hostname original:
+          // para literales IPv6 parsed.hostname trae brackets ("[::1]") y
+          // getaddrinfo falla con ENOTFOUND; para hostnames se elimina la segunda
+          // resolución (refuerza la mitigación de DNS rebinding).
+          hostname: resolvedIp,
+          port,
+          path: parsed.pathname + parsed.search,
+          method: "GET",
+          agent,
+          signal: totalController.signal,
+          // Si Node omite el agente custom (hostname literal), el SNI debe seguir
+          // siendo el nombre original; el agente ya lo fija en tls.connect.
+          ...(isHttps ? { servername: hostname } : {}),
+          headers: {
+            "User-Agent": USER_AGENT,
+            Host: parsed.host,
+            Accept: "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8",
+          },
         },
-      },
-      (res) => {
-        // Primer byte recibido — limpiar timeout de respuesta
+        (res) => {
+          // Primer byte recibido — limpiar timeout de respuesta
+          clearTimeout(responseTimer);
+
+          const { statusCode, headers } = res;
+
+          // Seguir redirects con re-validación SSRF
+          if ([301, 302, 303, 307, 308].includes(statusCode) && headers.location) {
+            // Consumir el body del redirect antes de seguir
+            res.resume();
+
+            if (redirectDepth >= maxRedirects) {
+              clearTimeout(totalTimer);
+              reject(new Error(`Too many redirects (max ${maxRedirects}) for ${url}`));
+              return;
+            }
+
+            // Resolver la URL de destino relativa a la original
+            let redirectUrl;
+            try {
+              redirectUrl = new URL(headers.location, url).href;
+            } catch {
+              clearTimeout(totalTimer);
+              reject(new Error(`Invalid redirect location: ${headers.location}`));
+              return;
+            }
+
+            // Validar que el destino sea http(s)
+            const redirectParsed = new URL(redirectUrl);
+            if (!["http:", "https:"].includes(redirectParsed.protocol)) {
+              clearTimeout(totalTimer);
+              reject(new Error(`Redirect to unsupported protocol: ${redirectParsed.protocol}`));
+              return;
+            }
+
+            clearTimeout(totalTimer);
+            // Re-validar el destino del redirect contra SSRF guards. La
+            // recursión hereda la MISMA fecha límite absoluta (deadlineMs vía
+            // ...options) y arma un timer con el tiempo restante — el
+            // presupuesto total no se renueva por hop (Plan 077).
+            performRequest(redirectUrl, {
+              ...options,
+              redirectDepth: redirectDepth + 1,
+            })
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
+          // Leer body con control de tamaño
+          const chunks = [];
+          let totalBytes = 0;
+
+          res.on("data", (chunk) => {
+            totalBytes += chunk.length;
+            if (totalBytes > maxResponseSize) {
+              req.destroy(
+                new Error(`Response size ${totalBytes} exceeds limit ${maxResponseSize}`)
+              );
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          res.on("end", () => {
+            clearTimeout(totalTimer);
+            const html = Buffer.concat(chunks).toString("utf8");
+            resolve({
+              html,
+              statusCode,
+              finalUrl: url,
+              headers: Object.fromEntries(
+                Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
+              ),
+            });
+          });
+
+          res.on("error", (err) => {
+            clearTimeout(totalTimer);
+            reject(err);
+          });
+        }
+      );
+
+      // Timeout de respuesta: empieza cuando el socket se conecta
+      req.on("socket", (socket) => {
+        socket.on("connect", () => {
+          responseTimer = setTimeout(() => {
+            req.destroy(
+              new Error(`Response timeout: no data received within ${responseTimeoutMs}ms`)
+            );
+          }, responseTimeoutMs);
+        });
+      });
+
+      req.on("error", (err) => {
+        clearTimeout(totalTimer);
         clearTimeout(responseTimer);
-
-        const { statusCode, headers } = res;
-
-        // Seguir redirects con re-validación SSRF
-        if ([301, 302, 303, 307, 308].includes(statusCode) && headers.location) {
-          // Consumir el body del redirect antes de seguir
-          res.resume();
-
-          if (redirectDepth >= maxRedirects) {
-            clearTimeout(totalTimer);
-            reject(new Error(`Too many redirects (max ${maxRedirects}) for ${url}`));
-            return;
-          }
-
-          // Resolver la URL de destino relativa a la original
-          let redirectUrl;
-          try {
-            redirectUrl = new URL(headers.location, url).href;
-          } catch {
-            clearTimeout(totalTimer);
-            reject(new Error(`Invalid redirect location: ${headers.location}`));
-            return;
-          }
-
-          // Validar que el destino sea http(s)
-          const redirectParsed = new URL(redirectUrl);
-          if (!["http:", "https:"].includes(redirectParsed.protocol)) {
-            clearTimeout(totalTimer);
-            reject(new Error(`Redirect to unsupported protocol: ${redirectParsed.protocol}`));
-            return;
-          }
-
-          clearTimeout(totalTimer);
-          // Re-validar el destino del redirect contra SSRF guards. La
-          // recursión hereda la MISMA fecha límite absoluta (deadlineMs vía
-          // ...options) y arma un timer con el tiempo restante — el
-          // presupuesto total no se renueva por hop (Plan 077).
-          performRequest(redirectUrl, {
-            ...options,
-            redirectDepth: redirectDepth + 1,
-          })
-            .then(resolve)
-            .catch(reject);
+        // No rechazar si ya fue abortado por timeout
+        if (totalController.signal.aborted) {
+          reject(new Error(`Request total timeout after ${totalTimeoutMs}ms`));
           return;
         }
-
-        // Leer body con control de tamaño
-        const chunks = [];
-        let totalBytes = 0;
-
-        res.on("data", (chunk) => {
-          totalBytes += chunk.length;
-          if (totalBytes > maxResponseSize) {
-            req.destroy(new Error(`Response size ${totalBytes} exceeds limit ${maxResponseSize}`));
-            return;
-          }
-          chunks.push(chunk);
-        });
-
-        res.on("end", () => {
-          clearTimeout(totalTimer);
-          const html = Buffer.concat(chunks).toString("utf8");
-          resolve({
-            html,
-            statusCode,
-            finalUrl: url,
-            headers: Object.fromEntries(
-              Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
-            ),
-          });
-        });
-
-        res.on("error", (err) => {
-          clearTimeout(totalTimer);
-          reject(err);
-        });
-      }
-    );
-
-    // Timeout de respuesta: empieza cuando el socket se conecta
-    req.on("socket", (socket) => {
-      socket.on("connect", () => {
-        responseTimer = setTimeout(() => {
-          req.destroy(
-            new Error(`Response timeout: no data received within ${responseTimeoutMs}ms`)
-          );
-        }, responseTimeoutMs);
+        reject(err);
       });
-    });
 
-    req.on("error", (err) => {
+      req.on("timeout", () => {
+        req.destroy(new Error(`Request timed out after ${totalTimeoutMs}ms`));
+      });
+
+      req.end();
+    } catch (err) {
+      // El timer total se armó ANTES del promise body: si la creación del
+      // request lanza sincrónicamente (p. ej. opciones internas inválidas),
+      // el promise rechaza solo, pero el timer quedaría pendiente hasta la
+      // fecha límite — limpiarlo para no filtrar un timer activo.
       clearTimeout(totalTimer);
-      clearTimeout(responseTimer);
-      // No rechazar si ya fue abortado por timeout
-      if (totalController.signal.aborted) {
-        reject(new Error(`Request total timeout after ${totalTimeoutMs}ms`));
-        return;
-      }
-      reject(err);
-    });
-
-    req.on("timeout", () => {
-      req.destroy(new Error(`Request timed out after ${totalTimeoutMs}ms`));
-    });
-
-    req.end();
+      throw err;
+    }
   });
 }
 
