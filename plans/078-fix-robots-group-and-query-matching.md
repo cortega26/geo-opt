@@ -12,7 +12,7 @@
 - **Risk**: MED
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md
 - **Category**: bug
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled; 073 DONE)
 
 ## Why this matters
 
@@ -24,12 +24,15 @@ target it. Local and remote audits can therefore disagree with published rules.
 ## Current state
 
 - `src/robots.js:182-195` returns a single selected group.
-- `src/fetcher.js:641-675` duplicates that single-group algorithm.
-- `src/fetcher.js:634-638` matches only `URL.pathname`.
+- `src/fetcher.js:727-780` (`checkRobotsRule`) duplicates that single-group
+  algorithm — group selection at 743-751, rule matching at 758-774.
+- `src/fetcher.js:734` matches only `URL.pathname` (no `search`).
 - Longest rule and Allow tie behavior live at `src/robots.js:198-230` and
-  `src/fetcher.js:659-681`.
+  `src/fetcher.js:758-774`.
+- `fetchRobotsTxt` (`src/fetcher.js:686-714`) changed with 075 (ERR_HOP_POLICY
+  re-throw at 702-703); its matching semantics are unaffected.
 - Existing patterns: `tests/optimizer.test.js:2031-2045` and
-  `tests/fetcher.test.js:512-569`.
+  `tests/fetcher.test.js:955-985` (`describe("checkRobotsRule")` at 932).
 
 ## Commands you will need
 

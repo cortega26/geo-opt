@@ -13,7 +13,7 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: performance
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled — line refs verified current)
 
 ## Why this matters
 

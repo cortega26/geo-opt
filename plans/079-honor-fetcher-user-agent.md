@@ -12,7 +12,7 @@
 - **Risk**: LOW
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md
 - **Category**: bug / public-api
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled; 073 DONE)
 
 ## Why this matters
 
@@ -22,10 +22,11 @@ auditor or align the HTTP header with robots evaluation as promised.
 
 ## Current state
 
-- `index.d.ts:933-934` and `src/fetcher.js:697` document `userAgent`.
-- `fetchUrl` destructures only allow flags, timeout, and size at lines 700-706.
-- `performRequest` hard-codes `USER_AGENT` at line 463.
-- `fetchRobotsTxt` forwards its options to `fetchUrl` at lines 594-604.
+- `index.d.ts:952-953` and `src/fetcher.js:805` document `userAgent`.
+- `fetchUrl` destructures only allow flags, policy (075), timeout, and size at
+  lines 812-816 — `userAgent` is still not destructured.
+- `performRequest` hard-codes `USER_AGENT` at line 546.
+- `fetchRobotsTxt` forwards its options to `fetchUrl` at lines 694-696.
 
 ## Commands you will need
 

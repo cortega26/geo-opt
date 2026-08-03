@@ -13,7 +13,7 @@
 - **Risk**: LOW
 - **Depends on**: plans/085-remove-v2-predictive-wording.md
 - **Category**: docs
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled)
 
 ## Why this matters
 
@@ -25,9 +25,10 @@ wrong compatibility or migration decision.
 ## Current state
 
 - `docs/documentation-governance.md:66-67` says v1 remains default until a gate.
-- `docs/architecture.md:20-24` correctly says v2 is default.
-- `docs/architecture.md:39-40` labels v1/default.
-- `docs/architecture.md:271-272` describes a future v1-to-v2 switch even though
+- `docs/architecture.md:20-21` correctly says v2 is default.
+- `docs/architecture.md:43` labels v1/default ("Legacy heuristic scoring
+  (v1/default)").
+- `docs/architecture.md:279-280` describes a future v1-to-v2 switch even though
   it already happened.
 - README action input and CI assets default to v2; Python remains v1-only by its
   documented capability tier.

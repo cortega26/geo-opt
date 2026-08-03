@@ -13,7 +13,7 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: security / privacy / bug
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled)
 
 ## Why this matters
 
@@ -24,12 +24,13 @@ content unexpectedly. Reports should contain findings/metadata, not raw input.
 
 ## Current state
 
-- `src/batch.js:37-38` stores `{ ..., report, content }` for success results.
-- `aggregateReport` returns `perFile: results` at lines 77-84 and 134-155.
-- `bin/cli.js:241-245` serializes the summary directly.
-- `bin/cli.js:1226-1237` intentionally consumes `r.content` for llms-full
-  generation, then serializes the aggregate at lines 1243-1245.
-- `AuditResult.content?: string` is public at `index.d.ts:615-621`.
+- `src/batch.js:37-38` stores `{ ..., report, content }` for success results
+  (push at 38).
+- `aggregateReport` returns `perFile: results` at lines 83 and 154.
+- `bin/cli.js:243-265` serializes the summary directly.
+- `bin/cli.js:1228-1229` intentionally consumes `r.content` for llms-full
+  generation, then serializes the aggregate at line 1244.
+- `AuditResult.content?: string` is public at `index.d.ts:620`.
 
 ## Commands you will need
 

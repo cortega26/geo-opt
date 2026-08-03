@@ -13,7 +13,7 @@
 - **Risk**: MED
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md and plans/086-lint-javascript-tests.md
 - **Category**: performance / dx
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled — line refs verified current)
 
 ## Why this matters
 

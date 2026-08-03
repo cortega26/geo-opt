@@ -1,7 +1,7 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Last reconciled:** 2026-08-03 — reconcile at `0006bb1`. Plans 069–075 verified DONE (spot-checked at HEAD: GHSA keying, injected clock, safe argv wrapper, aggregate `effectiveScore` semantics, hermetic fetcher suite, TLS pinning fixtures, `checkHopPolicy`/`ERR_HOP_POLICY`). All TODOs 076–091 re-verified at HEAD and their "Planned at" refreshed to `0006bb1`; no finding disappeared. Notable refreshes: 085's top v2 band label was already fixed in passing (F-06) — 3 of 4 bands still predict; 086's lint baseline moved to 10 errors in 5 files (Plan 069 added `check-audit.test.js`; 073/075 grew fetcher/sitemap tests) and was re-captured. Prior: 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
 **Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
@@ -535,7 +535,7 @@ remain in force unless a plan explicitly presents new evidence.
 
 ## Completed history
 
-Plans 001–017, 019–021, 023–026, 029–056, 058, 065–067, 069–074 are
+Plans 001–017, 019–021, 023–026, 029–056, 058, 065–067, 069–075 are
 completed and stored under [`archive/`](archive/). The prior audit register is
 [`archive/audit-findings-2026-06-25.md`](archive/audit-findings-2026-06-25.md).
 Historical pre-current-roadmap plans live under

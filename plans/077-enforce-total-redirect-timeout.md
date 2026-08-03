@@ -12,7 +12,7 @@
 - **Risk**: MED
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md
 - **Category**: bug / security
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled; 073 DONE)
 
 ## Why this matters
 
@@ -22,11 +22,13 @@ timeoutMs`, violating user expectations and allowing avoidable resource hold.
 
 ## Current state
 
-- `performRequest` defaults `totalTimeoutMs` at `src/fetcher.js:415-424`.
-- It starts a new timer at lines 445-449.
+- `performRequest` defaults `totalTimeoutMs` at `src/fetcher.js:477-483`.
+- It starts a new timer at lines 522-525.
 - Redirect handling clears that timer and recursively calls `performRequest` at
-  lines 474-510, resetting the full budget.
-- `index.d.ts:929-930` promises a total request timeout.
+  lines 586-594 (`...options` spread re-applies `totalTimeoutMs`), resetting the
+  full budget. The 075 hop-policy check at 494-505 runs per hop but does not
+  change the timeout semantics.
+- `index.d.ts:948` promises a total request timeout.
 - Hermetic timeout tests are established by Plan 073.
 
 ## Commands you will need

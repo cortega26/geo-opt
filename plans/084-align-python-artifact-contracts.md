@@ -13,7 +13,7 @@
 - **Risk**: MED
 - **Depends on**: plans/083-close-symlink-write-escapes.md
 - **Category**: bug / docs
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled)
 
 ## Why this matters
 
@@ -25,8 +25,8 @@ observable outputs with canonical Node behavior or explicitly narrow the claim.
 
 ## Current state
 
-- Python metadata falls back to filename at `geo_optimizer.py:721-730`, but
-  schema generation falls back to `"Untitled Document"` at lines 2020-2024.
+- Python metadata falls back to filename at `geo_optimizer.py:718-727`, but
+  schema generation falls back to `"Untitled Document"` at line 2024.
 - Python `generate_llms_txt` defaults `optional_threshold=50` and interpolates
   raw values at lines 753-788.
 - Node disables score-based Optional placement unless explicitly requested and

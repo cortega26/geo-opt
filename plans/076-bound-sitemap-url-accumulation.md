@@ -12,7 +12,7 @@
 - **Risk**: MED
 - **Depends on**: plans/075-enforce-remote-hop-policy.md
 - **Category**: security / performance
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled; 075 DONE)
 
 ## Why this matters
 
@@ -24,9 +24,12 @@ its own hard total and truncation report.
 ## Current state
 
 - `src/sitemap.js:565-568` documents only `maxFetches`.
-- `src/sitemap.js:579-604` appends all parsed page URLs to an unbounded array.
-- `bin/cli.js:1757-1788` combines all root/sub-sitemap URLs.
-- `bin/cli.js:1814-1817` applies `--max-urls` only after robots filtering.
+- `src/sitemap.js:583-603` appends all parsed page URLs to an unbounded array
+  (`pageUrls.push(...)` at 603).
+- `bin/cli.js:1814-1826` combines root and sub-sitemap URLs (`urls = [...urls, ...pageUrls]`
+  at 1826); `collectSubSitemapPageUrls` is called at 1814-1819 with the 075 policy
+  options (`sitemapFetchOptions`).
+- `bin/cli.js:1852-1856` applies `--max-urls` only after robots filtering.
 - Existing cap tests are in `tests/sitemap.test.js:634-700`; match their injected
   `fetchFn` pattern.
 

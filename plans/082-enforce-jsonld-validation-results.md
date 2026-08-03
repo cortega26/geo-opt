@@ -13,7 +13,7 @@
 - **Risk**: MED
 - **Depends on**: plans/081-reconcile-public-types-and-exports.md
 - **Category**: bug / public-api
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled)
 
 ## Why this matters
 
@@ -24,10 +24,12 @@ without changing unknown-type notes into hard errors.
 
 ## Current state
 
-- `src/validate.js:49-58` assumes `parsed` is an object.
-- `validateSchemaFile` prints and continues for parse/schema errors at lines
-  121-176, then returns `undefined`.
-- `bin/cli.js:542-553` exits nonzero only when an exception is thrown.
+- `src/validate.js:49-58` assumes `parsed` is an object (`parsed["@context"]`
+  deref at 54-56; a `null` root crashes).
+- `validateSchemaFile` (starts at `src/validate.js:96`) prints and continues for
+  parse/schema errors, then returns `undefined` ("No JSON-LD blocks found" early
+  return at 125-132; per-block loop after).
+- `bin/cli.js:544-552` exits nonzero only when an exception is thrown.
 - `tests/validate.test.js` asserts messages but not structured return or CLI
   exit status.
 - Core-return/CLI-exit ownership is an invariant at

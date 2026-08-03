@@ -13,7 +13,9 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: bug / public-api / types
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled — line refs verified current:
+  `src/index.js:33-34` exports the model constants, `findCommonBaseDir` at 84,
+  `validateSitemapXml` at 96; `index.d.ts:307` declares only `MODEL_VERSION`)
 
 ## Why this matters
 

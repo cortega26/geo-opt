@@ -13,7 +13,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: bug / docs / product-truth
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled — top band fixed in passing)
 
 ## Why this matters
 
@@ -25,15 +25,19 @@ than the model's evidence.
 
 ## Current state
 
-- `src/scoring-v2.js:674-695` says improvements reach
-  “production-ready,” gaps reduce citation likelihood, and engines are unlikely
-  to cite the page.
+- `src/scoring-v2.js:665-672` — the top band is ALREADY corrected in passing
+  (label "Strong Style Markers" with an F-06 disclaimer about not measuring
+  ranking); do not re-edit it.
+- `src/scoring-v2.js:673-689` — the remaining three bands still predict: "raise
+  it to production-ready" (solid, 677), "reduce its likelihood of being cited by
+  AI engines" (needs-work, 681), "AI engines are unlikely to cite this page"
+  (at-risk, 686).
 - `src/renderer.js:397-403` says pages are optimized/reliably discovered.
 - Bundled skill lines 396-401 documents “Production-Ready.”
 - `docs/architecture.md:256-265` is normative: no live ranking/citation or
   future-engine prediction.
-- The `production-ready` band id is described as stable at
-  `src/scoring-v2.js:665-671`; do not rename it here.
+- The `production-ready` band id is stable at `src/scoring-v2.js:665`; do not
+  rename it here.
 
 ## Commands you will need
 

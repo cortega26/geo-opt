@@ -13,7 +13,7 @@
 - **Risk**: MED
 - **Depends on**: plans/084-align-python-artifact-contracts.md
 - **Category**: performance / architecture
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled)
 
 ## Why this matters
 
@@ -27,8 +27,8 @@ from the report used for thresholds if a file changes between passes.
 - `geo_optimizer.py:2380` computes `batch_results = audit_files(...)`.
 - Text mode loops successes and calls `audit_file(r["file"], ...)` at lines
   2389-2393.
-- `audit_file`/`_score_content` are around lines 1289 and 1353; rendering is
-  currently coupled to that path.
+- `audit_files` starts at line 1271; `_score_content` is at 1353; `audit_file`
+  is at 1441; rendering is currently coupled to that path.
 - JSON and summary modes already consume `batch_results` directly.
 
 ## Commands you will need

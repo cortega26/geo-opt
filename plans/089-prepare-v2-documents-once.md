@@ -13,7 +13,7 @@
 - **Risk**: HIGH
 - **Depends on**: plans/088-make-stat-attribution-linear.md
 - **Category**: performance / architecture
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled — line refs verified current)
 
 ## Why this matters
 

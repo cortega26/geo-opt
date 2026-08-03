@@ -12,7 +12,7 @@
 - **Risk**: LOW
 - **Depends on**: plans/069-match-audit-advisories-by-stable-identity.md and plans/070-make-evidence-freshness-tests-deterministic.md
 - **Category**: dx / tests
-- **Planned at**: commit `888d3e7`, 2026-08-02
+- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled — baseline re-captured)
 
 ## Why this matters
 
@@ -42,10 +42,13 @@ with narrowly scoped test globals where necessary.
 
 **In scope**: `package.json`, `eslint.config.js` only for a narrow test override,
 `tests/058-onboarding-route.test.js`, `tests/audit-2026-07-31.e2e.test.js`,
-`tests/fetcher.test.js`, `tests/sitemap.test.js`, `CHANGELOG.md`, and
-`plans/README.md`. At commit `888d3e7`, `npx eslint tests/` reports exactly 15
-errors across those four files (unused imports/variables/arguments plus missing
-`setImmediate` global).
+`tests/check-audit.test.js`, `tests/fetcher.test.js`, `tests/sitemap.test.js`,
+`CHANGELOG.md`, and `plans/README.md`. At commit `0006bb1`, `npx eslint tests/`
+reports exactly 10 errors across those five files (unused
+imports/variables/arguments, a `no-dupe-keys` at `check-audit.test.js:39`, plus
+the missing `setImmediate` global at `fetcher.test.js:796`). The baseline moved
+from 15 errors/4 files at `888d3e7` because Plans 069/073/075 added new tests;
+re-capture with Step 1 before fixing.
 
 **Out of scope**: changing runtime code, disabling `no-undef`/`no-unused-vars`
 globally, replacing ESLint, or formatting unrelated files.
@@ -59,11 +62,11 @@ globally, replacing ESLint, or formatting unrelated files.
 
 ### Step 1: Capture the lint delta
 
-Run `npx eslint tests/` and classify the 15 known errors. Add only the required
-`setImmediate` test/global declaration; prefer fixing dead imports/variables
-and real undefined names in the four named files.
+Run `npx eslint tests/` and classify the 10 known errors. Add only the required
+`setImmediate` test/global declaration; prefer fixing dead imports/variables,
+the `no-dupe-keys`, and real undefined names in the five named files.
 
-**Verify**: the baseline reports 15 errors in exactly the four scoped files; no
+**Verify**: the baseline reports 10 errors in exactly the five scoped files; no
 source files changed.
 
 ### Step 2: Extend the canonical script and repair violations
