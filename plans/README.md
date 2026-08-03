@@ -435,12 +435,12 @@ independent work.
 
 | Plan | Title | Cat | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
-| [069](069-match-audit-advisories-by-stable-identity.md) | Match accepted npm advisories by stable GHSA plus reviewed installed surface | security/dx | P1 | S | — | DONE (2026-08-02; squash-merged to main as `db423ac`) |
-| [070](070-make-evidence-freshness-tests-deterministic.md) | Inject a deterministic clock into evidence-freshness tests | tests/bug | P1 | S | — | DONE (2026-08-02; squash-merged to main as `04fcd49`) |
-| [071](071-repair-github-composite-action.md) | Execute GitHub Action inputs as safe argv | bug/dx | P1 | S | 069, 070 | DONE (2026-08-02; squash-merged to main as `eca2aa4`) |
-| [072](072-correct-ci-wrapper-score-and-entitlements.md) | Report aggregate CI scores and truthful Community/Pro semantics | bug/docs | P1 | M | 071 | DONE (2026-08-02; squash-merged to main as `8b2c3ad`) |
-| [073](073-make-fetcher-tests-hermetic.md) | Make fetcher tests local, deterministic, and behavior-specific | tests | P1 | M | 069, 070 | DONE (2026-08-02; squash-merged to main as `92af2d9`) |
-| [074](074-cover-https-ip-pinning.md) | Deterministically cover TLS hostname verification and vetted-IP pinning | security/tests | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `e6e418d`) |
+| [069](archive/069-match-audit-advisories-by-stable-identity.md) | Match accepted npm advisories by stable GHSA plus reviewed installed surface | security/dx | P1 | S | — | DONE (2026-08-02; squash-merged to main as `db423ac`) |
+| [070](archive/070-make-evidence-freshness-tests-deterministic.md) | Inject a deterministic clock into evidence-freshness tests | tests/bug | P1 | S | — | DONE (2026-08-02; squash-merged to main as `04fcd49`) |
+| [071](archive/071-repair-github-composite-action.md) | Execute GitHub Action inputs as safe argv | bug/dx | P1 | S | 069, 070 | DONE (2026-08-02; squash-merged to main as `eca2aa4`) |
+| [072](archive/072-correct-ci-wrapper-score-and-entitlements.md) | Report aggregate CI scores and truthful Community/Pro semantics | bug/docs | P1 | M | 071 | DONE (2026-08-02; squash-merged to main as `8b2c3ad`) |
+| [073](archive/073-make-fetcher-tests-hermetic.md) | Make fetcher tests local, deterministic, and behavior-specific | tests | P1 | M | 069, 070 | DONE (2026-08-02; squash-merged to main as `92af2d9`) |
+| [074](archive/074-cover-https-ip-pinning.md) | Deterministically cover TLS hostname verification and vetted-IP pinning | security/tests | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `e6e418d`) |
 | [075](075-enforce-remote-hop-policy.md) | Apply HTTPS/origin policy to roots, redirects, robots, sitemaps, and pages | security | P1 | L | 073, 074 | TODO |
 | [076](076-bound-sitemap-url-accumulation.md) | Bound total retained sitemap page URLs | security/perf | P1 | M | 075 | TODO |
 | [077](077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | TODO |
@@ -534,8 +534,8 @@ remain in force unless a plan explicitly presents new evidence.
 
 ## Completed history
 
-Plans 001–017, 019–021, 023–026, 029–056, 058, 065–067 are completed and
-stored under [`archive/`](archive/). The prior audit register is
+Plans 001–017, 019–021, 023–026, 029–056, 058, 065–067, 069–074 are
+completed and stored under [`archive/`](archive/). The prior audit register is
 [`archive/audit-findings-2026-06-25.md`](archive/audit-findings-2026-06-25.md).
 Historical pre-current-roadmap plans live under
 [`archive/public-history/`](archive/public-history/).
