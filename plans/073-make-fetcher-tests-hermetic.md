@@ -14,6 +14,46 @@
 - **Depends on**: plans/069-match-audit-advisories-by-stable-identity.md and plans/070-make-evidence-freshness-tests-deterministic.md
 - **Category**: tests
 - **Planned at**: commit `888d3e7`, 2026-08-02
+- **Executed at**: commits `dbd6df7` + `f73c748` + `8daf3f6` + `578e890` +
+  `60bf411` (2026-08-02) on branch `advisor/073-hermetic-fetcher-tests`,
+  approved by reviewer, squash-merged to main as `92af2d9` (2026-08-02,
+  after release 2.3.6 `e4c2ab2`). Notes: suite duration
+  75.5s → ~2.5s (hermeticity evidence); the allow-private case ran (runner
+  exposes 192.168.100.8) with a documented skip path when no private
+  interface exists. Out-of-scope residual: `tests/audit-2026-07-31.e2e.test.js`
+  still contains the literal `169.254.169.254` (guard-block assertion only,
+  no outbound attempt) — candidate for a future cleanup. Reviewer revision
+  rounds (all verified live):
+  - `f73c748`: `startServer` brackets IPv6 hosts in `baseUrl` (was
+    `http://::1:8080` → ERR_INVALID_URL; latent footgun for Plans 074–079).
+  - `8daf3f6` (production fix, maintainer-authorized): the fetcher could not
+    fetch IPv6-literal URLs on Node 22+ — `parsed.hostname` for IPv6 carries
+    brackets (`"[::1]"`) and was passed to `http.request`, so `getaddrinfo`
+    failed with `ENOTFOUND [::1]` (the custom agent's createConnection is
+    bypassed for IP literals). `performRequest` now connects via the vetted
+    `resolvedIp` (unbracketed) with explicit `servername` for https; this
+    also removes the second resolution for names (strengthens the
+    DNS-rebinding mitigation). New ::1 tests: fetch 200 + correct bracketed
+    Host header; guard rejects `[::1]` pre-connection. Verified e2e via
+    `technical --url http://[::1]:<port>/`.
+  - `578e890` (gate-flake root cause, maintainer-authorized): the recurring
+    full-check red was a concurrent-build race — `node --test` runs
+    `artifact.test.js` and `integrity.test.js` in parallel, both building the
+    shared `dist/`; observed as `EACCES` reading `dist/licensing.js` and
+    half-written staging copies (reproduced 1/12 parallel runs).
+    `scripts/build.js` now serializes builds via an exclusive
+    `dist/.build.lock` (wx-open, 50ms retry to 15s, stale-PID recovery via
+    ESRCH, try/finally release, deadline error). New test: two concurrent
+    builds produce an integral dist/. Verified 6× parallel runs + full gate.
+  The earlier unexplained single gate red is attributed to this race class,
+  now eliminated.
+  - `60bf411` (reviewer round 4): the CLI's `--url` suggestion compared
+    `host === "::1"` but Node 22+ returns the bracketed `"[::1]"`, so
+    IPv6-literal URLs got the wrong suggestion (`--allow-http`, which does
+    not unblock loopback); both forms now match, with a regression test in
+    cli-smoke. Notes without action: https-to-IPv6-literal SNI
+    characterization belongs to Plan 074; build-lock PID-reuse edge accepted
+    by design; redirect-to-IPv6 covered by the shared performRequest path.
 
 ## Why this matters
 
