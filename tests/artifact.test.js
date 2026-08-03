@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -107,6 +110,44 @@ describe("artifact invariants", () => {
     assert.ok(
       integrityContent.includes(expected),
       "El hash embebido en dist/integrity.js no coincide con dist/licensing.js"
+    );
+  });
+
+  it("builds concurrentes sobre dist/ terminan íntegros", async () => {
+    // Dos builds simultáneos sobre el mismo dist/ (execFile con Promise.all:
+    // spawnSync los serializaría en el mismo proceso y no ejercitaría la
+    // carrera). El lock exclusivo de scripts/build.js los serializa; sin él,
+    // un build vecino puede pisar artefactos a medio escribir (EACCES,
+    // licensing.js a medias, placeholder sobre el hash).
+    const buildScript = path.join(repoRoot, "scripts", "build.js");
+    await Promise.all([
+      execFileAsync(process.execPath, [buildScript], { cwd: repoRoot, encoding: "utf8" }),
+      execFileAsync(process.execPath, [buildScript], { cwd: repoRoot, encoding: "utf8" }),
+    ]);
+    // execFile promisificado rechaza si algún build sale con status != 0:
+    // ambos terminaron íntegros.
+
+    const integrity = readDist("integrity.js");
+    assert.match(
+      integrity,
+      /const EXPECTED_HASH = "[0-9a-f]{64}"/,
+      "la asignación de EXPECTED_HASH en dist es el hash SHA-256 inyectado"
+    );
+    assert.ok(
+      !integrity.includes('const EXPECTED_HASH = "<<<LICENSING_HASH>>>"'),
+      "el template placeholder no se filtró a dist/ tras builds concurrentes"
+    );
+    // El hash embebido debe ser el SHA256 real de dist/licensing.js, que a su
+    // vez debe ser legible y copia exacta de src/licensing.js.
+    const expected = sha256(readDist("licensing.js"));
+    assert.ok(
+      integrity.includes(expected),
+      "El hash embebido en dist/integrity.js no coincide con dist/licensing.js"
+    );
+    assert.strictEqual(
+      readDist("licensing.js"),
+      readSrc("licensing.js"),
+      "dist/licensing.js difiere de src/licensing.js tras builds concurrentes"
     );
   });
 

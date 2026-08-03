@@ -1047,6 +1047,24 @@ describe("CLI technical --url", () => {
         stderr.includes("allow-localhost")
     );
   });
+
+  it("--url con literal IPv6 con brackets sugiere --allow-localhost, no --allow-http", () => {
+    // Sin flags de red, https:// es obligatorio. En Node 22+ el hostname de
+    // un literal IPv6 incluye brackets ("[::1]") y la sugerencia debe ser
+    // --allow-localhost (--allow-http no desbloquea loopback). El CLI falla
+    // en la validación de esquema antes de conectar, así que [::1]:1 nunca
+    // se toca.
+    const { status, stderr } = run(["technical", "--url", "http://[::1]:1/", "--format", "json"]);
+    assert.notEqual(status, 0);
+    assert.ok(
+      stderr.includes("--allow-localhost"),
+      `la sugerencia debe ser --allow-localhost, stderr: ${stderr}`
+    );
+    assert.ok(
+      !stderr.includes("--allow-http"),
+      `la sugerencia no debe ser --allow-http, stderr: ${stderr}`
+    );
+  });
 });
 
 describe("CLI technical --sitemap", () => {

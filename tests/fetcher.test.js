@@ -2,13 +2,13 @@
  * Tests para src/fetcher.js — módulo de fetch con SSRF guards.
  *
  * Usa servidores HTTP locales (node:http) para todas las pruebas.
- * Cero dependencias externas.
+ * Cero dependencias externas: ningún test contacta servicios públicos.
  */
 
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import net from "node:net";
+import os from "node:os";
 
 import {
   fetchUrl,
@@ -16,33 +16,104 @@ import {
   checkRobotsRule,
   clearRobotsCache,
   MAX_RESPONSE_SIZE,
-  TOTAL_TIMEOUT_MS,
-  RESPONSE_TIMEOUT_MS,
-  MAX_REDIRECTS,
 } from "../src/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** Servidores de test activos (server -> handle) — la limpieza de seguridad los cierra al final. */
+const activeServers = new Map();
+
 /**
- * Crea un servidor HTTP en un puerto aleatorio.
+ * Crea un servidor HTTP en un puerto aleatorio, escuchando en `host`
+ * (por defecto loopback). Rastrea los sockets conectados para poder
+ * destruirlos en la limpieza: un request colgado no debe bloquear el runner.
+ *
  * @param {object} handler — función (req, res) => void
- * @returns {Promise<{ server: http.Server, port: number, baseUrl: string }>}
+ * @param {string} [host="127.0.0.1"] — dirección a la que escuchar
+ * @returns {Promise<{ server: http.Server, sockets: Set, port: number, baseUrl: string }>}
  */
-function startServer(handler) {
+function startServer(handler, host = "127.0.0.1") {
   return new Promise((resolve, reject) => {
     const server = http.createServer(handler);
-    server.listen(0, "127.0.0.1", () => {
+    const sockets = new Set();
+    server.on("connection", (socket) => {
+      sockets.add(socket);
+      socket.on("close", () => sockets.delete(socket));
+    });
+    server.listen(0, host, () => {
       const port = server.address().port;
-      resolve({
-        server,
-        port,
-        baseUrl: `http://127.0.0.1:${port}`,
-      });
+      // Un host IPv6 necesita brackets en la URL ("http://[::1]:8080/"); sin
+      // ellos el parseo falla con ERR_INVALID_URL.
+      const urlHost = host.includes(":") ? `[${host}]` : host;
+      const handle = { server, sockets, port, baseUrl: `http://${urlHost}:${port}` };
+      activeServers.set(server, handle);
+      resolve(handle);
     });
     server.on("error", reject);
   });
+}
+
+/**
+ * Cierra un servidor de test: destruye primero sus sockets activos (para que
+ * un test colgado no bloquee el runner) y luego el listener.
+ *
+ * Acepta el handle completo o el http.Server desnudo (los describe guardan
+ * `server = s.server` para su hook after).
+ */
+function stopServer(serverOrHandle) {
+  const handle =
+    serverOrHandle && serverOrHandle.sockets ? serverOrHandle : activeServers.get(serverOrHandle);
+  if (!handle) return Promise.resolve();
+  const { server, sockets } = handle;
+  activeServers.delete(server);
+  for (const socket of sockets) socket.destroy();
+  return new Promise((resolve) => {
+    try {
+      server.closeAllConnections?.();
+    } catch {
+      // Ya cerrado — nada que hacer.
+    }
+    server.close(() => resolve());
+  });
+}
+
+// Seguridad: si un test falla antes de su limpieza, cerrar servidores restantes.
+after(async () => {
+  await Promise.allSettled([...activeServers.values()].map(stopServer));
+});
+
+/**
+ * Verifica que el fetch fue rechazado por la política SSRF (guard) y no por
+ * un fallo de conexión: el mensaje del error debe contener la razón exacta
+ * del guard, p. ej. "Private IPv4 blocked: 10.0.0.1".
+ */
+function guardRejects(promise, reasonFragment) {
+  return assert.rejects(promise, (err) => {
+    assert.ok(
+      err instanceof Error && err.message.includes(reasonFragment),
+      `esperaba rechazo del guard con "${reasonFragment}", recibí: ${err}`
+    );
+    return true;
+  });
+}
+
+/**
+ * Encuentra una dirección IPv4 privada de una interfaz local no loopback
+ * (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16). Retorna null si el runner no
+ * expone ninguna; en ese caso el test que la usa se omite explícitamente.
+ */
+function privateInterfaceAddress() {
+  for (const infos of Object.values(os.networkInterfaces())) {
+    for (const info of infos ?? []) {
+      if (info.family !== "IPv4" || info.internal) continue;
+      const [a, b] = info.address.split(".").map(Number);
+      const isPrivate = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+      if (isPrivate) return info.address;
+    }
+  }
+  return null;
 }
 
 /** Opciones por defecto para conectar a localhost. */
@@ -53,7 +124,7 @@ const LOCALHOST_OPTS = { allowLocalhost: true };
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("fetchUrl — SSRF guards", () => {
-  let server, port, baseUrl;
+  let server, baseUrl;
 
   before(async () => {
     const s = await startServer((_req, res) => {
@@ -63,16 +134,15 @@ describe("fetchUrl — SSRF guards", () => {
       );
     });
     server = s.server;
-    port = s.port;
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
   });
 
   it("bloquea conexión a localhost sin --allow-localhost", async () => {
-    await assert.rejects(() => fetchUrl(`${baseUrl}/`), /Loopback|blocked|private|loopback/i);
+    await guardRejects(fetchUrl(`${baseUrl}/`), "Loopback IPv4 blocked: 127.0.0.1");
   });
 
   it("permite conexión a localhost con allowLocalhost: true", async () => {
@@ -92,32 +162,34 @@ describe("fetchUrl — SSRF guards", () => {
 
   // ── Regresión SSRF: IPs privadas conocidas ──
   // Estos tests verifican que las IPs privadas más comunes son rechazadas
-  // en la etapa de validación, antes de cualquier intento de conexión.
+  // en la etapa de validación, antes de cualquier intento de conexión, y
+  // que la razón es de política (el mensaje exacto del guard), no un fallo
+  // de conexión.
 
   const BLOCKED_IPS = [
-    { label: "10.0.0.1 (Class A private)", url: "http://10.0.0.1/" },
-    { label: "192.168.1.1 (Class C private)", url: "http://192.168.1.1/" },
-    { label: "172.16.0.1 (Class B private)", url: "http://172.16.0.1/" },
-    { label: "127.0.0.1 (IPv4 loopback)", url: "http://127.0.0.1/" },
-    { label: "0.0.0.0 (current network)", url: "http://0.0.0.0/" },
+    { label: "10.0.0.1 (Class A private)", url: "http://10.0.0.1/", address: "10.0.0.1" },
+    { label: "192.168.1.1 (Class C private)", url: "http://192.168.1.1/", address: "192.168.1.1" },
+    { label: "172.16.0.1 (Class B private)", url: "http://172.16.0.1/", address: "172.16.0.1" },
+    { label: "127.0.0.1 (IPv4 loopback)", url: "http://127.0.0.1/", address: "127.0.0.1" },
+    { label: "0.0.0.0 (current network)", url: "http://0.0.0.0/", address: "0.0.0.0" },
   ];
 
   for (const ip of BLOCKED_IPS) {
     it(`bloquea IP privada — ${ip.label}`, async () => {
-      await assert.rejects(() => fetchUrl(ip.url), /blocked|private|loopback|current network/i);
+      await guardRejects(fetchUrl(ip.url), `blocked: ${ip.address}`);
     });
   }
 
   it("bloquea IPv6 loopback ::1", async () => {
-    await assert.rejects(() => fetchUrl("http://[::1]/"), /blocked|loopback/i);
+    await guardRejects(fetchUrl("http://[::1]/"), "blocked: ::1");
   });
 
   it("bloquea IPv6 link-local fe80::", async () => {
-    await assert.rejects(() => fetchUrl("http://[fe80::1]/"), /blocked|private/i);
+    await guardRejects(fetchUrl("http://[fe80::1]/"), "blocked: fe80::1");
   });
 
   it("bloquea IPv6 unique local fd00::", async () => {
-    await assert.rejects(() => fetchUrl("http://[fd00::1]/"), /blocked|private/i);
+    await guardRejects(fetchUrl("http://[fd00::1]/"), "blocked: fd00::1");
   });
 });
 
@@ -129,21 +201,26 @@ describe("fetchUrl — successful fetch", () => {
   let server, baseUrl;
 
   before(async () => {
-    const s = await startServer((_req, res) => {
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8",
-        "X-Custom": "test-value",
-      });
-      res.end(
-        '<!DOCTYPE html><html lang="es"><head><title>Test Page</title></head><body><h1>Hello World</h1></body></html>'
-      );
-    });
+    const s = await startServer(
+      (_req, res) => {
+        res.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "X-Custom": "test-value",
+        });
+        res.end(
+          '<!DOCTYPE html><html lang="es"><head><title>Test Page</title></head><body><h1>Hello World</h1></body></html>'
+        );
+      },
+      // Host explícito: ejercita el parámetro `host` de startServer
+      // (la ruta IPv6 del bracket queda cubierta por la revisión del helper).
+      "127.0.0.1"
+    );
     server = s.server;
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
   });
 
   it("retorna html, statusCode, finalUrl y headers", async () => {
@@ -166,20 +243,20 @@ describe("fetchUrl — successful fetch", () => {
       const result = await fetchUrl(`${s404.baseUrl}/not-found`, LOCALHOST_OPTS);
       assert.equal(result.statusCode, 404);
     } finally {
-      s404.server.close();
+      await stopServer(s404);
     }
   });
 
   it("maneja página 500 sin crashear", async () => {
-    const s404 = await startServer((_req, res) => {
+    const s500 = await startServer((_req, res) => {
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end("Internal Server Error");
     });
     try {
-      const result = await fetchUrl(`${s404.baseUrl}/error`, LOCALHOST_OPTS);
+      const result = await fetchUrl(`${s500.baseUrl}/error`, LOCALHOST_OPTS);
       assert.equal(result.statusCode, 500);
     } finally {
-      s404.server.close();
+      await stopServer(s500);
     }
   });
 });
@@ -257,8 +334,8 @@ describe("fetchUrl — redirects", () => {
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
   });
 
   it("sigue un redirect simple (1 nivel)", async () => {
@@ -291,10 +368,9 @@ describe("fetchUrl — redirects", () => {
   it("rechaza redirect a IP privada (re-validación SSRF)", async () => {
     // Usar allowLocalhost para el servidor local, pero la IP 10.0.0.1
     // del redirect debe ser bloqueada porque no es loopback.
-    await assert.rejects(
-      () =>
-        fetchUrl(`${baseUrl}/redirect-to-private`, { allowLocalhost: true, allowPrivate: false }),
-      /blocked|private|10\.0\.0/i
+    await guardRejects(
+      fetchUrl(`${baseUrl}/redirect-to-private`, { allowLocalhost: true, allowPrivate: false }),
+      "blocked: 10.0.0.1"
     );
   });
 
@@ -311,28 +387,28 @@ describe("fetchUrl — redirects", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("fetchUrl — timeouts", () => {
-  it("timeout: servidor que retiene conexión sin responder", async () => {
-    const s = await startServer((_req, res) => {
-      // No hacemos nada — nunca enviamos respuesta
-      // El timeout debería dispararse
+  it("timeout total: servidor que retiene la conexión sin responder", async () => {
+    const s = await startServer(() => {
+      // No hacemos nada — nunca enviamos respuesta.
+      // El total timeout debe abortar el request.
     });
 
     try {
+      const budget = 1_000;
+      const started = Date.now();
       await assert.rejects(
-        () =>
-          fetchUrl(`${s.baseUrl}/hang`, {
-            allowLocalhost: true,
-            responseTimeoutMs: 1000,
-            totalTimeoutMs: 2000,
-          }),
-        /timeout|timed out/i
+        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: budget }),
+        /Request total timeout after 1000ms/
       );
+      const elapsed = Date.now() - started;
+      assert.ok(elapsed >= 800, `timeout total disparado demasiado pronto (${elapsed}ms)`);
+      assert.ok(elapsed < 5_000, `timeout total tardó demasiado (${elapsed}ms)`);
     } finally {
-      s.server.close();
+      await stopServer(s);
     }
   });
 
-  it("timeout: servidor que envía headers pero no body", async () => {
+  it("timeout total: servidor que envía headers pero nunca termina el body", async () => {
     const s = await startServer((_req, res) => {
       res.writeHead(200, { "Content-Type": "text/html" });
       // Escribe headers pero nunca envía el body completo
@@ -341,16 +417,17 @@ describe("fetchUrl — timeouts", () => {
     });
 
     try {
+      const budget = 1_000;
+      const started = Date.now();
       await assert.rejects(
-        () =>
-          fetchUrl(`${s.baseUrl}/slow`, {
-            allowLocalhost: true,
-            totalTimeoutMs: 1500,
-          }),
-        /timeout|timed out/i
+        () => fetchUrl(`${s.baseUrl}/slow`, { allowLocalhost: true, timeoutMs: budget }),
+        /Request total timeout after 1000ms/
       );
+      const elapsed = Date.now() - started;
+      assert.ok(elapsed >= 800, `timeout total disparado demasiado pronto (${elapsed}ms)`);
+      assert.ok(elapsed < 5_000, `timeout total tardó demasiado (${elapsed}ms)`);
     } finally {
-      s.server.close();
+      await stopServer(s);
     }
   });
 });
@@ -388,8 +465,8 @@ describe("fetchUrl — max response size", () => {
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
   });
 
   it("rechaza body que excede maxSize sin OOM", async () => {
@@ -419,12 +496,14 @@ describe("fetchUrl — max response size", () => {
 
 describe("fetchUrl — DNS failures", () => {
   it("error con hostname inexistente", async () => {
+    // ".invalid" es un TLD reservado (RFC 2606): nunca resuelve, sin depender
+    // de ningún servicio externo.
     await assert.rejects(
       () =>
         fetchUrl("http://this-hostname-does-not-exist-xyz-123.invalid/", {
           allowPrivate: true,
         }),
-      /dns|resolve|no addresses/i
+      /DNS resolution failed: no addresses found/
     );
   });
 });
@@ -434,10 +513,12 @@ describe("fetchUrl — DNS failures", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("fetchRobotsTxt", () => {
-  let server, baseUrl;
+  let server, baseUrl, robotsRequests;
 
   before(async () => {
+    robotsRequests = 0;
     const s = await startServer((req, res) => {
+      robotsRequests += 1;
       const url = new URL(req.url, `http://${req.headers.host}`);
       if (url.pathname === "/robots.txt") {
         res.writeHead(200, { "Content-Type": "text/plain" });
@@ -466,26 +547,26 @@ describe("fetchRobotsTxt", () => {
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
     clearRobotsCache();
   });
 
   it("obtiene y parsea robots.txt correctamente", async () => {
+    clearRobotsCache();
     const result = await fetchRobotsTxt(baseUrl, LOCALHOST_OPTS);
     assert.ok(result.groups.length > 0);
     assert.ok(result.raw.length > 0);
   });
 
-  it("cachea robots.txt — segunda llamada usa caché", async () => {
-    // La caché se limpia en after, así que la primera llamada del test
-    // anterior ya la llenó. Verificamos que la segunda sea instantánea.
-    const start = Date.now();
-    const result = await fetchRobotsTxt(baseUrl, LOCALHOST_OPTS);
-    const elapsed = Date.now() - start;
-    assert.ok(result.groups.length > 0);
-    // La llamada cacheada debería ser muy rápida (< 100ms)
-    // Nota: puede ser ligeramente mayor debido a la carga del sistema
+  it("cachea robots.txt — la segunda llamada no vuelve a la red", async () => {
+    clearRobotsCache();
+    const first = await fetchRobotsTxt(baseUrl, LOCALHOST_OPTS);
+    assert.ok(first.groups.length > 0);
+    const requestsAfterFirst = robotsRequests;
+    const cached = await fetchRobotsTxt(baseUrl, LOCALHOST_OPTS);
+    assert.equal(cached, first, "la llamada cacheada debe devolver la misma entrada");
+    assert.equal(robotsRequests, requestsAfterFirst, "la caché no debe generar otra request");
   });
 
   it("fetchRobotsTxt no crashea si robots.txt no existe (404)", async () => {
@@ -500,7 +581,7 @@ describe("fetchRobotsTxt", () => {
       assert.ok(Array.isArray(result.groups));
       assert.equal(result.groups.length, 0);
     } finally {
-      s404.server.close();
+      await stopServer(s404);
     }
   });
 });
@@ -616,8 +697,8 @@ describe("fetchUrl — sitemap integration", () => {
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
   });
 
   it("puede fetchear un sitemap y parsear URLs", async () => {
@@ -675,8 +756,8 @@ describe("fetchUrl — rate limiting", () => {
     baseUrl = s.baseUrl;
   });
 
-  after(() => {
-    server.close();
+  after(async () => {
+    await stopServer(server);
   });
 
   it("maneja múltiples requests concurrentes sin crashear", async () => {
@@ -715,53 +796,115 @@ describe("fetchUrl — rate limiting", () => {
 describe("SSRF guards — audit F-02/F-03", () => {
   // El guard debe rechazar ANTES de intentar conectar (sin servidor local).
   it("fetcher-blocks-link-local-metadata (169.254.0.0/16)", async () => {
-    await assert.rejects(
-      fetchUrl("http://169.254.169.254/latest/meta-data/"),
-      /blocked/i,
-      "169.254.169.254 (cloud metadata) debe bloquearse antes de conectar"
-    );
+    // 169.254.0.1 está en el rango link-local del metadata service (F-02);
+    // se usa un literal distinto al de la dirección real para que el test
+    // no dependa de ningún servicio externo.
+    await guardRejects(fetchUrl("http://169.254.0.1/latest/meta-data/"), "blocked: 169.254.0.1");
   });
 
   it("fetcher-blocks-cgnat-range (100.64.0.0/10)", async () => {
-    await assert.rejects(fetchUrl("http://100.64.1.2/"), /blocked/i);
+    await guardRejects(fetchUrl("http://100.64.1.2/"), "blocked: 100.64.1.2");
   });
 
   it("fetcher-blocks-ipv4-mapped-loopback", async () => {
     // ::ffff:7f00:1 (hex) y ::ffff:127.0.0.1 (decimal) mapean a 127.0.0.1.
-    await assert.rejects(
-      fetchUrl("http://[::ffff:7f00:1]/"),
-      /blocked/i,
-      "::ffff:7f00:1 mapea a loopback y debe bloquearse"
-    );
-    await assert.rejects(
-      fetchUrl("http://[::ffff:127.0.0.1]/"),
-      /blocked/i,
-      "::ffff:127.0.0.1 mapea a loopback y debe bloquearse"
-    );
+    await guardRejects(fetchUrl("http://[::ffff:7f00:1]/"), "blocked: 127.0.0.1");
+    await guardRejects(fetchUrl("http://[::ffff:127.0.0.1]/"), "blocked: 127.0.0.1");
   });
 
   it("fetcher-blocks-ipv4-mapped-private", async () => {
-    // ::ffff:7f00:1 en versión privada: ::ffff:c000:0201 -> 192.0.2.1 es TEST-NET,
-    // pero ::ffff:a00:1 -> 10.0.0.1 (privada) debe bloquearse.
-    await assert.rejects(fetchUrl("http://[::ffff:a00:1]/"), /blocked/i);
+    // ::ffff:a00:1 -> 10.0.0.1 (privada) debe bloquearse.
+    await guardRejects(fetchUrl("http://[::ffff:a00:1]/"), "blocked: 10.0.0.1");
   });
 
   it("fetcher-blocks-link-local-v6-range (fe80::/10)", async () => {
     // El prefijo /10 cubre fe80::..febf:: — no solo fe80: (F-03).
-    await assert.rejects(fetchUrl("http://[fe90::1]/"), /blocked/i);
-    await assert.rejects(fetchUrl("http://[febf::1]/"), /blocked/i);
+    await guardRejects(fetchUrl("http://[fe90::1]/"), "blocked: fe90::1");
+    await guardRejects(fetchUrl("http://[febf::1]/"), "blocked: febf::1");
   });
 
-  it("allow-private no desbloquea loopback mapeado", async () => {
+  it("allow-private: desbloquea IPs privadas reales pero no loopback mapeado", async (t) => {
     // allowPrivate=true solo permite privadas no-loopback; el loopback
     // mapeado sigue bloqueado salvo allowLocalhost.
-    await assert.rejects(fetchUrl("http://[::ffff:7f00:1]/", { allowPrivate: true }), /blocked/i);
-    // 169.254.169.254 es privada no-loopback: allowPrivate=true la desbloquea.
-    await fetchUrl("http://169.254.169.254/latest/", { allowPrivate: true }).then(
-      () => assert.fail("esperaba fallo de conexión, no bloqueo"),
-      (err) => {
-        assert.ok(!/blocked/i.test(err.message), "no debe ser un bloqueo del guard");
-      }
+    await guardRejects(
+      fetchUrl("http://[::ffff:7f00:1]/", { allowPrivate: true }),
+      "blocked: 127.0.0.1"
     );
+
+    // Probar contra una IP privada local real (interfaz no loopback del
+    // runner): bloqueada por defecto por política, alcanzable con
+    // allowPrivate: true. Si el runner no expone una interfaz privada, se
+    // omite solo este caso; nunca se usa una dirección externa como
+    // sustituto.
+    const privateIp = privateInterfaceAddress();
+    if (!privateIp) {
+      t.skip("el runner no expone una interfaz privada local; se omite la parte de conexión local");
+      return;
+    }
+
+    const s = await startServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end("<html><body><p>private-ok</p></body></html>");
+    }, privateIp);
+    try {
+      // Rechazo por política (el mensaje del guard), no por fallo de
+      // conexión: se rechaza antes de conectar, incluso con allowLocalhost.
+      await guardRejects(
+        fetchUrl(`http://${privateIp}:${s.port}/`, { allowLocalhost: true }),
+        `blocked: ${privateIp}`
+      );
+
+      // allowPrivate: true desbloquea la privada y llega al servidor local.
+      const result = await fetchUrl(`http://${privateIp}:${s.port}/`, { allowPrivate: true });
+      assert.equal(result.statusCode, 200);
+      assert.ok(result.html.includes("private-ok"));
+    } finally {
+      await stopServer(s);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Conexiones con literales IPv6 (fix F2): fetchUrl debe conectar a [::1] por
+  // la dirección validada; parsed.hostname trae brackets ("[::1]") y, si llegan
+  // al request, getaddrinfo falla con ENOTFOUND en Node 22+.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  let ipv6Server, ipv6Unavailable, ipv6HostHeader;
+
+  before(async () => {
+    try {
+      const s = await startServer((req, res) => {
+        ipv6HostHeader = req.headers.host;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end("<html><body><p>v6-ok</p></body></html>");
+      }, "::1");
+      ipv6Server = s;
+    } catch {
+      ipv6Unavailable = true;
+    }
+  });
+
+  after(async () => {
+    if (ipv6Server) await stopServer(ipv6Server);
+  });
+
+  it("fetches-ipv6-literal: [::1] con allowLocalhost devuelve 200 y Host correcto", async (t) => {
+    if (ipv6Unavailable) {
+      t.skip("::1 no está disponible en este runner; se omite la conexión IPv6 local");
+      return;
+    }
+    const result = await fetchUrl(`http://[::1]:${ipv6Server.port}/`, {
+      allowLocalhost: true,
+    });
+    assert.equal(result.statusCode, 200);
+    assert.ok(result.html.includes("v6-ok"));
+    // El Host header debe ser la forma HTTP/1.1 correcta, con brackets.
+    assert.equal(ipv6HostHeader, `[::1]:${ipv6Server.port}`);
+  });
+
+  it("bloquea http://[::1] sin allowLocalhost por política (guard antes de conectar)", async () => {
+    // El guard rechaza en validación, antes de cualquier conexión: el puerto
+    // es irrelevante, así que no depende de que ::1 esté disponible.
+    await guardRejects(fetchUrl("http://[::1]:1/"), "blocked: ::1");
   });
 });

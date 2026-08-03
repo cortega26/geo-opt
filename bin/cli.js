@@ -1654,7 +1654,14 @@ async function handleRemoteTechnical(options) {
           let suggestion;
           try {
             const host = new URL(url).hostname;
-            if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+            // En Node 22+ el hostname de un literal IPv6 incluye brackets
+            // ("[::1]"); comparar ambas formas para sugerir el flag correcto.
+            if (
+              host === "localhost" ||
+              host === "127.0.0.1" ||
+              host === "::1" ||
+              host === "[::1]"
+            ) {
               suggestion = "--allow-localhost";
             } else if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) {
               suggestion = "--allow-private";

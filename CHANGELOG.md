@@ -16,6 +16,11 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- **fix:** CLI suggests --allow-localhost for bracketed IPv6-literal URLs (was --allow-http, which does not unblock loopback)
+- **fix:** concurrent builds over the shared dist/ are serialized via an exclusive lock (was corrupting dist/ under parallel test runners — EACCES/half-written artifacts)
+- **fix:** fetcher connects IPv6-literal URLs via the vetted address (was getaddrinfo ENOTFOUND on Node 22+ because the bracketed hostname leaked into the request)
+- **test:** bracket IPv6 hosts in fetcher test server URLs (Plan 073)
+- **test:** make fetcher tests hermetic (local servers only) and behavior-specific (Plan 073)
 - **ci:** report truthful aggregate scores and entitlements in CI wrappers (Plan 072)
 - **ci:** propagate the audit exit status through the GitLab template so failed audits fail the job (Plan 072)
 - **ci:** reject non-numeric averageScore in CI wrappers instead of coercing it to a fabricated score (Plan 072)

@@ -453,12 +453,19 @@ async function performRequest(url, options = {}) {
   return new Promise((resolve, reject) => {
     const req = httpMod.request(
       {
-        hostname,
+        // Conectar a la IP ya validada (resolvedIp) y no al hostname original:
+        // para literales IPv6 parsed.hostname trae brackets ("[::1]") y
+        // getaddrinfo falla con ENOTFOUND; para hostnames se elimina la segunda
+        // resolución (refuerza la mitigación de DNS rebinding).
+        hostname: resolvedIp,
         port,
         path: parsed.pathname + parsed.search,
         method: "GET",
         agent,
         signal: totalController.signal,
+        // Si Node omite el agente custom (hostname literal), el SNI debe seguir
+        // siendo el nombre original; el agente ya lo fija en tls.connect.
+        ...(isHttps ? { servername: hostname } : {}),
         headers: {
           "User-Agent": USER_AGENT,
           Host: parsed.host,
