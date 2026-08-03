@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.7](https://github.com/cortega26/geo-opt/compare/v2.3.6...v2.3.7) (2026-08-03)
+
+
+### Bug Fixes
+
+* **sitemap:** cap collected page URLs ([aa7738a](https://github.com/cortega26/geo-opt/commit/aa7738a0666f9072e099bd2a5d86cc3c8e8322ad))
+
 ## [2.3.6](https://github.com/cortega26/geo-opt/compare/v2.3.5...v2.3.6) (2026-08-02)
 
 
