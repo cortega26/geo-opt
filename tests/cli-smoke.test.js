@@ -1531,6 +1531,104 @@ describe("CLI technical --sitemap — hop policy (Plan 075)", () => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Plan 076 — tope finito de URLs de página retenidas (raíz + sub-sitemaps)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("CLI technical --sitemap — page URL budget (Plan 076)", () => {
+  let localhostResolvesToLoopback = false;
+
+  before(async () => {
+    try {
+      const v4 = await dns.resolve4("localhost");
+      localhostResolvesToLoopback = v4.includes("127.0.0.1");
+    } catch {
+      localhostResolvesToLoopback = false;
+    }
+  });
+
+  it("un sub-sitemap con >50.000 URLs se trunca con aviso y el total queda acotado", async (t) => {
+    if (!localhostResolvesToLoopback) {
+      t.skip(
+        "localhost no resuelve a 127.0.0.1 en este runner; se omite el caso del presupuesto de URLs"
+      );
+      return;
+    }
+
+    // Sub-sitemap con 50.003 URLs de página (todas únicas). El presupuesto
+    // compartido (raíz + sub-sitemaps, 50.000 según la escala del spec) debe
+    // truncar 3 y avisar; luego --max-urls recorta a 2 páginas auditadas.
+    const PAGE_COUNT = 50_003;
+    let pageRequests = 0;
+    const server = await startTlsServer(
+      tlsFixture("TEST-ONLY-localhost-server-key.pem"),
+      tlsFixture("TEST-ONLY-localhost-server-cert.pem"),
+      (req, res) => {
+        const pathname = new URL(req.url, "https://localhost").pathname;
+        if (pathname === "/sitemap.xml") {
+          res.writeHead(200, { "Content-Type": "application/xml" });
+          res.end(
+            `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>https://localhost:${server.port}/sub.xml</loc></sitemap></sitemapindex>`
+          );
+          return;
+        }
+        if (pathname === "/sub.xml") {
+          const rows = [];
+          for (let i = 0; i < PAGE_COUNT; i += 1) {
+            rows.push(`<url><loc>https://localhost:${server.port}/page-${i}</loc></url>`);
+          }
+          res.writeHead(200, { "Content-Type": "application/xml" });
+          res.end(
+            `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${rows.join("")}</urlset>`
+          );
+          return;
+        }
+        pageRequests += 1;
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(
+          '<!DOCTYPE html><html lang="en"><head><title>Budget Page</title></head><body><h1>P</h1></body></html>'
+        );
+      }
+    );
+    const env = {
+      ...process.env,
+      NODE_EXTRA_CA_CERTS: join(TLS_FIXTURES_DIR, "TEST-ONLY-ca-cert.pem"),
+    };
+
+    try {
+      const run = await runAsync(
+        [
+          "technical",
+          "--sitemap",
+          `https://localhost:${server.port}/sitemap.xml`,
+          "--max-urls",
+          "2",
+          "--allow-localhost",
+          "--no-robots",
+        ],
+        { env }
+      );
+      assert.equal(run.status, 0, `stderr: ${run.stderr.slice(0, 800)}`);
+      assert.ok(
+        run.stdout.includes("Extracted 50000 page URLs from sub-sitemaps."),
+        `esperaba el conteo acotado, stdout: ${run.stdout.slice(0, 800)}`
+      );
+      assert.ok(
+        run.stderr.includes("Sub-sitemap page URL limit reached (50000)") &&
+          run.stderr.includes("3 unique page URL(s) omitted"),
+        `esperaba el aviso de truncamiento, stderr: ${run.stderr.slice(0, 800)}`
+      );
+      assert.ok(
+        run.stdout.includes("Limited to 2 URLs (of 50000 allowed)."),
+        "el total combinado (raíz + sub-sitemaps) queda en 50.000 antes de --max-urls"
+      );
+      assert.equal(pageRequests, 2, "--max-urls sigue recortando tras el presupuesto");
+    } finally {
+      server?.server.close();
+    }
+  });
+});
+
 describe("CLI technical — mutual exclusion", () => {
   const htmlFixture = "tests/fixtures/technical/valid-static.html";
 

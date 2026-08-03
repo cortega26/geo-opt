@@ -1811,9 +1811,19 @@ async function handleRemoteTechnical(options) {
       // cross-origin) no puede amplificar el trabajo del CLI (F-11). La
       // lógica vive en src/sitemap.js con fetch inyectable para poder
       // testearse sin red.
+      //
+      // Las URLs retenidas tienen además su propio tope finito (Plan 076):
+      // cada sub-sitemap puede aportar hasta 50.000 URLs (escala del spec),
+      // así que 100 fetches retendrían millones de strings antes de que
+      // --max-urls recorte. El presupuesto es COMPARTIDO entre las URLs
+      // directas del índice y las de los sub-sitemaps: la lista combinada
+      // nunca supera las 50.000 entradas antes de la evaluación de robots.
+      // El collector des-duplica, conserva el orden de primer avistamiento y
+      // advierte (una vez) si omite URLs por el tope.
       const { pageUrls } = await collectSubSitemapPageUrls(parsed.sitemapUrls, {
         fetchFn: (url, opts) => fetchUrl(url, opts),
         fetchOptions: sitemapFetchOptions,
+        maxPageUrls: Math.max(1, 50_000 - urls.length),
         onInfo: format !== "json" ? (m) => console.log(chalk.dim(m)) : undefined,
         onWarn: format !== "json" ? (m) => console.warn(chalk.yellow(m)) : undefined,
       });

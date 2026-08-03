@@ -699,3 +699,221 @@ describe("collectSubSitemapPageUrls — sub-sitemap cap (F-11)", () => {
     assert.equal(fetched, 3);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Plan 076 — tope finito de URLs de página retenidas (independiente del
+// tope de fetches y del --max-urls final del CLI)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
+  function urlsetWith(loc) {
+    return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${loc}</loc></url></urlset>`;
+  }
+
+  function urlsetWithMany(count, prefix = "http://x/page-") {
+    const rows = [];
+    for (let i = 0; i < count; i += 1) {
+      rows.push(`<url><loc>${prefix}${i}.html</loc></url>`);
+    }
+    return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${rows.join("")}</urlset>`;
+  }
+
+  function urlsetWithLocs(locs) {
+    return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs
+      .map((l) => `<url><loc>${l}</loc></url>`)
+      .join("")}</urlset>`;
+  }
+
+  function sitemapIndexWith(locs) {
+    return `<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${locs
+      .map((l) => `<sitemap><loc>${l}</loc></sitemap>`)
+      .join("")}</sitemapindex>`;
+  }
+
+  const urlLimitWarning = (warnings) =>
+    warnings.filter((w) => w.includes("page URL limit reached"));
+
+  it("exact limit keeps every URL without truncation", async () => {
+    const subs = [{ loc: "http://x/a.xml" }, { loc: "http://x/b.xml" }];
+    const pagesBySub = { "a.xml": ["p1", "p2", "p3"], "b.xml": ["p4", "p5", "p6"] };
+    let fetches = 0;
+    const warnings = [];
+    const fetchFn = async (url) => {
+      fetches += 1;
+      const name = url.split("/").pop();
+      return { html: urlsetWithLocs(pagesBySub[name].map((p) => `http://x/${p}.html`)) };
+    };
+
+    const { pageUrls, fetched, truncatedPageUrls, urlLimitReached } =
+      await collectSubSitemapPageUrls(subs, {
+        fetchFn,
+        maxPageUrls: 6,
+        onWarn: (m) => warnings.push(m),
+      });
+
+    assert.equal(fetched, 2, "fetch count y URL count se afirman por separado");
+    assert.equal(pageUrls.length, 6, "límite exacto: todo se retiene");
+    assert.deepEqual(
+      pageUrls,
+      [
+        "http://x/p1.html",
+        "http://x/p2.html",
+        "http://x/p3.html",
+        "http://x/p4.html",
+        "http://x/p5.html",
+        "http://x/p6.html",
+      ],
+      "orden de primer avistamiento"
+    );
+    assert.equal(truncatedPageUrls, 0);
+    assert.equal(urlLimitReached, false);
+    assert.equal(urlLimitWarning(warnings).length, 0, "sin aviso de tope");
+  });
+
+  it("limit+1 truncates the overflow and emits exactly one warning", async () => {
+    const subs = [{ loc: "http://x/a.xml" }, { loc: "http://x/b.xml" }];
+    let fetches = 0;
+    const warnings = [];
+    const fetchFn = async (url) => {
+      fetches += 1;
+      // Prefijos distintos por sub-sitemap: 8 URLs únicas en total.
+      const prefix = url.split("/").pop().replace(".xml", "");
+      return { html: urlsetWithMany(4, `http://x/${prefix}-`) };
+    };
+
+    const { pageUrls, fetched, truncatedPageUrls, urlLimitReached } =
+      await collectSubSitemapPageUrls(subs, {
+        fetchFn,
+        maxPageUrls: 5,
+        onWarn: (m) => warnings.push(m),
+      });
+
+    assert.equal(fetched, 2, "el tope de URLs no toca el tope de fetches");
+    assert.equal(pageUrls.length, 5, "nunca más del tope configurado");
+    assert.equal(truncatedPageUrls, 3, "8 únicas, 5 retenidas, 3 omitidas");
+    assert.equal(urlLimitReached, true);
+    const limitWarnings = urlLimitWarning(warnings);
+    assert.equal(limitWarnings.length, 1, "exactamente un warning de tope");
+    assert.ok(limitWarnings[0].includes("3 unique page URL(s) omitted"), limitWarnings[0]);
+  });
+
+  it("duplicates are deduped and do not consume the budget", async () => {
+    const subs = [{ loc: "http://x/a.xml" }, { loc: "http://x/b.xml" }, { loc: "http://x/c.xml" }];
+    let fetches = 0;
+    const fetchFn = async (url) => {
+      fetches += 1;
+      const name = url.split("/").pop();
+      if (name === "a.xml") {
+        return {
+          html: urlsetWithLocs(["http://x/pa.html", "http://x/pb.html", "http://x/pc.html"]),
+        };
+      }
+      if (name === "b.xml") {
+        return {
+          html: urlsetWithLocs(["http://x/pb.html", "http://x/pc.html", "http://x/pd.html"]),
+        };
+      }
+      return { html: urlsetWith("http://x/pe.html") };
+    };
+
+    const { pageUrls, fetched, truncatedPageUrls } = await collectSubSitemapPageUrls(subs, {
+      fetchFn,
+      maxPageUrls: 4,
+    });
+
+    assert.equal(fetched, 3);
+    assert.deepEqual(
+      pageUrls,
+      ["http://x/pa.html", "http://x/pb.html", "http://x/pc.html", "http://x/pd.html"],
+      "los duplicados no consumen presupuesto ni reordenan"
+    );
+    assert.equal(truncatedPageUrls, 1, "solo la quinta única (pe) se omite");
+  });
+
+  it("nested indexes count leaf page URLs against the same cap", async () => {
+    // Nivel 1: 2 índices; cada uno con 2 leafs; cada leaf con 2 páginas
+    // → 4 leafs × 2 = 8 páginas, con tope 3.
+    const level1 = [{ loc: "http://x/l1-0.xml" }, { loc: "http://x/l1-1.xml" }];
+    let fetches = 0;
+    const warnings = [];
+    const fetchFn = async (url) => {
+      fetches += 1;
+      const m = url.match(/l1-(\d+)/);
+      if (m) {
+        const i = Number(m[1]);
+        return { html: sitemapIndexWith([`http://x/l2-${i}-a.xml`, `http://x/l2-${i}-b.xml`]) };
+      }
+      return { html: urlsetWithMany(2, `http://x/${url.match(/l2-(\d+-\w)/)[1]}-`) };
+    };
+
+    const { pageUrls, fetched, truncatedPageUrls } = await collectSubSitemapPageUrls(level1, {
+      fetchFn,
+      maxPageUrls: 3,
+      onWarn: (m) => warnings.push(m),
+    });
+
+    assert.equal(fetched, 6, "2 índices + 4 leafs");
+    assert.equal(pageUrls.length, 3, "tope aplicado a las hojas de la anidación");
+    assert.equal(truncatedPageUrls, 5, "8 páginas únicas − 3 retenidas");
+    assert.ok(
+      warnings.some((w) => w.includes("Nested sitemap index")),
+      "aviso de anidación intacto"
+    );
+  });
+
+  it("default cap is finite (50,000) and truncation is reported", async () => {
+    // Sin maxPageUrls: el default de 50.000 acota incluso un sub-sitemap con
+    // 50.001 URLs (el parseador solo advierte, no trunca, por sí mismo).
+    const subs = [{ loc: "http://x/big.xml" }];
+    let fetches = 0;
+    const warnings = [];
+    const fetchFn = async () => {
+      fetches += 1;
+      return { html: urlsetWithMany(50_001) };
+    };
+
+    const { pageUrls, fetched, truncatedPageUrls, urlLimitReached } =
+      await collectSubSitemapPageUrls(subs, { fetchFn, onWarn: (m) => warnings.push(m) });
+
+    assert.equal(fetched, 1);
+    assert.equal(pageUrls.length, 50_000, "el default de 50.000 es un tope real");
+    assert.equal(truncatedPageUrls, 1);
+    assert.equal(urlLimitReached, true);
+    assert.ok(
+      urlLimitWarning(warnings).some((w) => w.includes("1 unique page URL(s) omitted")),
+      "la omisión nunca es silenciosa"
+    );
+  });
+
+  it("no-limit-hit path keeps everything under the default", async () => {
+    const subs = Array.from({ length: 3 }, (_, i) => ({ loc: `http://x/sub-${i}.xml` }));
+    let fetches = 0;
+    const warnings = [];
+    const fetchFn = async (url) => {
+      fetches += 1;
+      const n = url.match(/sub-(\d+)/)[1];
+      return { html: urlsetWithMany(5, `http://x/s${n}-`) };
+    };
+
+    const { pageUrls, fetched, truncatedPageUrls, urlLimitReached } =
+      await collectSubSitemapPageUrls(subs, { fetchFn, onWarn: (m) => warnings.push(m) });
+
+    assert.equal(fetched, 3);
+    assert.equal(pageUrls.length, 15, "15 únicas, muy por debajo del default");
+    assert.equal(truncatedPageUrls, 0);
+    assert.equal(urlLimitReached, false);
+    assert.equal(urlLimitWarning(warnings).length, 0);
+  });
+
+  it("invalid maxPageUrls is rejected", async () => {
+    const subs = [{ loc: "http://x/sub-0.xml" }];
+    const fetchFn = async () => ({ html: urlsetWith("http://x/page.html") });
+    for (const bad of [0, -1, 1.5, NaN, "5"]) {
+      await assert.rejects(
+        collectSubSitemapPageUrls(subs, { fetchFn, maxPageUrls: bad }),
+        /maxPageUrls must be a positive integer/,
+        `maxPageUrls=${bad} debe rechazarse`
+      );
+    }
+  });
+});

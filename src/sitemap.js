@@ -558,27 +558,46 @@ function _renderSitemapIndex(entries) {
  *
  * El fetch es inyectable para poder testear la lógica del tope sin red.
  *
+ * Las URLs de página retenidas tienen su PROPIO tope independiente del de
+ * fetches (`maxPageUrls`): cada sub-sitemap puede aportar hasta 50.000 URLs
+ * (escala del spec), así que 100 fetches podrían retener millones de strings
+ * antes de que el CLI aplique `--max-urls`. La colección se des-duplica y se
+ * trunca al tope conservando el orden de primer avistamiento; la omisión
+ * nunca es silenciosa (se emite exactamente un warning) y queda expuesta
+ * en el resultado vía `truncatedPageUrls`/`urlLimitReached` (Plan 076).
+ *
  * @param {Array<{loc: string}>} sitemapUrls — sub-sitemaps del índice raíz
  * @param {object} deps
  * @param {(url: string, options?: object) => Promise<{html: string}>} deps.fetchFn
  * @param {object} [deps.fetchOptions] — opciones pasadas a fetchFn
  * @param {number} [deps.maxFetches=100] — tope total de fetches (todos los niveles)
+ * @param {number} [deps.maxPageUrls=50000] — tope de URLs de página retenidas
+ *   (todos los niveles, tras des-duplicar); positivo entero, escala del spec
+ *   de sitemaps. Independiente de maxFetches y del `--max-urls` final.
  * @param {(msg: string) => void} [deps.onInfo] — progreso (solo si aplica)
  * @param {(msg: string) => void} [deps.onWarn] — warnings y aviso de tope
- * @returns {Promise<{ pageUrls: string[], fetched: number, skipped: number }>}
+ * @returns {Promise<{ pageUrls: string[], fetched: number, skipped: number,
+ *   truncatedPageUrls: number, urlLimitReached: boolean }>}
  */
 export async function collectSubSitemapPageUrls(sitemapUrls, deps) {
   const {
     fetchFn,
     fetchOptions = {},
     maxFetches = 100,
+    maxPageUrls = 50_000,
     onInfo = () => {},
     onWarn = () => {},
   } = deps;
 
+  if (!Number.isInteger(maxPageUrls) || maxPageUrls < 1) {
+    throw new Error(`maxPageUrls must be a positive integer, got ${maxPageUrls}`);
+  }
+
   const pageUrls = [];
+  const seen = new Set();
   const queue = [...sitemapUrls];
   let fetched = 0;
+  let truncatedPageUrls = 0;
 
   while (queue.length > 0 && fetched < maxFetches) {
     const sub = queue.shift();
@@ -600,7 +619,19 @@ export async function collectSubSitemapPageUrls(sitemapUrls, deps) {
         );
         queue.push(...parsed.sitemapUrls);
       } else {
-        pageUrls.push(...parsed.urls.map((u) => u.loc));
+        // Des-duplicar mientras se recolecta: los duplicados no consumen el
+        // presupuesto ni trabajo aguas abajo, y se preserva el orden de
+        // primer avistamiento. Al alcanzar el tope se deja de acumular y se
+        // cuenta lo omitido (Plan 076).
+        for (const u of parsed.urls) {
+          if (seen.has(u.loc)) continue;
+          seen.add(u.loc);
+          if (pageUrls.length < maxPageUrls) {
+            pageUrls.push(u.loc);
+          } else {
+            truncatedPageUrls += 1;
+          }
+        }
       }
     } catch (e) {
       onWarn(`    Failed to fetch sub-sitemap ${sub.loc}: ${e.message}`);
@@ -611,5 +642,10 @@ export async function collectSubSitemapPageUrls(sitemapUrls, deps) {
   if (skipped > 0) {
     onWarn(`  Sub-sitemap fetch limit reached (${maxFetches}); ${skipped} sub-sitemap(s) skipped.`);
   }
-  return { pageUrls, fetched, skipped };
+  if (truncatedPageUrls > 0) {
+    onWarn(
+      `  Sub-sitemap page URL limit reached (${maxPageUrls}); ${truncatedPageUrls} unique page URL(s) omitted (${pageUrls.length} retained in first-seen order).`
+    );
+  }
+  return { pageUrls, fetched, skipped, truncatedPageUrls, urlLimitReached: truncatedPageUrls > 0 };
 }
