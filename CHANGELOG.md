@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.8](https://github.com/cortega26/geo-opt/compare/v2.3.7...v2.3.8) (2026-08-03)
+
+
+### Bug Fixes
+
+* **fetcher:** harden shared-deadline edges (coverage, timer cleanup) ([0a7844b](https://github.com/cortega26/geo-opt/commit/0a7844b00913934c5ce56afd8cb5b5264113b2b6))
+* **fetcher:** share timeout across redirects ([7f29992](https://github.com/cortega26/geo-opt/commit/7f29992d8a9dc0e256d376f19daaeb9d8ba68809))
+
 ## [2.3.7](https://github.com/cortega26/geo-opt/compare/v2.3.6...v2.3.7) (2026-08-03)
 
 
