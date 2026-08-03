@@ -883,10 +883,13 @@ describe("fetchUrl — timeouts", () => {
   });
 
   it("timeout total: presupuesto agotado antes de entrar lanza de inmediato", async () => {
-    // Un presupuesto de 1ms se consume en la adquisición del rate-limiter:
-    // el check de entrada (remaining <= 0) lanza SIN armar el timer ni
-    // conectar. La aserción aguanta ambos caminos (throw de entrada o timer
-    // de 1ms): el mensaje es el mismo y elapsed queda por debajo de 50ms.
+    // timeoutMs: 0 hace el check de entrada determinista: deadlineMs =
+    // Date.now() + 0, así que remaining <= 0 a la entrada siempre (mismo
+    // milisegundo o uno pasado); el check lanza ANTES de armar el timer ni
+    // iniciar conexión alguna. El assert sockets.size === 0 fija la
+    // semántica "presupuesto agotado no toca la red" (relevante para
+    // SSRF/retención de recursos), que el assert de elapsed solo no puede
+    // distinguir de un abort por timer de 1ms armado.
     const s = await startServer(() => {
       // Nunca responde — el abort debe venir del presupuesto total.
     });
@@ -894,11 +897,12 @@ describe("fetchUrl — timeouts", () => {
     try {
       const started = Date.now();
       await assert.rejects(
-        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: 1 }),
-        /Request total timeout after 1ms/
+        () => fetchUrl(`${s.baseUrl}/hang`, { allowLocalhost: true, timeoutMs: 0 }),
+        /Request total timeout after 0ms/
       );
       const elapsed = Date.now() - started;
       assert.ok(elapsed < 50, `timeout total tardó demasiado (${elapsed}ms)`);
+      assert.equal(s.sockets.size, 0, "el check de entrada no debe iniciar conexiones");
     } finally {
       await stopServer(s);
     }
