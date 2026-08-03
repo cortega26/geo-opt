@@ -14,6 +14,30 @@
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md
 - **Category**: security / tests
 - **Planned at**: commit `888d3e7`, 2026-08-02
+- **Executed at**: commits `ff4fdbd` + `56d3464` + `afa7ebd` + `e9257c3`
+  (2026-08-03) on branch `advisor/074-test-https-pinning`, approved by
+  reviewer, squash-merged to main as `e6e418d` (2026-08-03). Notes: test-only CA/certs fixtures under
+  `tests/fixtures/tls/` (TEST-ONLY-*, expiry 2036-07-31, regeneration
+  documented; never trusted outside the NODE_EXTRA_CA_CERTS child process).
+  Positive case runs the real `fetchUrl` in a child with the CA trusted and
+  asserts Host header, SNI, and socket target 127.0.0.1 separately; negative
+  hostname-mismatch runs WITH the CA trusted to isolate the altname
+  dimension (ERR_TLS_CERT_ALTNAME_INVALID); untrusted self-signed fails
+  closed in the main process; source-contract test pins rejectUnauthorized:
+  true, servername: hostname, host: resolvedIp, and resolution-before-agent
+  ordering. No production change; src/fetcher.js untouched. Reviewer
+  revision: the concurrent-build read-during-write window (EACCES in this
+  sandbox, partial content in CI) was still flaking — the build lock
+  serializes builds, not test reads; `readDist` and the staging `cpSync` now
+  retry on EACCES/ENOENT and on content violating the build's deterministic
+  invariants (verified: the 4x `npm test` loop that reproduced the flake at
+  1/4 now passes 4/4). Reviewer round 2 (`afa7ebd`): fixtures README
+  generation date corrected to 2026-08-03 (verified against the PEM
+  notBefore). Reviewer round 3 (`e9257c3`): the completeness predicate's
+  fallback only required non-empty content, leaving a partial-read window
+  for `dist/bin/cli.js`/`dist/index.js`; the generic predicate now requires
+  the snapshot to end with `}` (verified both built files end with `}`);
+  3x `npm test` + gate green after.
 
 ## Why this matters
 
