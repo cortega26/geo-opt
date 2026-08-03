@@ -26,6 +26,7 @@ Documentation ownership, status meanings and reconciliation rules live in
 - Update this index and the plan status in the same change that completes,
   blocks, defers or supersedes work.
 - `DONE` plans move to `archive/`; partial and deferred plans remain active.
+  `npm run check` enforces this via scripts/check-plan-archive.js.
 - No public npm release, future scoring-default change, or Pro implementation
   may cross its named gate.
 
@@ -124,7 +125,7 @@ AI discoverability — not just a score, but fixes.
 
 | Plan | Type | Outcome | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|---|
-| [022](022-calibrate-profiled-audit-v2.md) | Program slice | Profile-aware v2 model (default switch: v2 is now default, migration note and deprecation warning added) | P1 | L | T0 done | DONE |
+| [022](archive/022-calibrate-profiled-audit-v2.md) | Program slice | Profile-aware v2 model (default switch: v2 is now default, migration note and deprecation warning added) | P1 | L | T0 done | DONE |
 | [024](archive/024-align-structured-data-semantics.md) | Execution | Accurate structured-data semantics | P1 | M | 030, 031, 034 | DONE |
 | [025](archive/025-harden-llms-artifacts.md) | Execution | Proposal-correct, curated artifacts | P2 | M | 024 | DONE |
 | [023](archive/023-add-technical-discovery-audit.md) | Program slice | Phase 1 + 2 done (CLI technical, parseSitemapXml, remote fetch with SSRF guards per security review 2026-06-28) | P2 | L | T0 | DONE |

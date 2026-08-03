@@ -55,6 +55,9 @@ jobs:
       - name: Test-count badge
         run: node scripts/check-test-count.js
 
+      - name: Plan archive gate
+        run: node scripts/check-plan-archive.js
+
       - name: Coverage badge
         run: npm run test:coverage && node scripts/check-coverage.js
 

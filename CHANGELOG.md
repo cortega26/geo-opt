@@ -16,7 +16,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
-- **fix:** CLI suggests --allow-localhost for bracketed IPv6-literal URLs (was --allow-http, which does not unblock loopback)
+- **docs:** enforce the DONE-to-`plans/archive/` governance rule via scripts/check-plan-archive.js in `npm run check` and CI, covered by tests/plan-archive.test.js (plan 022 archived)
 - **fix:** concurrent builds over the shared dist/ are serialized via an exclusive lock (was corrupting dist/ under parallel test runners — EACCES/half-written artifacts)
 - **fix:** fetcher connects IPv6-literal URLs via the vetted address (was getaddrinfo ENOTFOUND on Node 22+ because the bracketed hostname leaked into the request)
 - **test:** bracket IPv6 hosts in fetcher test server URLs (Plan 073)
