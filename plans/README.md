@@ -1,7 +1,7 @@
 # Implementation roadmap
 
 **Status:** canonical execution index  
-**Last reconciled:** 2026-08-03 — reconcile at `0006bb1`. Plans 069–075 verified DONE (spot-checked at HEAD: GHSA keying, injected clock, safe argv wrapper, aggregate `effectiveScore` semantics, hermetic fetcher suite, TLS pinning fixtures, `checkHopPolicy`/`ERR_HOP_POLICY`). Plan 076 executed, APPROVED, and squash-merged to main as `aa7738a` (page-URL retention hard-capped at 50,000 unique URLs with dedupe, first-seen ordering, one truncation warning, and shared root+child budget before robots evaluation; 818/155 tests green). All TODOs 076–091 re-verified at HEAD and their "Planned at" refreshed to `0006bb1`; no finding disappeared. Notable refreshes: 085's top v2 band label was already fixed in passing (F-06) — 3 of 4 bands still predict; 086's lint baseline moved to 10 errors in 5 files (Plan 069 added `check-audit.test.js`; 073/075 grew fetcher/sitemap tests) and was re-captured. Prior: 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
+**Last reconciled:** 2026-08-03 — reconcile at `0006bb1`. Plans 069–075 verified DONE (spot-checked at HEAD: GHSA keying, injected clock, safe argv wrapper, aggregate `effectiveScore` semantics, hermetic fetcher suite, TLS pinning fixtures, `checkHopPolicy`/`ERR_HOP_POLICY`). Plan 076 executed, APPROVED, and squash-merged to main as `aa7738a` (page-URL retention hard-capped at 50,000 unique URLs with dedupe, first-seen ordering, one truncation warning, and shared root+child budget before robots evaluation; 818/155 tests green). Plans 077–093 executed, APPROVED, and squash-merged to main (077 `7f29992`: one shared deadline covering DNS/connect, headers, body, and every redirect hop; 092 `0a7844b`: adversarial-audit closure — entry-check test, timer-abort bounds, request-creation timer cleanup; 093 `17708ed`: entry-check "no connection" semantics pinned with `timeoutMs: 0` + sockets assert; 823/155 tests green). Audit notes: DNS abortability rejected with empirical evidence (recorded below); the repo's changelog policy requires a CHANGELOG.md bullet for any `tests/*.js` commit — future test plans must scope it in from the start. All TODOs 076–091 re-verified at HEAD and their "Planned at" refreshed to `0006bb1`; no finding disappeared. Notable refreshes: 085's top v2 band label was already fixed in passing (F-06) — 3 of 4 bands still predict; 086's lint baseline moved to 10 errors in 5 files (Plan 069 added `check-audit.test.js`; 073/075 grew fetcher/sitemap tests) and was re-captured. Prior: 2026-08-02 — deep advisor audit at `888d3e7` documented every selected net-positive finding as Plans 069–091. Plans 069–072 restore green gates and the CI entry path before Plan 059 may start; 073–091 are ordered technical hardening, contract, performance, and documentation handoffs. Plans 065–067 remain DONE; their static contracts did not cover the newly verified action execution bug, aggregate-score semantics, or repeated-suite cost. Plan 068 remains DEFERRED. The Pro public-launch viability dossier does not supersede plan 018 until all four review parts receive GO.
 **Strategy update:** 2026-07-22 — the active motion is a capped, product-led 90-day validation for a narrow local CI/pre-merge job; the former LinkedIn-led G1, public Pro, service funnel, and speculative feature sequence are historical or conditional only.
 **Architecture gate:** T0 COMPLETE (029–034 done) ✓  
 **Quality gate:** Q0 GO (035–037 done, 2026-06-28) ✓  
@@ -424,6 +424,13 @@ evidence):
   demand evidence.
 - **GitHub Action end-to-end smoke test in a scratch public repo**:
   deferred to post-065 execution; out of scope for the plan itself.
+- **Aborting DNS resolution via AbortSignal** (post-077 audit, 2026-08-03):
+  REJECTED with empirical evidence — `dns.promises.resolve4(hostname,
+  { signal })` ignores the signal and `dns.promises.lookup` resolves
+  normally even with an already-aborted signal (verified on Node v24.15.0
+  for `localhost` and `example.com`). Node's name-resolution APIs do not
+  honor AbortSignal in this runtime; closing the Plan 077 STOP #1 gap would
+  need a worker-process resolver (disproportionate). See plan 092.
 
 ### Advisor deep audit — 2026-08-02 (implementation handoffs 069–091)
 
@@ -444,7 +451,7 @@ independent work.
 | [074](archive/074-cover-https-ip-pinning.md) | Deterministically cover TLS hostname verification and vetted-IP pinning | security/tests | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `e6e418d`) |
 | [075](archive/075-enforce-remote-hop-policy.md) | Apply HTTPS/origin policy to roots, redirects, robots, sitemaps, and pages | security | P1 | L | 073, 074 | DONE (2026-08-03; squash-merged to main as `2ab56ed`) |
 | [076](archive/076-bound-sitemap-url-accumulation.md) | Bound total retained sitemap page URLs | security/perf | P1 | M | 075 | DONE (2026-08-03; squash-merged to main as `aa7738a`) |
-| [077](077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | TODO |
+| [077](archive/077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `7f29992`) |
 | [078](078-fix-robots-group-and-query-matching.md) | Combine equally specific robots groups and include query strings | bug | P2 | M | 073 | TODO |
 | [079](079-honor-fetcher-user-agent.md) | Honor and validate the public fetcher user-agent option | bug/api | P2 | S | 073 | TODO |
 | [080](080-redact-source-content-from-summaries.md) | Remove audited source bodies from serialized summaries | privacy/bug | P1 | S | — | TODO |
@@ -459,6 +466,8 @@ independent work.
 | [089](089-prepare-v2-documents-once.md) | Reuse one prepared document across v2 profile/observation/scoring | perf/architecture | P3 | L | 088 | TODO |
 | [090](090-render-python-audits-without-rescoring.md) | Render stored Python reports instead of rereading/rescoring | perf/architecture | P3 | M | 084 | TODO |
 | [091](091-correct-default-model-documentation.md) | Make normative current docs consistently name v2 as default | docs | P2 | S | 085 | TODO |
+| [092](archive/092-harden-shared-deadline-edges.md) | Close audit gaps of 077: entry-check test, timer-abort test bounds, request-creation timer cleanup | tests/robustness | P2 | S | 077 (DONE `7f29992`) | DONE (2026-08-03; squash-merged to main as `0a7844b`) |
+| [093](archive/093-pin-entry-check-no-connection-semantics.md) | Pin the entry-check test's "no connection" semantics with timeoutMs 0 + sockets assert | tests | P3 | S | 092 (DONE `0a7844b`) | DONE (2026-08-03; squash-merged to main as `17708ed`) |
 
 Recommended execution waves:
 
