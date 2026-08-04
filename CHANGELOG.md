@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.10](https://github.com/cortega26/geo-opt/compare/v2.3.9...v2.3.10) (2026-08-04)
+
+
+### Bug Fixes
+
+* **fetcher:** honor custom user agent (Plan 079) ([428372b](https://github.com/cortega26/geo-opt/commit/428372ba95d1fc4ad0cd7a840a5942a5663a578d))
+* **fetcher:** propagate UA validation and key robots cache (Plan 096) ([cee5383](https://github.com/cortega26/geo-opt/commit/cee538324110f8cf4b21994682dd7ae5202a138f))
+
 ## [2.3.9](https://github.com/cortega26/geo-opt/compare/v2.3.8...v2.3.9) (2026-08-04)
 
 
