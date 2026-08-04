@@ -2245,6 +2245,53 @@ Disallow: /other
   }
 });
 
+test("all-empty User-agent comma lists create no ghost robots group (Plan 095)", () => {
+  for (const ghost of ["User-agent: ,", "User-agent: , ,", "User-agent:   ,  "]) {
+    const groups = parseRobotsGroups(`${ghost}\nDisallow: /x\nUser-agent: GPTBot\nDisallow: /y\n`);
+    assert.deepStrictEqual(
+      groups.map((g) => g.agents),
+      [["GPTBot"]],
+      `"${ghost}" must not create an empty-agents group`
+    );
+    assert.strictEqual(groups[0].rules.length, 1, "the ghost line's rule is not captured");
+    assert.strictEqual(groups[0].rules[0].path, "/y", "only the valid group's rule survives");
+    assert.strictEqual(
+      checkRobotsRule("https://x.com/x", groups, "GPTBot").allowed,
+      true,
+      "the swallowed rule never blocks"
+    );
+    assert.strictEqual(
+      checkRobotsRule("https://x.com/y/z", groups, "GPTBot").allowed,
+      false,
+      "the following valid group still blocks"
+    );
+  }
+});
+
+test("CRLF line endings and a UTF-8 BOM parse identically in robots input (pinned, Plan 095)", () => {
+  const crlf = parseRobotsGroups("User-agent: GPTBot\r\nDisallow: /private\r\n");
+  assert.deepStrictEqual(
+    crlf.map((g) => g.agents),
+    [["GPTBot"]],
+    "CRLF input yields one GPTBot group"
+  );
+  assert.strictEqual(crlf[0].rules.length, 1);
+  assert.strictEqual(crlf[0].rules[0].path, "/private");
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/private/x", crlf, "GPTBot").allowed,
+    false,
+    "CRLF input blocks via the same rules"
+  );
+
+  const bom = parseRobotsGroups("﻿User-agent: GPTBot\nDisallow: /private\n");
+  assert.deepStrictEqual(bom, crlf, "BOM prefix parses to identical groups");
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/private/x", bom, "GPTBot").allowed,
+    false,
+    "BOM input blocks via the same rules"
+  );
+});
+
 test("comment-only lines do not end a group; blank lines still do", () => {
   const withComment = `User-agent: GPTBot
 # maintenance note

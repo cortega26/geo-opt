@@ -452,7 +452,7 @@ independent work.
 | [075](archive/075-enforce-remote-hop-policy.md) | Apply HTTPS/origin policy to roots, redirects, robots, sitemaps, and pages | security | P1 | L | 073, 074 | DONE (2026-08-03; squash-merged to main as `2ab56ed`) |
 | [076](archive/076-bound-sitemap-url-accumulation.md) | Bound total retained sitemap page URLs | security/perf | P1 | M | 075 | DONE (2026-08-03; squash-merged to main as `aa7738a`) |
 | [077](archive/077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `7f29992`) |
-| [078](078-fix-robots-group-and-query-matching.md) | Combine equally specific robots groups and include query strings | bug | P2 | M | 073 | TODO |
+| [078](archive/078-fix-robots-group-and-query-matching.md) | Combine equally specific robots groups and include query strings | bug | P2 | M | 073 | DONE (2026-08-03; committed as `674b1bc` on `advisor/078-robots-matching`; merge pending) |
 | [079](079-honor-fetcher-user-agent.md) | Honor and validate the public fetcher user-agent option | bug/api | P2 | S | 073 | TODO |
 | [080](080-redact-source-content-from-summaries.md) | Remove audited source bodies from serialized summaries | privacy/bug | P1 | S | — | TODO |
 | [081](081-reconcile-public-types-and-exports.md) | Synchronize runtime exports, declarations, profiles, and batch signatures | api/types | P1 | M | — | TODO |
@@ -468,6 +468,8 @@ independent work.
 | [091](091-correct-default-model-documentation.md) | Make normative current docs consistently name v2 as default | docs | P2 | S | 085 | TODO |
 | [092](archive/092-harden-shared-deadline-edges.md) | Close audit gaps of 077: entry-check test, timer-abort test bounds, request-creation timer cleanup | tests/robustness | P2 | S | 077 (DONE `7f29992`) | DONE (2026-08-03; squash-merged to main as `0a7844b`) |
 | [093](archive/093-pin-entry-check-no-connection-semantics.md) | Pin the entry-check test's "no connection" semantics with timeoutMs 0 + sockets assert | tests | P3 | S | 092 (DONE `0a7844b`) | DONE (2026-08-03; squash-merged to main as `17708ed`) |
+| [094](archive/094-close-robots-parser-and-parity-gaps.md) | Close robots parser and Node/Python parity gaps (audit follow-up of 078: comma agents, comment group-breaks, Python single-group semantics, matchedGroup case dedup, H5/H6 pins) | bug/parity | P2 | M | 078 (DONE `674b1bc`) | DONE (2026-08-03; committed as `01cf260` on `advisor/094-robots-parser-parity`; merge pending) |
+| [095](archive/095-close-robots-ghost-groups-and-cli-parity.md) | Close robots ghost groups and pin CLI parity (audit follow-up of 094: empty comma lists create no group, CRLF/BOM pins, Node↔Python CLI JSON parity pin) | bug/parity/tests | P3 | S | 094 (DONE `01cf260`) | DONE (2026-08-03; committed as `51eeedf` on `advisor/095-robots-ghost-groups`; merge pending) |
 
 Recommended execution waves:
 

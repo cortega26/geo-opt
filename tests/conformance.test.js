@@ -287,6 +287,17 @@ describe("Python CLI smoke tests (tier: compatible)", () => {
     });
   }
 
+  // Local mirror of py() for the Node CLI (Plan 095): the module-level
+  // nodeAudit() helper is audit-command-specific and cannot run robots.
+  function node(args, opts = {}) {
+    return execFileSync("node", [NODE_CLI, ...args], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: "pipe",
+      ...opts,
+    });
+  }
+
   it("robots audit with a temp file exits 0", () => {
     // Create a minimal robots.txt for audit
     const tmpFile = path.join(REPO_ROOT, `conformance-robots-${Date.now()}.txt`);
@@ -326,6 +337,54 @@ describe("Python CLI smoke tests (tier: compatible)", () => {
         "the second group's root Disallow must apply through the combined decision"
       );
       assert.deepEqual(gpt.matchedGroup, ["GPTBot"]);
+    } finally {
+      execFileSync("rm", ["-f", tmpFile], { stdio: "ignore" });
+    }
+  });
+
+  it("robots audit CLI JSON parity is field-by-field identical (Plan 095)", () => {
+    // Comma list + mid-group comment + two blank-separated GPTBot groups +
+    // wildcard: both runtimes must emit identical top-level keys and
+    // identical allowed/matchedGroup/matchedRule for every entry.
+    const tmpFile = path.join(REPO_ROOT, `conformance-robots-parity-${Date.now()}.txt`);
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        `printf 'User-agent: GPTBot, Googlebot\\n# mid-group comment\\nDisallow: /private\\n\\nUser-agent: GPTBot\\nDisallow: /restricted\\n\\nUser-agent: *\\nAllow: /' > ${tmpFile}`,
+      ],
+      { cwd: REPO_ROOT }
+    );
+    try {
+      const nodeParsed = JSON.parse(node(["robots", "audit", tmpFile, "-f", "json"]));
+      const pyParsed = JSON.parse(py(["robots", "audit", tmpFile, "--format", "json"]));
+      assert.deepEqual(
+        Object.keys(nodeParsed).sort(),
+        ["agents", "path", "registryVersion", "wildcard"],
+        "Node top-level key set"
+      );
+      assert.deepEqual(
+        Object.keys(pyParsed).sort(),
+        ["agents", "path", "registryVersion", "wildcard"],
+        "Python top-level key set"
+      );
+      const nodeGpt = nodeParsed.agents.find((entry) => entry.token === "GPTBot");
+      const pyGpt = pyParsed.agents.find((entry) => entry.token === "GPTBot");
+      assert.ok(nodeGpt && pyGpt, "GPTBot entry present in both runtimes");
+      assert.deepEqual(
+        [nodeGpt.allowed, nodeGpt.matchedGroup, nodeGpt.matchedRule],
+        [pyGpt.allowed, pyGpt.matchedGroup, pyGpt.matchedRule],
+        "GPTBot allowed/matchedGroup/matchedRule parity"
+      );
+      assert.deepEqual(
+        [
+          nodeParsed.wildcard.allowed,
+          nodeParsed.wildcard.matchedGroup,
+          nodeParsed.wildcard.matchedRule,
+        ],
+        [pyParsed.wildcard.allowed, pyParsed.wildcard.matchedGroup, pyParsed.wildcard.matchedRule],
+        "wildcard allowed/matchedGroup/matchedRule parity"
+      );
     } finally {
       execFileSync("rm", ["-f", tmpFile], { stdio: "ignore" });
     }

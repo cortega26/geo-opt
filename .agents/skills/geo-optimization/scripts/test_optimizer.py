@@ -137,6 +137,38 @@ class TestGeoOptimizer(unittest.TestCase):
         )
         self.assertEqual(spaced[0]["agents"], ["Googlebot", "ClaudeBot"])
 
+    def test_parse_robots_groups_all_empty_agent_lists_create_no_ghost_group(self):
+        for ghost in ["User-agent: ,", "User-agent: , ,", "User-agent:   ,  "]:
+            groups = parse_robots_groups(
+                f"{ghost}\nDisallow: /x\nUser-agent: GPTBot\nDisallow: /y\n"
+            )
+            self.assertEqual(len(groups), 1, f"`{ghost}` must not create an empty-agents group")
+            self.assertEqual(groups[0]["agents"], ["GPTBot"])
+            self.assertEqual(len(groups[0]["rules"]), 1, "the ghost line's rule is not captured")
+            self.assertEqual(groups[0]["rules"][0]["path"], "/y")
+
+    def test_parse_robots_groups_crlf_and_bom(self):
+        crlf = parse_robots_groups("User-agent: GPTBot\r\nDisallow: /private\r\n")
+        self.assertEqual(len(crlf), 1)
+        self.assertEqual(crlf[0]["agents"], ["GPTBot"])
+        self.assertEqual(len(crlf[0]["rules"]), 1)
+        self.assertEqual(crlf[0]["rules"][0]["path"], "/private")
+
+        bom = parse_robots_groups("﻿User-agent: GPTBot\nDisallow: /private\n")
+        self.assertEqual(bom, crlf, "BOM prefix parses to identical groups")
+
+    def test_check_robots_bom_prefixed_file_still_blocks(self):
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            f.write("﻿User-agent: GPTBot\nDisallow: /\n")
+            tmp_path = f.name
+        try:
+            result = check_robots(tmp_path, output_format="json")
+            gpt = next(e for e in result["agents"] if e["token"] == "GPTBot")
+            self.assertFalse(gpt["allowed"], "BOM-prefixed file must still block")
+            self.assertEqual(gpt["matchedRule"]["path"], "/")
+        finally:
+            os.remove(tmp_path)
+
     def test_parse_robots_groups_keeps_groups_across_comment_lines(self):
         kept = parse_robots_groups(
             "User-agent: GPTBot\n# nota\nDisallow: /private\n"

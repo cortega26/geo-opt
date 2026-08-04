@@ -1817,6 +1817,8 @@ def parse_robots_groups(content):
     groups = []
     current = None
 
+    content = content.lstrip("﻿")  # a leading UTF-8 BOM must not hide the first line
+
     for raw_line in content.split("\n"):
         stripped = raw_line.strip()
         without_comment = re.sub(r"#.*", "", stripped).strip()
@@ -1828,15 +1830,18 @@ def parse_robots_groups(content):
 
         agent_match = re.match(r"^User-agent:\s*(.+)$", raw_line, re.IGNORECASE)
         if agent_match:
+            # Google's de-facto spec permits comma-separated product tokens on
+            # one line; each token is a separate agent (RFC 9309 ABNF only
+            # covers one token per line). An all-empty list (e.g.
+            # "User-agent: ,") is an invalid line: it must not create a ghost
+            # group that swallows rules.
+            tokens = [t.strip() for t in agent_match.group(1).split(",") if t.strip()]
+            if not tokens:
+                continue
             if current is None or current["rules"]:
                 current = {"agents": [], "rules": []}
                 groups.append(current)
-            # Google's de-facto spec permits comma-separated product tokens on
-            # one line; each token is a separate agent (RFC 9309 ABNF only
-            # covers one token per line). A trailing comma drops the empty
-            # last token.
-            for token in [t.strip() for t in agent_match.group(1).split(",") if t.strip()]:
-                current["agents"].append(token)
+            current["agents"].extend(tokens)
             continue
 
         rule_match = re.match(r"^(Allow|Disallow):\s*(.*)$", raw_line, re.IGNORECASE)
@@ -1985,7 +1990,7 @@ def check_robots(robots_path, output_format="text"):
         sys.exit(1)
         
     try:
-        with open(robots_path, 'r', encoding='utf-8', errors='replace') as f:
+        with open(robots_path, 'r', encoding='utf-8-sig', errors='replace') as f:
             content = f.read()
     except Exception as e:
         print(f"Error: Failed to read robots.txt: {e}", file=sys.stderr)

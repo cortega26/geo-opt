@@ -156,19 +156,22 @@ export function parseRobotsGroups(content) {
 
     const agentMatch = rawLine.match(/^User-agent:\s*(.+)$/i);
     if (agentMatch) {
+      // Google's de-facto spec permits comma-separated product tokens on one
+      // line; each token is a separate agent (RFC 9309 ABNF only covers one
+      // token per line). An all-empty list (e.g. "User-agent: ,") is an
+      // invalid line: it must not create a ghost group that swallows rules.
+      const tokens = agentMatch[1]
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (tokens.length === 0) {
+        continue;
+      }
       if (!current || current.rules.length > 0) {
         current = { agents: [], rules: [] };
         groups.push(current);
       }
-      // Google's de-facto spec permits comma-separated product tokens on one
-      // line; each token is a separate agent (RFC 9309 ABNF only covers one
-      // token per line). A trailing comma drops the empty last token.
-      for (const token of agentMatch[1]
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean)) {
-        current.agents.push(token);
-      }
+      current.agents.push(...tokens);
       continue;
     }
 
