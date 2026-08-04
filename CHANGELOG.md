@@ -40,6 +40,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- **fix:** `fetchUrl`/`fetchRobotsTxt` now honor the public `userAgent` option on every request: redirect hops inherit it, omitting the option keeps the default user agent, an empty string falls back to the default, and CR/LF values are rejected with a clear error before any network I/O (header-injection guard) (Plan 079)
+- **test:** pin the default/custom user agent, redirect-hop preservation, robots fetch, and CR/LF rejection with zero requests (Plan 079)
 - **fix:** `User-agent:` lines with comma-separated tokens now split into separate agents (Google de-facto spec), comment-only lines no longer end a group (dropping following rules), and the Python port matches Node's combined-group semantics — equally specific groups merge their rules, `matchedGroup` dedup is case-insensitive in both runtimes, and percent-encoding byte-for-byte matching plus `$`-anchored query exclusion are pinned by tests (Plan 094)
 - **test:** pin comma-agent splitting, comment-line group continuity, Node↔Python combined-group parity, case-insensitive `matchedGroup` dedup, percent-encoding byte-for-byte matching and `$`-anchor query exclusion (Plan 094)
 - **fix:** a `User-agent:` line whose comma-separated token list is entirely empty (e.g. `User-agent: ,`) no longer creates a ghost group with zero agents that silently swallows the following rules; the Python port strips a leading UTF-8 BOM in `parse_robots_groups` and reads robots files as `utf-8-sig`, so BOM-prefixed files audit the same as plain ones (Plan 095)

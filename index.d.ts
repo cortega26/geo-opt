@@ -953,7 +953,7 @@ declare module "geo-opt" {
     timeoutMs?: number;
     /** Maximum response body size in bytes (default: 2_097_152). */
     maxSize?: number;
-    /** User-Agent header (default: geo-opt/2.0.0). */
+    /** User-Agent header (default: geo-opt/2.0.0; empty string falls back to the default). */
     userAgent?: string;
   }
 

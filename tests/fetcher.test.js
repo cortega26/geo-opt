@@ -19,6 +19,7 @@ import {
   auditRobots,
   checkRobotsRule,
   clearRobotsCache,
+  FETCHER_USER_AGENT,
   fetchRobotsTxt,
   fetchUrl,
   MAX_RESPONSE_SIZE,
@@ -1973,5 +1974,105 @@ describe("fetchUrl — hop scheme & origin policy over HTTPS (Plan 075)", () => 
     } finally {
       await stopServer(s.server);
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// userAgent option (Plan 079)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("fetchUrl — opción userAgent (Plan 079)", () => {
+  // Servidor local que registra el header User-Agent de cada request en
+  // orden de llegada y lo devuelve en el cuerpo de la respuesta; /redirect
+  // responde 302 a /final para cubrir la preservación entre hops.
+  let server, baseUrl, seenUserAgents;
+
+  before(async () => {
+    seenUserAgents = [];
+    const s = await startServer((req, res) => {
+      seenUserAgents.push(req.headers["user-agent"] ?? null);
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      if (url.pathname === "/redirect") {
+        res.writeHead(302, { Location: "/final" });
+        res.end();
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(`<html><body><p>ua=${String(req.headers["user-agent"])}</p></body></html>`);
+    });
+    server = s.server;
+    baseUrl = s.baseUrl;
+  });
+
+  after(async () => {
+    await stopServer(server);
+  });
+
+  it("envía el default USER_AGENT cuando se omite userAgent", async () => {
+    const result = await fetchUrl(`${baseUrl}/`, LOCALHOST_OPTS);
+    assert.equal(result.statusCode, 200);
+    assert.equal(seenUserAgents.at(-1), FETCHER_USER_AGENT);
+    assert.ok(result.html.includes(FETCHER_USER_AGENT));
+  });
+
+  it("envía el User-Agent custom cuando se pasa userAgent", async () => {
+    const custom = "MyAuditor/1.0";
+    const result = await fetchUrl(`${baseUrl}/`, { ...LOCALHOST_OPTS, userAgent: custom });
+    assert.equal(result.statusCode, 200);
+    assert.equal(seenUserAgents.at(-1), custom);
+    assert.ok(result.html.includes(custom));
+  });
+
+  it("preserva el User-Agent custom en cada hop de una cadena de redirects", async () => {
+    const custom = "RedirectBot/2.0";
+    const result = await fetchUrl(`${baseUrl}/redirect`, {
+      ...LOCALHOST_OPTS,
+      userAgent: custom,
+    });
+    assert.equal(result.statusCode, 200);
+    assert.equal(seenUserAgents.at(-2), custom, "el hop del redirect debe enviar el custom UA");
+    assert.equal(seenUserAgents.at(-1), custom, "el hop final debe enviar el custom UA");
+  });
+
+  it("fetchRobotsTxt envía el User-Agent custom al obtener robots.txt", async () => {
+    clearRobotsCache();
+    const s = await startServer((req, res) => {
+      seenUserAgents.push(req.headers["user-agent"] ?? null);
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("User-agent: *\nDisallow:\n");
+    });
+    try {
+      const result = await fetchRobotsTxt(s.baseUrl, {
+        ...LOCALHOST_OPTS,
+        userAgent: "RobotsUA/3.0",
+      });
+      assert.ok(Array.isArray(result.groups));
+      assert.equal(
+        seenUserAgents.at(-1),
+        "RobotsUA/3.0",
+        "el fetch de robots.txt debe enviar el custom UA"
+      );
+    } finally {
+      await stopServer(s.server);
+    }
+  });
+
+  it("rechaza un valor con CR/LF (inyección de headers) antes de conectar (0 requests)", async () => {
+    const before = seenUserAgents.length;
+    await assert.rejects(
+      () => fetchUrl(`${baseUrl}/`, { ...LOCALHOST_OPTS, userAgent: "Evil\r\nX-Injected: 1" }),
+      /user-agent/i
+    );
+    assert.equal(
+      seenUserAgents.length - before,
+      0,
+      "el valor malicioso no debe generar ninguna request"
+    );
+  });
+
+  it("trata el string vacío como valor omitido (default)", async () => {
+    const result = await fetchUrl(`${baseUrl}/`, { ...LOCALHOST_OPTS, userAgent: "" });
+    assert.equal(result.statusCode, 200);
+    assert.equal(seenUserAgents.at(-1), FETCHER_USER_AGENT);
   });
 });

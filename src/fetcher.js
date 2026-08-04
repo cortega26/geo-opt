@@ -472,6 +472,8 @@ function createPlainAgent(hostname, resolvedIp, port) {
  * @param {number} [options.responseTimeoutMs]
  * @param {number} [options.maxResponseSize]
  * @param {number} [options.maxRedirects]
+ * @param {string} [options.userAgent=USER_AGENT] — User-Agent header; el
+ *   string vacío cae al default (Plan 079)
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
  */
 async function performRequest(url, options = {}) {
@@ -487,7 +489,20 @@ async function performRequest(url, options = {}) {
     responseTimeoutMs = RESPONSE_TIMEOUT_MS,
     maxResponseSize = MAX_RESPONSE_SIZE,
     maxRedirects = MAX_REDIRECTS,
+    userAgent = USER_AGENT,
   } = options;
+
+  // Validación del User-Agent (Plan 079): ocurre aquí, antes de cualquier
+  // I/O de red (DNS y conexión) — un valor con CR/LF permitiría inyección
+  // de headers y no hay forma consistente de dejar que Node lo valide en
+  // httpMod.request. El string vacío se normaliza al default: el header
+  // siempre identifica al auditor. Esta función es el punto de paso único
+  // (fetchUrl y cada hop de redirect recursivo la invocan), así que la
+  // validación cubre toda la cadena.
+  const effectiveUserAgent = userAgent || USER_AGENT;
+  if (typeof effectiveUserAgent !== "string" || /[\r\n]/.test(effectiveUserAgent)) {
+    throw new Error("Invalid User-Agent value: expected a single-line string without CR/LF");
+  }
 
   const parsed = new URL(url);
   const hostname = parsed.hostname;
@@ -577,7 +592,7 @@ async function performRequest(url, options = {}) {
           // siendo el nombre original; el agente ya lo fija en tls.connect.
           ...(isHttps ? { servername: hostname } : {}),
           headers: {
-            "User-Agent": USER_AGENT,
+            "User-Agent": effectiveUserAgent,
             Host: parsed.host,
             Accept: "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8",
           },
@@ -815,7 +830,8 @@ export function checkRobotsRule(url, groups, userAgent) {
  *   transacción completa (DNS, redirects y body) con UNA fecha límite
  *   compartida entre todos los hops
  * @param {number} [options.maxSize=MAX_RESPONSE_SIZE] — tamaño máximo de respuesta
- * @param {string} [options.userAgent=USER_AGENT] — User-Agent header
+ * @param {string} [options.userAgent=USER_AGENT] — User-Agent header; el
+ *   string vacío cae al default (Plan 079)
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
  */
 export async function fetchUrl(url, options = {}) {
@@ -827,6 +843,7 @@ export async function fetchUrl(url, options = {}) {
     rootOrigin = null,
     timeoutMs = TOTAL_TIMEOUT_MS,
     maxSize = MAX_RESPONSE_SIZE,
+    userAgent = USER_AGENT,
   } = options;
 
   // Validar esquema
@@ -868,6 +885,7 @@ export async function fetchUrl(url, options = {}) {
       totalTimeoutMs: timeoutMs,
       deadlineMs,
       maxResponseSize: maxSize,
+      userAgent,
     });
     return result;
   } finally {
