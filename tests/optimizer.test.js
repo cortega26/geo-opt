@@ -17,6 +17,7 @@ import {
   buildReportMeta,
   calculateReadability,
   checkRobots,
+  checkRobotsRule,
   cleanMarkdownToPlainText,
   COMMUNITY_SCHEMA_TYPES,
   createFinding,
@@ -35,6 +36,7 @@ import {
   MODEL_VERSION,
   MODEL_VERSION_V1,
   parseFrontmatter,
+  parseRobotsGroups,
   preprocessContent,
   isHtmlContent,
   extractHtmlVisibleText,
@@ -2040,6 +2042,139 @@ Allow: /private/public
   for (const token of ["OAI-SearchBot", "Claude-SearchBot"]) {
     assert.strictEqual(publicReport.agents.find((entry) => entry.token === token).allowed, true);
     assert.strictEqual(privateReport.agents.find((entry) => entry.token === token).allowed, false);
+  }
+});
+
+test("auditRobots combines rules from repeated equally specific groups", () => {
+  const content = `User-agent: GPTBot
+Disallow: /no-gpt
+User-agent: GPTBot
+Disallow: /also-gpt
+Allow: /no-gpt/public
+`;
+  const gpt = (path) =>
+    auditRobots(content, { path }).agents.find((entry) => entry.token === "GPTBot");
+
+  assert.strictEqual(gpt("/no-gpt/draft").allowed, false, "first group rule applies");
+  assert.strictEqual(
+    gpt("/also-gpt/draft").allowed,
+    false,
+    "rules of the second equally specific group must apply too"
+  );
+  assert.strictEqual(gpt("/no-gpt/public/read").allowed, true, "longest Allow still wins");
+});
+
+test("auditRobots matches rules against the query string", () => {
+  const content = `User-agent: GPTBot
+Disallow: /search?q=spam
+Allow: /search
+`;
+  const gpt = (path) =>
+    auditRobots(content, { path }).agents.find((entry) => entry.token === "GPTBot");
+
+  assert.strictEqual(
+    gpt("/search?q=spam").allowed,
+    false,
+    "query-targeted Disallow blocks the URL"
+  );
+  assert.strictEqual(gpt("/search?q=news").allowed, true, "plain-path Allow covers other queries");
+  assert.strictEqual(gpt("/search").allowed, true);
+});
+
+test("auditRobots combines repeated wildcard groups, keeps Allow ties, ignores empty Disallow", () => {
+  const content = `User-agent: *
+Disallow: /wild-a
+User-agent: *
+Disallow: /wild-b
+User-agent: *
+Disallow: /tie
+User-agent: *
+Allow: /tie
+User-agent: *
+Disallow:
+`;
+  const wildcard = (path) => auditRobots(content, { path }).wildcard;
+
+  assert.strictEqual(wildcard("/wild-b/x").allowed, false, "second wildcard group applies");
+  assert.deepStrictEqual(
+    wildcard("/wild-b/x").matchedGroup,
+    ["*"],
+    "wildcard agents merge deduped"
+  );
+  assert.strictEqual(wildcard("/tie").allowed, true, "Allow wins on equal length");
+  assert.strictEqual(wildcard("/tie").matchedRule.directive, "allow");
+  assert.strictEqual(wildcard("/anything").allowed, true, "empty Disallow matches nothing");
+});
+
+test("auditRobots only combines groups with equally specific agents", () => {
+  const content = `User-agent: *
+Disallow: /x
+User-agent: GPTBot
+Disallow: /y
+`;
+  const gpt = (path) =>
+    auditRobots(content, { path }).agents.find((entry) => entry.token === "GPTBot");
+
+  assert.strictEqual(gpt("/y/one").allowed, false, "most specific group wins");
+  assert.strictEqual(
+    gpt("/x/one").allowed,
+    true,
+    "wildcard rules do not leak into a more specific agent"
+  );
+  assert.strictEqual(
+    auditRobots(content, { path: "/x/one" }).wildcard.allowed,
+    false,
+    "wildcard audit still sees wildcard rules"
+  );
+});
+
+test("auditRobots and checkRobotsRule agree on combined groups and query matching", () => {
+  const content = `User-agent: GPTBot
+Disallow: /no-gpt
+Disallow: /search?q=spam
+User-agent: GPTBot
+Disallow: /also-gpt
+Allow: /no-gpt/public
+User-agent: *
+Disallow: /wild-a
+User-agent: *
+Disallow: /wild-b
+User-agent: *
+Disallow: /tie
+User-agent: *
+Allow: /tie
+`;
+  const groups = parseRobotsGroups(content);
+  const cases = [
+    ["GPTBot", "/no-gpt/draft", false],
+    ["GPTBot", "/also-gpt/draft", false],
+    ["GPTBot", "/no-gpt/public/read", true],
+    ["GPTBot", "/search?q=spam", false],
+    ["GPTBot", "/search?q=news", true],
+    ["GPTBot", "/search", true],
+    ["GPTBot", "/tie", true],
+    ["GPTBot", "/wild-a/x", true],
+    ["MyBot", "/wild-a/x", false],
+    ["MyBot", "/wild-b/x", false],
+    ["MyBot", "/tie", true],
+    ["MyBot", "/open", true],
+  ];
+
+  for (const [userAgent, target, expected] of cases) {
+    const local = auditRobots(content, { path: target });
+    const localDecision =
+      userAgent === "MyBot"
+        ? local.wildcard
+        : local.agents.find((entry) => entry.token === userAgent);
+    const remote = checkRobotsRule(`https://example.com${target}`, groups, userAgent);
+
+    assert.strictEqual(localDecision.allowed, expected, `${userAgent} local ${target}`);
+    assert.strictEqual(remote.allowed, expected, `${userAgent} remote ${target}`);
+    assert.deepStrictEqual(
+      remote.matchedRule,
+      localDecision.matchedRule,
+      `${userAgent} matchedRule parity ${target}`
+    );
   }
 });
 

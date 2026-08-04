@@ -31,6 +31,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- **fix:** robots.txt groups with equally specific user-agent tokens now combine their rules (RFC 9309 §2.2.1) in both `auditRobots` and `checkRobotsRule`, and rule matching includes the URL query string as part of the path (Plan 078)
 - **fix:** the shared total deadline (Plan 077) no longer leaks a pending timer when request creation throws synchronously — the timer armed before the promise is now cleared before rethrowing (Plan 092)
 - **test:** pin the entry-check no-connection semantics (Plan 093)
 - **fix:** `timeoutMs` is now one shared total deadline for the whole fetch transaction — DNS/connect, headers, body, and every redirect hop consume the same budget, so a redirect chain can no longer hold the process for (hops + 1) × `timeoutMs` (Plan 077)

@@ -16,7 +16,7 @@ import https from "node:https";
 import tls from "node:tls";
 import net from "node:net";
 
-import { parseRobotsGroups } from "./robots.js";
+import { parseRobotsGroups, selectGroups, evaluateSelectedGroups } from "./robots.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants
@@ -763,8 +763,11 @@ export async function fetchRobotsTxt(origin, options = {}) {
 /**
  * Verifica si una URL está bloqueada por las reglas de robots.txt.
  *
- * Reimplementa la lógica de selección de grupo y matching de path
- * de src/robots.js para evitar dependencia circular.
+ * Comparte la implementación de selección y evaluación con src/robots.js
+ * (selectGroups + evaluateSelectedGroups, sin dependencia circular): combina
+ * las reglas de TODOS los grupos con el token de user-agent más específico
+ * y compara contra `pathname + search` — la query string participa en el
+ * matching, como muestran los ejemplos del RFC 9309 §2.2.2.
  *
  * @param {string} url — URL absoluta a verificar
  * @param {Array} groups — resultado de parseRobotsGroups()
@@ -778,52 +781,13 @@ export function checkRobotsRule(url, groups, userAgent) {
 
   let targetPath;
   try {
-    targetPath = new URL(url).pathname || "/";
+    const parsed = new URL(url);
+    targetPath = `${parsed.pathname || "/"}${parsed.search}`;
   } catch {
     return { allowed: true, matchedRule: null };
   }
 
-  // Seleccionar el grupo más específico que aplique al user-agent
-  let selectedGroup = null;
-  let selectedLength = -1;
-
-  for (const group of groups) {
-    for (const agent of group.agents) {
-      const applies = agent === "*" || userAgent.toLowerCase().includes(agent.toLowerCase());
-      if (applies && agent.length > selectedLength) {
-        selectedGroup = group;
-        selectedLength = agent.length;
-      }
-    }
-  }
-
-  if (!selectedGroup) {
-    return { allowed: true, matchedRule: null };
-  }
-
-  // Verificar reglas del grupo seleccionado
-  let strongestRule = null;
-  for (const rule of selectedGroup.rules) {
-    const escaped = rule.path
-      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-      .replaceAll("*", ".*")
-      .replace(/\\\$$/, "$");
-    const regex = new RegExp(`^${escaped}`);
-    if (regex.test(targetPath)) {
-      if (
-        !strongestRule ||
-        rule.path.length > strongestRule.path.length ||
-        (rule.path.length === strongestRule.path.length && rule.directive === "allow")
-      ) {
-        strongestRule = rule;
-      }
-    }
-  }
-
-  return {
-    allowed: strongestRule?.directive !== "disallow",
-    matchedRule: strongestRule,
-  };
+  return evaluateSelectedGroups(selectGroups(groups, userAgent), targetPath);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

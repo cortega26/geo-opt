@@ -16,11 +16,13 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 import {
-  fetchUrl,
-  fetchRobotsTxt,
+  auditRobots,
   checkRobotsRule,
   clearRobotsCache,
+  fetchRobotsTxt,
+  fetchUrl,
   MAX_RESPONSE_SIZE,
+  parseRobotsGroups,
 } from "../src/index.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1123,6 +1125,97 @@ describe("checkRobotsRule", () => {
     const result = checkRobotsRule("https://example.com/anything", [], "AnyBot");
     assert.equal(result.allowed, true);
     assert.equal(result.matchedRule, null);
+  });
+
+  it("combina reglas de grupos repetidos igualmente específicos", () => {
+    const groups = parseRobotsGroups(`User-agent: GPTBot
+Disallow: /no-gpt
+User-agent: GPTBot
+Disallow: /also-gpt
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/also-gpt/x", groups, "GPTBot").allowed,
+      false,
+      "las reglas del segundo grupo GPTBot deben aplicar"
+    );
+    assert.equal(checkRobotsRule("https://example.com/no-gpt/x", groups, "GPTBot").allowed, false);
+  });
+
+  it("hace match de reglas contra la query string", () => {
+    const groups = parseRobotsGroups(`User-agent: *
+Disallow: /search?q=spam
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/search?q=spam", groups, "MyBot").allowed,
+      false,
+      "la query string participa en el matching"
+    );
+    assert.equal(
+      checkRobotsRule("https://example.com/search", groups, "MyBot").allowed,
+      true,
+      "la regla con query no bloquea el path sin query"
+    );
+  });
+
+  it("combina grupos wildcard repetidos y conserva el empate Allow", () => {
+    const groups = parseRobotsGroups(`User-agent: *
+Disallow: /wild-a
+User-agent: *
+Disallow: /wild-b
+User-agent: *
+Disallow: /tie
+User-agent: *
+Allow: /tie
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/wild-b/x", groups, "MyBot").allowed,
+      false,
+      "el segundo grupo wildcard debe aplicar"
+    );
+    const tie = checkRobotsRule("https://example.com/tie", groups, "MyBot");
+    assert.equal(tie.allowed, true, "Allow gana en empate de longitud");
+    assert.equal(tie.matchedRule.directive, "allow");
+  });
+
+  it("mantiene paridad con auditRobots para grupos combinados y queries", () => {
+    const content = `User-agent: GPTBot
+Disallow: /no-gpt
+Disallow: /search?q=spam
+User-agent: GPTBot
+Disallow: /also-gpt
+Allow: /no-gpt/public
+User-agent: *
+Disallow: /wild-a
+User-agent: *
+Disallow: /wild-b
+User-agent: *
+Disallow: /tie
+User-agent: *
+Allow: /tie
+`;
+    const groups = parseRobotsGroups(content);
+    const cases = [
+      ["GPTBot", "/no-gpt/draft"],
+      ["GPTBot", "/also-gpt/draft"],
+      ["GPTBot", "/no-gpt/public/read"],
+      ["GPTBot", "/search?q=spam"],
+      ["GPTBot", "/search"],
+      ["GPTBot", "/tie"],
+      ["MyBot", "/wild-a/x"],
+      ["MyBot", "/wild-b/x"],
+      ["MyBot", "/tie"],
+      ["MyBot", "/open"],
+    ];
+    for (const [userAgent, target] of cases) {
+      const local = auditRobots(content, { path: target });
+      const localDecision =
+        userAgent === "MyBot"
+          ? local.wildcard
+          : local.agents.find((entry) => entry.token === userAgent);
+      const remote = checkRobotsRule(`https://example.com${target}`, groups, userAgent);
+      assert.equal(remote.allowed, localDecision.allowed, `${userAgent} ${target}`);
+      assert.deepEqual(remote.matchedRule, localDecision.matchedRule, `${userAgent} ${target}`);
+    }
   });
 });
 
