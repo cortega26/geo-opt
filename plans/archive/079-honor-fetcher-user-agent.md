@@ -3,7 +3,7 @@
 > **Executor instructions**: Thread the option through every redirect and
 > robots fetch. Preserve the default constant for callers that omit it.
 >
-> **Drift check (run first)**: `git diff --stat 888d3e7..HEAD -- src/fetcher.js index.d.ts tests/fetcher.test.js plans/README.md`
+> **Drift check (run first)**: `git diff --stat 6f90465..HEAD -- src/fetcher.js index.d.ts tests/fetcher.test.js plans/README.md`
 
 ## Status
 
@@ -12,7 +12,7 @@
 - **Risk**: LOW
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md
 - **Category**: bug / public-api
-- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled; 073 DONE)
+- **Planned at**: commit `6f90465`, 2026-08-03 (reconciled after 078/094/095 squash-merges; 073 DONE)
 
 ## Why this matters
 
@@ -22,11 +22,16 @@ auditor or align the HTTP header with robots evaluation as promised.
 
 ## Current state
 
-- `index.d.ts:952-953` and `src/fetcher.js:805` document `userAgent`.
+- `index.d.ts:956-957` and `src/fetcher.js:818` document `userAgent`.
 - `fetchUrl` destructures only allow flags, policy (075), timeout, and size at
-  lines 812-816 — `userAgent` is still not destructured.
-- `performRequest` hard-codes `USER_AGENT` at line 546.
-- `fetchRobotsTxt` forwards its options to `fetchUrl` at lines 694-696.
+  lines 822-830 — `userAgent` is still not destructured.
+- `performRequest` hard-codes `"User-Agent": USER_AGENT` in the header object
+  at line 580.
+- `fetchUrl` calls `performRequest` with an explicit option list at lines
+  862-871 (no `userAgent` in it); the redirect recursion at lines 625-628
+  already forwards `...options`, so threading the option through
+  `performRequest`'s destructure covers every hop automatically.
+- `fetchRobotsTxt` forwards its options to `fetchUrl` at line 743.
 
 ## Commands you will need
 
@@ -60,9 +65,13 @@ redirect chain, and `fetchRobotsTxt`.
 
 ### Step 2: Thread and validate the option
 
-Destructure `userAgent = USER_AGENT` in `fetchUrl`, pass it into every
-`performRequest` hop, and use it for the header. Reject CR/LF or invalid header
-values with a clear error before connection; do not permit header injection.
+Destructure `userAgent = USER_AGENT` in `fetchUrl`, add it to the explicit
+`performRequest(url, {...})` option object at lines 862-871, destructure it in
+`performRequest` (lines 478-490), and use it for the header at line 580. The
+redirect recursion already forwards `...options`, so hops inherit it with no
+further change. Reject CR/LF or invalid header values with a clear error before
+connection; do not permit header injection. Validate before any network I/O
+(i.e. before `httpMod.request`).
 
 **Verify**: focused tests pass; CR/LF value is rejected and server request count
 remains zero.
