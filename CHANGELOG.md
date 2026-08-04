@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.9](https://github.com/cortega26/geo-opt/compare/v2.3.8...v2.3.9) (2026-08-04)
+
+
+### Bug Fixes
+
+* **robots:** combine groups and match queries (Plan 078) ([c85ee5d](https://github.com/cortega26/geo-opt/commit/c85ee5d58a67675a9620a26e2aeb86a322852281))
+* **robots:** parse comma agents, keep groups across comments, align Python (Plan 094) ([529dd3b](https://github.com/cortega26/geo-opt/commit/529dd3b0a530c0d8d17a843737bba383fac8cad2))
+* **robots:** skip empty User-agent token lists; pin CRLF/BOM and CLI parity (Plan 095) ([3a08151](https://github.com/cortega26/geo-opt/commit/3a081511230aa82f1062ca62dd912548b6a71315))
+
 ## [2.3.8](https://github.com/cortega26/geo-opt/compare/v2.3.7...v2.3.8) (2026-08-03)
 
 
