@@ -40,6 +40,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- **fix:** user-agent validation errors now propagate out of `fetchRobotsTxt` with `code = "ERR_INVALID_USER_AGENT"` instead of silently caching an empty result — a control-character `userAgent` previously poisoned the origin-keyed robots cache so later valid calls never fetched real rules; the rejection now covers all control characters except HTAB and happens before any network I/O, and the robots cache is keyed by origin + effective user-agent so different agents refetch (Plan 096)
+- **test:** pin the validation-error propagation, the extended control-character rejection (incl. non-string values) with zero requests, the user-agent-aware robots cache key, the HTAB-allowed case, and the unchanged network-failure degradation (Plan 096)
 - **fix:** `fetchUrl`/`fetchRobotsTxt` now honor the public `userAgent` option on every request: redirect hops inherit it, omitting the option keeps the default user agent, an empty string falls back to the default, and CR/LF values are rejected with a clear error before any network I/O (header-injection guard) (Plan 079)
 - **test:** pin the default/custom user agent, redirect-hop preservation, robots fetch, and CR/LF rejection with zero requests (Plan 079)
 - **fix:** `User-agent:` lines with comma-separated tokens now split into separate agents (Google de-facto spec), comment-only lines no longer end a group (dropping following rules), and the Python port matches Node's combined-group semantics — equally specific groups merge their rules, `matchedGroup` dedup is case-insensitive in both runtimes, and percent-encoding byte-for-byte matching plus `$`-anchored query exclusion are pinned by tests (Plan 094)

@@ -2076,3 +2076,130 @@ describe("fetchUrl — opción userAgent (Plan 079)", () => {
     assert.equal(seenUserAgents.at(-1), FETCHER_USER_AGENT);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// userAgent validation & robots cache (Plan 096)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("fetchUrl — validación userAgent y caché de robots (Plan 096)", () => {
+  // Servidor local que cuenta requests por path y sirve robots.txt con una
+  // regla real (Disallow: /private) para los tests de caché. Los tests de
+  // rechazo dependen de que la validación ocurra ANTES de cualquier
+  // conexión (contadores en 0).
+  let server, baseUrl, requestCounts;
+
+  before(async () => {
+    requestCounts = { robots: 0, page: 0 };
+    const s = await startServer((req, res) => {
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      if (url.pathname === "/robots.txt") {
+        requestCounts.robots += 1;
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end("User-agent: *\nDisallow: /private\n");
+        return;
+      }
+      requestCounts.page += 1;
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end("<html><body>ok</body></html>");
+    });
+    server = s.server;
+    baseUrl = s.baseUrl;
+  });
+
+  after(async () => {
+    await stopServer(server);
+  });
+
+  it("fetchRobotsTxt rechaza un userAgent con CR/LF con code ERR_INVALID_USER_AGENT (0 requests)", async () => {
+    const before = requestCounts.robots;
+    await assert.rejects(
+      () => fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: "Evil\r\nX-Injected: 1" }),
+      (err) => err.code === "ERR_INVALID_USER_AGENT"
+    );
+    assert.equal(
+      requestCounts.robots - before,
+      0,
+      "el userAgent con CR/LF no debe generar ninguna request"
+    );
+  });
+
+  it("tras el rechazo, un fetchRobotsTxt válido hace una request real (la caché no queda envenenada)", async () => {
+    // Sin clearRobotsCache(): el test anterior (rechazo) no debió cachear
+    // nada; un fetch válido debe llegar al servidor.
+    const before = requestCounts.robots;
+    const result = await fetchRobotsTxt(baseUrl, LOCALHOST_OPTS);
+    assert.equal(requestCounts.robots - before, 1, "debe haber una request real al servidor");
+    assert.equal(result.groups.length, 1, "debe parsear la regla Disallow: /private");
+  });
+
+  it("rechaza caracteres de control (salvo HTAB) con ERR_INVALID_USER_AGENT antes de conectar", async () => {
+    for (const control of ["\x00", "\x0b", "\x0c", "\x0e", "\x1f", "\x7f"]) {
+      const before = requestCounts.robots;
+      await assert.rejects(
+        () => fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: `Evil${control}Bot` }),
+        (err) => err.code === "ERR_INVALID_USER_AGENT",
+        `el control ${JSON.stringify(control)} debe rechazarse con ERR_INVALID_USER_AGENT`
+      );
+      assert.equal(
+        requestCounts.robots - before,
+        0,
+        `el control ${JSON.stringify(control)} no debe generar ninguna request`
+      );
+    }
+  });
+
+  it("permite un tab (HTAB) en el userAgent: el fetch llega al servidor", async () => {
+    const before = requestCounts.page;
+    const result = await fetchUrl(`${baseUrl}/`, {
+      ...LOCALHOST_OPTS,
+      userAgent: "AuditBot\t1.0",
+    });
+    assert.equal(result.statusCode, 200);
+    assert.equal(
+      requestCounts.page - before,
+      1,
+      "HTAB es legal en el valor de un header: el fetch debe llegar al servidor"
+    );
+  });
+
+  it("rechaza un userAgent no-string (42) con ERR_INVALID_USER_AGENT antes de cualquier request", async () => {
+    const before = requestCounts.robots;
+    await assert.rejects(
+      () => fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: 42 }),
+      (err) => err.code === "ERR_INVALID_USER_AGENT"
+    );
+    assert.equal(requestCounts.robots - before, 0);
+  });
+
+  it("cachea robots.txt por origin + userAgent: cada agente distinto refetchea", async () => {
+    clearRobotsCache();
+    const base = requestCounts.robots;
+    await fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: "UA-A" });
+    assert.equal(requestCounts.robots - base, 1, "UA-A: primer fetch");
+    await fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: "UA-B" });
+    assert.equal(requestCounts.robots - base, 2, "UA-B: agente distinto, debe refetchear");
+    await fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: "UA-A" });
+    assert.equal(requestCounts.robots - base, 2, "UA-A de nuevo: cache hit");
+  });
+
+  it("el string vacío y el valor omitido comparten la clave default de la caché", async () => {
+    clearRobotsCache();
+    const base = requestCounts.robots;
+    await fetchRobotsTxt(baseUrl, { ...LOCALHOST_OPTS, userAgent: "" });
+    assert.equal(requestCounts.robots - base, 1, "string vacío: primer fetch con el default");
+    await fetchRobotsTxt(baseUrl, LOCALHOST_OPTS);
+    assert.equal(requestCounts.robots - base, 1, "sin userAgent: cache hit de la clave default");
+  });
+
+  it("la degradación por fallo de red no lanza: resuelve grupos vacíos", async () => {
+    clearRobotsCache();
+    const s = await startServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("User-agent: *\nDisallow:\n");
+    });
+    const closedOrigin = s.baseUrl;
+    await stopServer(s.server);
+    const result = await fetchRobotsTxt(closedOrigin, LOCALHOST_OPTS);
+    assert.deepEqual(result, { groups: [], raw: "" });
+  });
+});

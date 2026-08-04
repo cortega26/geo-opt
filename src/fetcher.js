@@ -473,7 +473,9 @@ function createPlainAgent(hostname, resolvedIp, port) {
  * @param {number} [options.maxResponseSize]
  * @param {number} [options.maxRedirects]
  * @param {string} [options.userAgent=USER_AGENT] — User-Agent header; el
- *   string vacío cae al default (Plan 079)
+ *   string vacío cae al default (Plan 079); valores con caracteres de
+ *   control se rechazan con code = "ERR_INVALID_USER_AGENT" antes de
+ *   cualquier I/O de red
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
  */
 async function performRequest(url, options = {}) {
@@ -492,16 +494,28 @@ async function performRequest(url, options = {}) {
     userAgent = USER_AGENT,
   } = options;
 
-  // Validación del User-Agent (Plan 079): ocurre aquí, antes de cualquier
-  // I/O de red (DNS y conexión) — un valor con CR/LF permitiría inyección
-  // de headers y no hay forma consistente de dejar que Node lo valide en
-  // httpMod.request. El string vacío se normaliza al default: el header
-  // siempre identifica al auditor. Esta función es el punto de paso único
+  // Validación del User-Agent (Plan 079, ampliada en Plan 096): ocurre aquí,
+  // antes de cualquier I/O de red (DNS y conexión) — un valor con caracteres
+  // de control permitiría inyección de headers y no hay forma consistente de
+  // dejar que Node lo valide en httpMod.request. El regex es exactamente el
+  // set que Node rechaza en valores de header menos HTAB (\x09), que HTTP sí
+  // permite. El string vacío se normaliza al default: el header siempre
+  // identifica al auditor. El error lanza con code "ERR_INVALID_USER_AGENT"
+  // para que los llamadores (p. ej. fetchRobotsTxt) distingan una validación
+  // fallida de un fallo de red/HTTP. Esta función es el punto de paso único
   // (fetchUrl y cada hop de redirect recursivo la invocan), así que la
   // validación cubre toda la cadena.
   const effectiveUserAgent = userAgent || USER_AGENT;
-  if (typeof effectiveUserAgent !== "string" || /[\r\n]/.test(effectiveUserAgent)) {
-    throw new Error("Invalid User-Agent value: expected a single-line string without CR/LF");
+  if (
+    typeof effectiveUserAgent !== "string" ||
+    // eslint-disable-next-line no-control-regex -- set deliberado: el regex REJECTA caracteres de control
+    /[\x00-\x08\x0a-\x1f\x7f]/u.test(effectiveUserAgent)
+  ) {
+    const err = new Error(
+      "Invalid User-Agent value: expected a single-line string without control characters"
+    );
+    err.code = "ERR_INVALID_USER_AGENT";
+    throw err;
   }
 
   const parsed = new URL(url);
@@ -746,7 +760,17 @@ const robotsCache = new Map();
  * @throws {Error} con code "ERR_HOP_POLICY" si la política bloquea el hop
  */
 export async function fetchRobotsTxt(origin, options = {}) {
-  const cached = robotsCache.get(origin);
+  const { userAgent = USER_AGENT } = options;
+  // Mismo normalizado que performRequest: el string vacío cae al default.
+  // La clave de caché incluye el UA efectivo porque un mismo origin puede
+  // servir robots.txt distinto por agente.
+  const effectiveUserAgent = userAgent || USER_AGENT;
+  // Separador \u0000: no puede aparecer ni en un origin (viene de URL
+  // parsing) ni en un UA válido (la validación rechaza caracteres de
+  // control), así que la clave no es ambigua.
+  const cacheKey = `${origin}\u0000${effectiveUserAgent}`;
+
+  const cached = robotsCache.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -758,20 +782,23 @@ export async function fetchRobotsTxt(origin, options = {}) {
     result = await fetchUrl(robotsUrl, options);
   } catch (error) {
     // Degradación silenciosa SOLO para fallos de red/HTTP. Un rechazo de
-    // política tragado haría indistinguible un robots.txt bloqueado de uno
-    // inexistente — el bug que este fix cierra — así que se propaga sin
+    // política (ERR_HOP_POLICY) tragado haría indistinguible un robots.txt
+    // bloqueado de uno inexistente — el bug que el Plan 075 cerró — y un
+    // userAgent inválido (ERR_INVALID_USER_AGENT) es un error del llamador,
+    // no un fallo de red: cachear el vacío bajo esa clave envenenaría
+    // también las llamadas válidas posteriores. Ambos se propagan sin
     // cachear el resultado vacío.
-    if (error?.code === "ERR_HOP_POLICY") {
+    if (error?.code === "ERR_HOP_POLICY" || error?.code === "ERR_INVALID_USER_AGENT") {
       throw error;
     }
     const empty = { groups: [], raw: "" };
-    robotsCache.set(origin, empty);
+    robotsCache.set(cacheKey, empty);
     return empty;
   }
 
   const groups = parseRobotsGroups(result.html);
   const entry = { groups, raw: result.html };
-  robotsCache.set(origin, entry);
+  robotsCache.set(cacheKey, entry);
   return entry;
 }
 
@@ -831,7 +858,9 @@ export function checkRobotsRule(url, groups, userAgent) {
  *   compartida entre todos los hops
  * @param {number} [options.maxSize=MAX_RESPONSE_SIZE] — tamaño máximo de respuesta
  * @param {string} [options.userAgent=USER_AGENT] — User-Agent header; el
- *   string vacío cae al default (Plan 079)
+ *   string vacío cae al default (Plan 079); valores con caracteres de
+ *   control se rechazan con code = "ERR_INVALID_USER_AGENT" antes de
+ *   cualquier I/O de red
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
  */
 export async function fetchUrl(url, options = {}) {
