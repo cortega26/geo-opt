@@ -2178,6 +2178,175 @@ Allow: /tie
   }
 });
 
+test("auditRobots and checkRobotsRule split comma-separated User-agent tokens", () => {
+  const content = `User-agent: GPTBot, Googlebot
+Disallow: /private
+`;
+  const groups = parseRobotsGroups(content);
+  assert.deepStrictEqual(
+    groups.map((g) => g.agents),
+    [["GPTBot", "Googlebot"]],
+    "comma tokens become separate agents"
+  );
+
+  const gpt = auditRobots(content, { path: "/private/d" }).agents.find((e) => e.token === "GPTBot");
+  assert.strictEqual(gpt.allowed, false, "GPTBot blocked by the shared group");
+  assert.strictEqual(gpt.matchedRule.path, "/private");
+  for (const agent of ["GPTBot", "Googlebot"]) {
+    const remote = checkRobotsRule("https://x.com/private/d", groups, agent);
+    assert.strictEqual(remote.allowed, false, `${agent} blocked remotely`);
+    assert.strictEqual(remote.matchedRule.path, "/private", `${agent} matchedRule`);
+  }
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/public", groups, "Googlebot").allowed,
+    true,
+    "unrelated path stays allowed"
+  );
+});
+
+test("wildcard inside a comma-separated User-agent list applies to every agent", () => {
+  const content = `User-agent: *, GPTBot
+Disallow: /private
+`;
+  const groups = parseRobotsGroups(content);
+  assert.deepStrictEqual(groups[0].agents, ["*", "GPTBot"]);
+
+  const audit = auditRobots(content, { path: "/private/d" });
+  assert.strictEqual(audit.wildcard.allowed, false, "wildcard token applies");
+  assert.deepStrictEqual(audit.wildcard.matchedGroup, ["*", "GPTBot"]);
+  assert.strictEqual(
+    audit.agents.find((e) => e.token === "GPTBot").allowed,
+    false,
+    "GPTBot still blocked via its own token"
+  );
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/private/d", groups, "TotallyUnrelatedBot").allowed,
+    false,
+    "star in a comma list applies to unrelated agents"
+  );
+});
+
+test("trailing commas and stray spaces in User-agent lists are tolerated", () => {
+  const groups = parseRobotsGroups(`User-agent: GPTBot,
+Disallow: /private
+User-agent:  Googlebot  ,ClaudeBot
+Disallow: /other
+`);
+  assert.deepStrictEqual(
+    groups.map((g) => g.agents),
+    [["GPTBot"], ["Googlebot", "ClaudeBot"]]
+  );
+  for (const agent of ["GPTBot", "Googlebot", "ClaudeBot"]) {
+    assert.strictEqual(
+      checkRobotsRule("https://x.com/other/x", groups, agent).allowed,
+      agent === "GPTBot",
+      `${agent} follows its own group's rules`
+    );
+  }
+});
+
+test("comment-only lines do not end a group; blank lines still do", () => {
+  const withComment = `User-agent: GPTBot
+# maintenance note
+Disallow: /private
+`;
+  const gpt = auditRobots(withComment, { path: "/private/d" }).agents.find(
+    (e) => e.token === "GPTBot"
+  );
+  assert.strictEqual(gpt.allowed, false, "rule after a mid-group comment applies");
+  assert.strictEqual(gpt.matchedRule.path, "/private");
+
+  const merged = parseRobotsGroups(`User-agent: GPTBot
+# between
+User-agent: Googlebot
+Disallow: /private
+`);
+  assert.deepStrictEqual(
+    merged.map((g) => g.agents),
+    [["GPTBot", "Googlebot"]],
+    "comment between User-agent lines keeps ONE group with merged agents"
+  );
+  assert.strictEqual(merged[0].rules.length, 1, "the rule lands in the merged group");
+
+  const separated = parseRobotsGroups(`User-agent: GPTBot
+
+User-agent: Googlebot
+Disallow: /private
+`);
+  assert.deepStrictEqual(
+    separated.map((g) => g.agents),
+    [["GPTBot"], ["Googlebot"]],
+    "a real blank line still separates groups"
+  );
+});
+
+test("matchedGroup dedup is case-insensitive and keeps first-seen casing", () => {
+  const content = `User-agent: GPTBot
+Disallow: /a
+User-agent: gptbot
+Disallow: /b
+`;
+  const gpt = auditRobots(content, { path: "/b/x" }).agents.find((e) => e.token === "GPTBot");
+  assert.deepStrictEqual(gpt.matchedGroup, ["GPTBot"], "mixed-case duplicate collapses");
+  assert.strictEqual(gpt.allowed, false, "second group rules apply (combined)");
+  assert.strictEqual(gpt.matchedRule.path, "/b");
+});
+
+test("percent-encoded rule paths match byte-for-byte (pinned, both Node APIs)", () => {
+  const encoded = `User-agent: GPTBot
+Disallow: /mi%20carpeta
+`;
+  const literalSpace = `User-agent: GPTBot
+Disallow: /mi carpeta
+`;
+  const gptEncoded = auditRobots(encoded, { path: "/mi%20carpeta/a" }).agents.find(
+    (e) => e.token === "GPTBot"
+  );
+  assert.strictEqual(gptEncoded.allowed, false, "%20 rule blocks the %20 URL");
+  assert.strictEqual(gptEncoded.matchedRule.path, "/mi%20carpeta");
+  const gptLiteral = auditRobots(literalSpace, { path: "/mi%20carpeta/a" }).agents.find(
+    (e) => e.token === "GPTBot"
+  );
+  assert.strictEqual(
+    gptLiteral.allowed,
+    true,
+    "a literal-space rule does NOT match the %20 form (pinned byte-for-byte)"
+  );
+
+  const groupsEnc = parseRobotsGroups(encoded);
+  const groupsLit = parseRobotsGroups(literalSpace);
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/mi%20carpeta/a", groupsEnc, "GPTBot").allowed,
+    false,
+    "checkRobotsRule: %20 rule blocks the %20 URL"
+  );
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/mi%20carpeta/a", groupsLit, "GPTBot").allowed,
+    true,
+    "checkRobotsRule: literal-space rule does not match the %20 form"
+  );
+});
+
+test("dollar-anchored rules match the plain path but not the query form (pinned, both Node APIs)", () => {
+  const content = `User-agent: GPTBot
+Disallow: /page$
+`;
+  const gpt = (p) => auditRobots(content, { path: p }).agents.find((e) => e.token === "GPTBot");
+  const plain = gpt("/page");
+  assert.strictEqual(plain.allowed, false, "$ rule blocks the plain path");
+  assert.strictEqual(plain.matchedRule.path, "/page$");
+  assert.strictEqual(gpt("/page?x=1").allowed, true, "$ rule does not match the query form");
+  assert.strictEqual(gpt("/page/x").allowed, true, "$ anchors the end of the path");
+
+  const groups = parseRobotsGroups(content);
+  assert.strictEqual(checkRobotsRule("https://x.com/page", groups, "GPTBot").allowed, false);
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/page?x=1", groups, "GPTBot").allowed,
+    true,
+    "checkRobotsRule parity for the query form"
+  );
+});
+
 // CLI integration tests
 test("CLI robots generate --dry-run outputs expected content", () => {
   const result = spawnSync(process.execPath, [cliPath, "robots", "generate", "--dry-run"], {

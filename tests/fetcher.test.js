@@ -1217,6 +1217,90 @@ Allow: /tie
       assert.deepEqual(remote.matchedRule, localDecision.matchedRule, `${userAgent} ${target}`);
     }
   });
+
+  it("aplica reglas de grupos con tokens separados por coma", () => {
+    const groups = parseRobotsGroups(`User-agent: GPTBot, Googlebot
+Disallow: /private
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/private/data", groups, "GPTBot").allowed,
+      false,
+      "el primer token del par aplica"
+    );
+    assert.equal(
+      checkRobotsRule("https://example.com/private/data", groups, "Googlebot").allowed,
+      false,
+      "el segundo token del par aplica"
+    );
+    assert.equal(checkRobotsRule("https://example.com/public", groups, "Googlebot").allowed, true);
+    const withStar = parseRobotsGroups(`User-agent: *, GPTBot
+Disallow: /private
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/private/data", withStar, "OtherBot").allowed,
+      false,
+      "el comodín dentro de una lista separada por coma aplica a cualquier agente"
+    );
+  });
+
+  it("no termina el grupo con líneas de solo comentario", () => {
+    const groups = parseRobotsGroups(`User-agent: GPTBot
+# nota de mantenimiento
+Disallow: /private
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/private/data", groups, "GPTBot").allowed,
+      false,
+      "la regla tras un comentario dentro del grupo debe aplicar"
+    );
+    assert.equal(checkRobotsRule("https://example.com/public", groups, "GPTBot").allowed, true);
+  });
+
+  it("deduplica matchedGroup sin distinción de mayúsculas", () => {
+    const content = `User-agent: GPTBot
+Disallow: /a
+User-agent: gptbot
+Disallow: /b
+`;
+    const local = auditRobots(content, { path: "/b/x" });
+    const gpt = local.agents.find((entry) => entry.token === "GPTBot");
+    assert.deepEqual(gpt.matchedGroup, ["GPTBot"], "las mayúsculas no crean duplicados");
+    const groups = parseRobotsGroups(content);
+    assert.equal(checkRobotsRule("https://example.com/b/x", groups, "GPTBot").allowed, false);
+  });
+
+  it("hace match de reglas percent-encoded byte a byte (pinned)", () => {
+    const encoded = parseRobotsGroups(`User-agent: GPTBot
+Disallow: /mi%20carpeta
+`);
+    const literal = parseRobotsGroups(`User-agent: GPTBot
+Disallow: /mi carpeta
+`);
+    assert.equal(
+      checkRobotsRule("https://example.com/mi%20carpeta/a", encoded, "GPTBot").allowed,
+      false,
+      "la regla %20 bloquea la URL %20"
+    );
+    assert.equal(
+      checkRobotsRule("https://example.com/mi%20carpeta/a", literal, "GPTBot").allowed,
+      true,
+      "la regla con espacio literal NO bloquea la forma %20"
+    );
+  });
+
+  it("no hace match de reglas ancladas con $ contra la query (pinned)", () => {
+    const groups = parseRobotsGroups(`User-agent: GPTBot
+Disallow: /page$
+`);
+    const plain = checkRobotsRule("https://example.com/page", groups, "GPTBot");
+    assert.equal(plain.allowed, false, "$ bloquea el path plano");
+    assert.equal(plain.matchedRule.path, "/page$");
+    assert.equal(
+      checkRobotsRule("https://example.com/page?x=1", groups, "GPTBot").allowed,
+      true,
+      "$ no alcanza la forma con query"
+    );
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

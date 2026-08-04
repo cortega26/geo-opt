@@ -144,11 +144,15 @@ export function parseRobotsGroups(content) {
   let current = null;
 
   for (let rawLine of content.split("\n")) {
-    rawLine = rawLine.replace(/#.*/, "").trim();
-    if (!rawLine) {
-      current = null;
-      continue;
+    const trimmed = rawLine.trim();
+    const withoutComment = trimmed.replace(/#.*/, "").trim();
+    if (!withoutComment) {
+      if (!trimmed) {
+        current = null; // real blank line ends the group
+      }
+      continue; // comment-only line: keep the current group open
     }
+    rawLine = withoutComment;
 
     const agentMatch = rawLine.match(/^User-agent:\s*(.+)$/i);
     if (agentMatch) {
@@ -156,7 +160,15 @@ export function parseRobotsGroups(content) {
         current = { agents: [], rules: [] };
         groups.push(current);
       }
-      current.agents.push(agentMatch[1].trim());
+      // Google's de-facto spec permits comma-separated product tokens on one
+      // line; each token is a separate agent (RFC 9309 ABNF only covers one
+      // token per line). A trailing comma drops the empty last token.
+      for (const token of agentMatch[1]
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean)) {
+        current.agents.push(token);
+      }
       continue;
     }
 
@@ -278,8 +290,11 @@ function collectMatchedAgents(groups) {
   const agents = [];
   for (const group of groups) {
     for (const agent of group.agents) {
-      if (!seen.has(agent)) {
-        seen.add(agent);
+      // Matching is case-insensitive (agentApplies), so dedup is too; keep
+      // the first-seen original casing in the report.
+      const key = agent.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
         agents.push(agent);
       }
     }

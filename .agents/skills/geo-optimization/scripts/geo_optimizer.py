@@ -1818,17 +1818,25 @@ def parse_robots_groups(content):
     current = None
 
     for raw_line in content.split("\n"):
-        raw_line = re.sub(r"#.*", "", raw_line).strip()
-        if not raw_line:
-            current = None
-            continue
+        stripped = raw_line.strip()
+        without_comment = re.sub(r"#.*", "", stripped).strip()
+        if not without_comment:
+            if not stripped:
+                current = None  # real blank line ends the group
+            continue  # comment-only line: keep the current group open
+        raw_line = without_comment
 
         agent_match = re.match(r"^User-agent:\s*(.+)$", raw_line, re.IGNORECASE)
         if agent_match:
             if current is None or current["rules"]:
                 current = {"agents": [], "rules": []}
                 groups.append(current)
-            current["agents"].append(agent_match.group(1).strip())
+            # Google's de-facto spec permits comma-separated product tokens on
+            # one line; each token is a separate agent (RFC 9309 ABNF only
+            # covers one token per line). A trailing comma drops the empty
+            # last token.
+            for token in [t.strip() for t in agent_match.group(1).split(",") if t.strip()]:
+                current["agents"].append(token)
             continue
 
         rule_match = re.match(r"^(Allow|Disallow):\s*(.*)$", raw_line, re.IGNORECASE)
@@ -1849,17 +1857,42 @@ def agent_applies(agent_pattern, target_agent):
     return agent_pattern.lower() in target_agent.lower()
 
 
-def select_robots_group(groups, target_agent):
-    selected = None
-    selected_length = -1
+def select_robots_groups(groups, target_agent):
+    """Return ALL groups whose user-agent token applies with the highest
+    specificity (longest matching token). Equally specific groups are combined
+    per RFC 9309 2.2.1 — mirrors Node's selectGroups()."""
+    best_length = -1
+    selected = []
 
     for group in groups:
-        for agent in group["agents"]:
-            if agent_applies(agent, target_agent) and len(agent) > selected_length:
-                selected = group
-                selected_length = len(agent)
+        applicable = [agent for agent in group["agents"] if agent_applies(agent, target_agent)]
+        if not applicable:
+            continue
+        group_length = max(len(agent) for agent in applicable)
+        if group_length > best_length:
+            best_length = group_length
+            selected = [group]
+        elif group_length == best_length:
+            selected.append(group)
 
     return selected
+
+
+def collect_matched_agents(groups):
+    """Union of the agents of the selected groups in document order,
+    deduplicated case-insensitively (matching is case-insensitive); keep the
+    first-seen original casing. None when no groups were selected."""
+    if not groups:
+        return None
+    seen = set()
+    agents = []
+    for group in groups:
+        for agent in group["agents"]:
+            key = agent.lower()
+            if key not in seen:
+                seen.add(key)
+                agents.append(agent)
+    return agents
 
 
 def robots_rule_matches_path(rule_path, target_path):
@@ -1873,23 +1906,27 @@ def robots_rule_matches_path(rule_path, target_path):
     return re.match(pattern, target_path) is not None
 
 
-def evaluate_robots_group(group, target_path):
-    if not group:
+def evaluate_robots_groups(groups, target_path):
+    """Evaluate the merged rules of ALL selected groups (longest match wins,
+    Allow wins on equal length). Mirrors Node's evaluateSelectedGroups(). An
+    empty list means 'no rules': access allowed without a matching rule."""
+    if not groups:
         return {"allowed": True, "matchedRule": None}
 
     strongest_rule = None
-    for rule in group["rules"]:
-        if not robots_rule_matches_path(rule["path"], target_path):
-            continue
-        if (
-            strongest_rule is None
-            or len(rule["path"]) > len(strongest_rule["path"])
-            or (
-                len(rule["path"]) == len(strongest_rule["path"])
-                and rule["directive"] == "allow"
-            )
-        ):
-            strongest_rule = rule
+    for group in groups:
+        for rule in group["rules"]:
+            if not robots_rule_matches_path(rule["path"], target_path):
+                continue
+            if (
+                strongest_rule is None
+                or len(rule["path"]) > len(strongest_rule["path"])
+                or (
+                    len(rule["path"]) == len(strongest_rule["path"])
+                    and rule["directive"] == "allow"
+                )
+            ):
+                strongest_rule = rule
 
     return {
         "allowed": strongest_rule is None or strongest_rule["directive"] != "disallow",
@@ -1918,19 +1955,19 @@ def crawler_warnings(entry):
 def audit_robots(content, target_path="/"):
     """Return effective robots.txt policy for the versioned crawler registry."""
     groups = parse_robots_groups(content)
-    wildcard_group = select_robots_group(groups, "*")
+    wildcard_groups = select_robots_groups(groups, "*")
     wildcard = {
-        "matchedGroup": wildcard_group["agents"] if wildcard_group else None,
-        **evaluate_robots_group(wildcard_group, target_path),
+        "matchedGroup": collect_matched_agents(wildcard_groups),
+        **evaluate_robots_groups(wildcard_groups, target_path),
     }
     agents = []
     for entry in AI_CRAWLER_REGISTRY:
-        group = select_robots_group(groups, entry["token"])
+        entry_groups = select_robots_groups(groups, entry["token"])
         agents.append(
             {
                 **entry,
-                "matchedGroup": group["agents"] if group else None,
-                **evaluate_robots_group(group, target_path),
+                "matchedGroup": collect_matched_agents(entry_groups),
+                **evaluate_robots_groups(entry_groups, target_path),
                 "warnings": crawler_warnings(entry),
             }
         )

@@ -25,6 +25,7 @@ from geo_optimizer import (
     audit_llms_txt,
     audit_robots,
     generate_robots_txt,
+    parse_robots_groups,
     check_robots,
     generate_schema_data,
     has_pro_entitlement,
@@ -118,6 +119,99 @@ class TestGeoOptimizer(unittest.TestCase):
         finally:
             os.remove(unrelated_path)
             os.remove(allowed_path)
+
+    def test_parse_robots_groups_splits_comma_agents(self):
+        groups = parse_robots_groups(
+            "User-agent: GPTBot, Googlebot\nDisallow: /private\n"
+        )
+        self.assertEqual(groups[0]["agents"], ["GPTBot", "Googlebot"])
+        self.assertEqual(groups[0]["rules"][0]["path"], "/private")
+
+        trailing = parse_robots_groups(
+            "User-agent: GPTBot, \nDisallow: /private\n"
+        )
+        self.assertEqual(trailing[0]["agents"], ["GPTBot"])
+
+        spaced = parse_robots_groups(
+            "User-agent:  Googlebot  ,ClaudeBot\nDisallow: /x\n"
+        )
+        self.assertEqual(spaced[0]["agents"], ["Googlebot", "ClaudeBot"])
+
+    def test_parse_robots_groups_keeps_groups_across_comment_lines(self):
+        kept = parse_robots_groups(
+            "User-agent: GPTBot\n# nota\nDisallow: /private\n"
+        )
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(len(kept[0]["rules"]), 1)
+        self.assertEqual(kept[0]["rules"][0]["path"], "/private")
+
+        merged = parse_robots_groups(
+            "User-agent: GPTBot\n# comentario\nUser-agent: Googlebot\nDisallow: /x\n"
+        )
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["agents"], ["GPTBot", "Googlebot"])
+
+        separated = parse_robots_groups(
+            "User-agent: GPTBot\n\nUser-agent: Googlebot\nDisallow: /x\n"
+        )
+        self.assertEqual(len(separated), 2)
+
+    def test_audit_robots_combines_equally_specific_groups(self):
+        content = (
+            "User-agent: GPTBot\n"
+            "Disallow: /no-gpt\n"
+            "Disallow: /search?q=spam\n"
+            "User-agent: GPTBot\n"
+            "Disallow: /also-gpt\n"
+            "Allow: /no-gpt/public\n"
+            "User-agent: *\n"
+            "Disallow: /wild-a\n"
+            "User-agent: *\n"
+            "Disallow: /wild-b\n"
+            "User-agent: *\n"
+            "Disallow: /tie\n"
+            "User-agent: *\n"
+            "Allow: /tie\n"
+        )
+        cases = [
+            ("GPTBot", "/no-gpt/draft", False),
+            ("GPTBot", "/also-gpt/draft", False),
+            ("GPTBot", "/no-gpt/public/read", True),
+            ("GPTBot", "/search?q=spam", False),
+            ("GPTBot", "/search?q=news", True),
+            ("GPTBot", "/search", True),
+            ("GPTBot", "/tie", True),
+            ("GPTBot", "/wild-a/x", True),
+            ("MyBot", "/wild-a/x", False),
+            ("MyBot", "/wild-b/x", False),
+            ("MyBot", "/tie", True),
+            ("MyBot", "/open", True),
+        ]
+        for agent, target, expected in cases:
+            result = audit_robots(content, target)
+            if agent == "MyBot":
+                decision = result["wildcard"]
+            else:
+                decision = next(e for e in result["agents"] if e["token"] == agent)
+            self.assertEqual(decision["allowed"], expected, f"{agent} {target}")
+
+    def test_audit_robots_matched_group_dedup_case_insensitive(self):
+        content = "User-agent: GPTBot\nDisallow: /a\nUser-agent: gptbot\nDisallow: /b\n"
+        result = audit_robots(content, "/b/x")
+        entry = next(e for e in result["agents"] if e["token"] == "GPTBot")
+        self.assertEqual(entry["matchedGroup"], ["GPTBot"])
+        self.assertFalse(entry["allowed"])
+        self.assertEqual(entry["matchedRule"]["path"], "/b")
+
+    def test_audit_robots_dollar_anchor_pinned(self):
+        content = "User-agent: GPTBot\nDisallow: /page$\n"
+        result_plain = audit_robots(content, "/page")
+        entry = next(e for e in result_plain["agents"] if e["token"] == "GPTBot")
+        self.assertFalse(entry["allowed"])
+        self.assertEqual(entry["matchedRule"]["path"], "/page$")
+        result_query = audit_robots(content, "/page?x=1")
+        entry_query = next(e for e in result_query["agents"] if e["token"] == "GPTBot")
+        self.assertTrue(entry_query["allowed"])
 
     def test_generate_schema_data_article(self):
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as temp:

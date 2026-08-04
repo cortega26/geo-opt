@@ -301,6 +301,36 @@ describe("Python CLI smoke tests (tier: compatible)", () => {
     }
   });
 
+  it("robots audit reflects combined rules of separated equally specific groups", () => {
+    // Two separated GPTBot groups: only the SECOND blocks the root. The
+    // Python port must combine both groups (Plan 094 parity), so GPTBot ends
+    // up blocked — a single-group port would only see the first group's
+    // /first rule and report allowed.
+    const tmpFile = path.join(REPO_ROOT, `conformance-robots-combined-${Date.now()}.txt`);
+    execFileSync(
+      "bash",
+      [
+        "-c",
+        `printf 'User-agent: GPTBot\\nDisallow: /first\\nUser-agent: GPTBot\\nDisallow: /\\nUser-agent: *\\nAllow: /' > ${tmpFile}`,
+      ],
+      { cwd: REPO_ROOT }
+    );
+    try {
+      const out = py(["robots", "audit", tmpFile, "--format", "json"]);
+      const parsed = JSON.parse(out);
+      const gpt = parsed.agents.find((entry) => entry.token === "GPTBot");
+      assert.ok(gpt, "GPTBot entry present in the Python report");
+      assert.equal(
+        gpt.allowed,
+        false,
+        "the second group's root Disallow must apply through the combined decision"
+      );
+      assert.deepEqual(gpt.matchedGroup, ["GPTBot"]);
+    } finally {
+      execFileSync("rm", ["-f", tmpFile], { stdio: "ignore" });
+    }
+  });
+
   it("robots generate --help exits 0", () => {
     const out = py(["robots", "generate", "--help"]);
     assert.ok(out.includes("usage:") || out.includes("--dry-run"));

@@ -31,6 +31,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- **fix:** `User-agent:` lines with comma-separated tokens now split into separate agents (Google de-facto spec), comment-only lines no longer end a group (dropping following rules), and the Python port matches Node's combined-group semantics — equally specific groups merge their rules, `matchedGroup` dedup is case-insensitive in both runtimes, and percent-encoding byte-for-byte matching plus `$`-anchored query exclusion are pinned by tests (Plan 094)
+- **test:** pin comma-agent splitting, comment-line group continuity, Node↔Python combined-group parity, case-insensitive `matchedGroup` dedup, percent-encoding byte-for-byte matching and `$`-anchor query exclusion (Plan 094)
 - **fix:** robots.txt groups with equally specific user-agent tokens now combine their rules (RFC 9309 §2.2.1) in both `auditRobots` and `checkRobotsRule`, and rule matching includes the URL query string as part of the path (Plan 078)
 - **fix:** the shared total deadline (Plan 077) no longer leaks a pending timer when request creation throws synchronously — the timer armed before the promise is now cleared before rethrowing (Plan 092)
 - **test:** pin the entry-check no-connection semantics (Plan 093)
