@@ -588,7 +588,7 @@ declare module "geo-opt" {
   ): string;
 
   export function renderAggregateReportHtml(
-    results: AuditResult[],
+    results: AggregatePerFile[],
     summary: AggregateReport,
     options?: HtmlReportOptions
   ): string;
@@ -617,7 +617,17 @@ declare module "geo-opt" {
     status: "success" | "error";
     score?: number;
     report?: AuditReport;
+    /** Raw source body. Internal reuse only (e.g. generate-all) — never serialized into reports or summaries. */
     content?: string;
+    error?: string;
+  }
+
+  /** Per-file entry in an aggregate report. Never contains raw source bodies. */
+  export interface AggregatePerFile {
+    file: string;
+    status: "success" | "error";
+    score?: number;
+    report?: AuditReport;
     error?: string;
   }
 
@@ -645,7 +655,7 @@ declare module "geo-opt" {
       fileCount: number;
     }>;
     worstFiles?: Array<{ file: string; score: number }>;
-    perFile?: AuditResult[];
+    perFile?: AggregatePerFile[];
   }
 
   export function auditFiles(files: string[], config: GeoConfig): AuditResult[];

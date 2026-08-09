@@ -416,6 +416,94 @@ describe("CLI sitemap", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Summary redaction (plan 080)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("CLI summary redaction", () => {
+  const SECRET = "LEAK-SENTINEL-080-CORP-BUDGET-42";
+
+  function makeContentDir() {
+    const tmpDir = mkdtempSync(join(repoRoot, "tmp-cli-redact-"));
+    const contentDir = join(tmpDir, "content");
+    mkdirSync(contentDir, { recursive: true });
+    writeFileSync(
+      join(contentDir, "secret.md"),
+      `# Secret Page\n\nBudget planning discusses ${SECRET} confidential details.\n`
+    );
+    return { tmpDir, contentDir };
+  }
+
+  it("audit --summary --format json omits audited bodies", () => {
+    const { tmpDir, contentDir } = makeContentDir();
+    try {
+      const { status, stdout, stderr } = run([
+        "audit",
+        contentDir,
+        "--recursive",
+        "--summary",
+        "--format",
+        "json",
+      ]);
+      assert.equal(status, 0, stderr);
+      assert.ok(!stdout.includes(SECRET), "aggregate JSON must not contain audited bodies");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("audit --format json without --summary omits audited bodies", () => {
+    const { tmpDir, contentDir } = makeContentDir();
+    try {
+      const { status, stdout, stderr } = run([
+        "audit",
+        contentDir,
+        "--recursive",
+        "--format",
+        "json",
+      ]);
+      assert.equal(status, 0, stderr);
+      assert.ok(!stdout.includes(SECRET), "per-file report JSON must not contain audited bodies");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("audit text summary omits audited bodies", () => {
+    const { tmpDir, contentDir } = makeContentDir();
+    try {
+      const { status, stdout, stderr } = run(["audit", contentDir, "--recursive", "--summary"]);
+      assert.equal(status, 0, stderr);
+      assert.ok(!stdout.includes(SECRET), "text summary must not contain audited bodies");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("generate-all audit-report.json omits bodies while llms-full.txt keeps them", () => {
+    const { tmpDir, contentDir } = makeContentDir();
+    const outDir = join(tmpDir, "out");
+    try {
+      const { status, stderr } = run([
+        "generate-all",
+        contentDir,
+        "--recursive",
+        "--output",
+        outDir,
+        "--site-url",
+        "https://example.com",
+      ]);
+      assert.equal(status, 0, stderr);
+      const reportJson = readFileSync(join(outDir, "audit-report.json"), "utf8");
+      assert.ok(!reportJson.includes(SECRET), "audit-report.json must omit audited bodies");
+      const llmsFull = readFileSync(join(outDir, "llms-full.txt"), "utf8");
+      assert.ok(llmsFull.includes(SECRET), "llms-full.txt must keep page content");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Generate-All
 // ═══════════════════════════════════════════════════════════════════════════
 

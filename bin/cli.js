@@ -1125,8 +1125,9 @@ program
           ? renderV2ReportHtml(r.report, r.file, { noBranding })
           : renderV1ReportHtml(r.report, r.file, { noBranding });
     } else {
-      // Multi-file aggregate report
-      html = renderAggregateReportHtml(results, summary, { noBranding });
+      // Multi-file aggregate report: use the redacted per-file view, never
+      // the raw audit results so source bodies cannot reach the HTML output.
+      html = renderAggregateReportHtml(summary.perFile ?? [], summary, { noBranding });
     }
 
     const outPath = path.resolve(options.output);

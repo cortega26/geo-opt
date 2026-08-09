@@ -454,7 +454,7 @@ independent work.
 | [077](archive/077-enforce-total-redirect-timeout.md) | Share one timeout deadline across redirects and body reads | bug/security | P1 | M | 073 | DONE (2026-08-03; squash-merged to main as `7f29992`) |
 | [078](archive/078-fix-robots-group-and-query-matching.md) | Combine equally specific robots groups and include query strings | bug | P2 | M | 073 | DONE (2026-08-03; squash-merged to main as `c85ee5d`) |
 | [079](archive/079-honor-fetcher-user-agent.md) | Honor and validate the public fetcher user-agent option | bug/api | P2 | S | 073 | DONE (2026-08-03; executed in worktree as `912f525`, reviewed and APPROVED — squash-merge to main pending) |
-| [080](080-redact-source-content-from-summaries.md) | Remove audited source bodies from serialized summaries | privacy/bug | P1 | S | — | TODO |
+| [080](archive/080-redact-source-content-from-summaries.md) | Remove audited source bodies from serialized summaries | privacy/bug | P1 | S | — | DONE (2026-08-09; executed in worktree on `main` — squash-merge pending) |
 | [081](081-reconcile-public-types-and-exports.md) | Synchronize runtime exports, declarations, profiles, and batch signatures | api/types | P1 | M | — | TODO |
 | [082](082-enforce-jsonld-validation-results.md) | Return structured validation results and fail invalid JSON-LD | bug/api | P1 | M | 081 | TODO |
 | [083](083-close-symlink-write-escapes.md) | Route every Node/Python artifact destination through atomic symlink-safe writes | security | P1 | L | — | TODO |

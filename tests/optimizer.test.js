@@ -1443,6 +1443,58 @@ test("aggregateReport handles zero successes", () => {
   assert.ok(summary.message);
 });
 
+test("aggregateReport omits raw source bodies from per-file data (plan 080)", () => {
+  const SECRET = "LEAK-SENTINEL-080-CORP-BUDGET-42";
+  const results = [
+    {
+      file: "a.md",
+      status: "success",
+      score: 80,
+      report: { recommendations: ["Add links"] },
+      content: SECRET,
+    },
+    { file: "bad.md", status: "error", error: "Read failed: ENOENT", content: "other-secret" },
+  ];
+  const summary = aggregateReport(results);
+  const serialized = JSON.stringify(summary);
+  assert.ok(!serialized.includes(SECRET), "aggregate JSON must not contain success bodies");
+  assert.ok(!serialized.includes("other-secret"), "aggregate JSON must not contain error bodies");
+  assert.strictEqual(results[0].content, SECRET, "original results must keep content for reuse");
+  assert.ok(Array.isArray(summary.perFile));
+  for (const entry of summary.perFile) {
+    assert.ok(!("content" in entry), "perFile entries must not expose content");
+  }
+  assert.strictEqual(summary.perFile[0].score, 80);
+  assert.deepStrictEqual(summary.perFile[0].report, { recommendations: ["Add links"] });
+  assert.strictEqual(summary.perFile[1].error, "Read failed: ENOENT");
+});
+
+test("aggregateReport preserves metadata on non-success per-file entries (plan 080)", () => {
+  const partial = {
+    file: "partial.md",
+    status: "error",
+    score: 45,
+    report: { recommendations: ["Add links"] },
+    error: "network",
+    content: "PARTIAL-SENTINEL",
+  };
+  const summary = aggregateReport([partial]);
+  const entry = summary.perFile[0];
+  assert.strictEqual(entry.score, 45, "score must survive on non-success entries");
+  assert.deepStrictEqual(entry.report, { recommendations: ["Add links"] });
+  assert.strictEqual(entry.error, "network");
+  assert.ok(!("content" in entry), "content must never survive");
+  assert.ok(!JSON.stringify(summary).includes("PARTIAL-SENTINEL"));
+  assert.strictEqual(partial.content, "PARTIAL-SENTINEL", "input must not be mutated");
+});
+
+test("aggregateReport zero-success branch also omits content (plan 080)", () => {
+  const results = [{ file: "a.md", status: "error", error: "bad", content: "ZERO-SENTINEL" }];
+  const summary = aggregateReport(results);
+  assert.ok(!JSON.stringify(summary).includes("ZERO-SENTINEL"));
+  assert.strictEqual(results[0].content, "ZERO-SENTINEL");
+});
+
 test("auditFiles collects errors without crashing", () => {
   const results = auditFiles(["/nonexistent/file.md"], {});
   assert.strictEqual(results.length, 1);
@@ -3222,6 +3274,24 @@ test("renderAggregateReportHtml escapes hostile input", () => {
   } finally {
     fs.unlinkSync(tempFile);
   }
+});
+
+test("renderAggregateReportHtml never emits source bodies (plan 080)", () => {
+  const SECRET = "LEAK-SENTINEL-080-CORP-BUDGET-42";
+  const results = [
+    {
+      file: "secret.md",
+      status: "success",
+      score: 70,
+      report: { recommendations: ["Add links"] },
+      content: SECRET,
+    },
+  ];
+  const summary = aggregateReport(results);
+  const html = renderAggregateReportHtml(results, summary);
+  assert.ok(!html.includes(SECRET), "HTML aggregate report must not embed source bodies");
+  assert.ok(html.includes("secret.md"), "file name must still appear");
+  assert.ok(html.includes("70"), "score must still appear");
 });
 
 test("esc function escapes single quotes", () => {

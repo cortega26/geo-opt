@@ -62,6 +62,24 @@ function isValidatedFinding(finding) {
 }
 
 /**
+ * Build the public per-file view of an audit result. Serialized aggregates
+ * must never carry raw source bodies; `generate-all` consumes `content` from
+ * the original results, so this returns a new object and never mutates input.
+ * Metadata (score/report/error) is preserved whenever present, regardless of
+ * status, so partially-scored stored results keep their data.
+ *
+ * @param {object} result - output from auditFiles()
+ * @returns {{ file: string, status: string, score?: number, report?: object, error?: string }}
+ */
+function toAggregatePerFile(result) {
+  const perFile = { file: result.file, status: result.status };
+  if (result.score !== undefined) perFile.score = result.score;
+  if (result.report !== undefined) perFile.report = result.report;
+  if (result.error !== undefined) perFile.error = result.error;
+  return perFile;
+}
+
+/**
  * Aggregate per-file audit results into a site-level summary report.
  *
  * @param {Array} results - output from auditFiles()
@@ -80,7 +98,7 @@ export function aggregateReport(results) {
       succeeded: 0,
       failed,
       message: "No files could be audited.",
-      perFile: results,
+      perFile: results.map(toAggregatePerFile),
     };
   }
 
@@ -151,7 +169,7 @@ export function aggregateReport(results) {
       .sort((a, b) => a.score - b.score)
       .slice(0, 5)
       .map((r) => ({ file: r.file, score: r.score })),
-    perFile: results,
+    perFile: results.map(toAggregatePerFile),
   };
 }
 
