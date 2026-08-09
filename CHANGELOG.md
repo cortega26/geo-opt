@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [2.4.0](https://github.com/cortega26/geo-opt/compare/v2.3.11...v2.4.0) (2026-08-09)
+
+
+### Features
+
+* **validate:** CI-grade JSON-LD validation gate (Plans 081+082) ([13bdfeb](https://github.com/cortega26/geo-opt/commit/13bdfeb36c476de59dc631eb6a1506b500d41620))
+
 ## [Unreleased]
 
 ### Changed
