@@ -36,6 +36,8 @@ from geo_optimizer import (
     reminders_are_enabled,
     set_reminders_enabled,
     write_engagement_state,
+    write_file_safe,
+    copy_file_safe,
 )
 
 class TestGeoOptimizer(unittest.TestCase):
@@ -940,6 +942,116 @@ class TestGeoOptimizer(unittest.TestCase):
         finally:
             import shutil
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+class SymlinkSafeWriteTests(unittest.TestCase):
+    """Plan 083: atomic symlink-safe artifact writes (Python boundary)."""
+
+    def setUp(self):
+        self.work_dir = tempfile.mkdtemp(prefix="geo-safe-py-", dir=os.getcwd())
+        self.outside_dir = tempfile.mkdtemp(prefix="geo-outside-py-")
+        self.prev_cwd = os.getcwd()
+        os.chdir(self.work_dir)
+
+    def tearDown(self):
+        os.chdir(self.prev_cwd)
+        import shutil
+
+        shutil.rmtree(self.work_dir, ignore_errors=True)
+        shutil.rmtree(self.outside_dir, ignore_errors=True)
+
+    def test_write_file_safe_normal(self):
+        write_file_safe("out.txt", "hola")
+        with open("out.txt", "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "hola")
+        self.assertEqual(
+            [n for n in os.listdir(".") if n.endswith(".tmp") or ".geo-opt-tmp" in n], []
+        )
+
+    def test_write_file_safe_preserves_mode(self):
+        write_file_safe("out.txt", "v1")
+        os.chmod("out.txt", 0o600)
+        write_file_safe("out.txt", "v2")
+        self.assertEqual(os.stat("out.txt").st_mode & 0o777, 0o600)
+
+    def test_write_file_safe_rejects_final_symlink(self):
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "out.txt")
+        with self.assertRaises(SystemExit):
+            write_file_safe("out.txt", "x")
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_write_file_safe_rejects_symlinked_parent(self):
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(self.outside_dir, "sub")
+        with self.assertRaises(SystemExit):
+            write_file_safe("sub/out.txt", "x")
+        self.assertFalse(os.path.exists(os.path.join(self.outside_dir, "out.txt")))
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_copy_file_safe_rejects_final_symlink(self):
+        with open("src.md", "w", encoding="utf-8") as f:
+            f.write("contenido")
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "src.md.bak")
+        with self.assertRaises(SystemExit):
+            copy_file_safe("src.md", "src.md.bak")
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_copy_file_safe_normal_backup(self):
+        with open("src.md", "w", encoding="utf-8") as f:
+            f.write("contenido")
+        os.chmod("src.md", 0o640)
+        copy_file_safe("src.md", "src.md.bak")
+        with open("src.md.bak", "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "contenido")
+        self.assertEqual(os.stat("src.md.bak").st_mode & 0o777, 0o640)
+
+    def test_cli_robots_generate_rejects_symlink_output(self):
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "robots.txt")
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "geo_optimizer.py"
+        )
+        result = subprocess.run(
+            [sys.executable, script_path, "robots", "generate", "--output", "robots.txt"],
+            cwd=self.work_dir, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr)
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_cli_llmstxt_generate_rejects_symlink_output(self):
+        with open("index.md", "w", encoding="utf-8") as f:
+            f.write("# Home\n\nWelcome to our test site with enough words for a description.\n")
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "llms.txt")
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "geo_optimizer.py"
+        )
+        result = subprocess.run(
+            [sys.executable, script_path, "llmstxt", "generate", ".",
+             "--site-url", "https://example.com", "--title", "Test Site",
+             "--description", "A description.", "--recursive"],
+            cwd=self.work_dir, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
 
 
 if __name__ == "__main__":

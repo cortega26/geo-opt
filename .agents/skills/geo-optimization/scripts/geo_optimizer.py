@@ -6,6 +6,7 @@ import json
 import argparse
 import contextlib
 import io
+import stat
 import tempfile
 from datetime import datetime, timezone
 
@@ -665,6 +666,84 @@ def is_inside_directory(candidate_path, directory_path):
     return relative_path == "." or not (
         relative_path == ".." or relative_path.startswith(f"..{os.sep}") or os.path.isabs(relative_path)
     )
+
+
+def _resolve_existing_parent(dir_path):
+    """Real path of the nearest existing ancestor of dir_path."""
+    probe = os.path.abspath(dir_path)
+    while not os.path.exists(probe):
+        parent = os.path.dirname(probe)
+        if parent == probe:
+            break
+        probe = parent
+    return os.path.realpath(probe)
+
+
+def write_file_safe(filepath, content, mode=None):
+    """Atomically write content to filepath inside the CWD (Plan 083).
+
+    Rejects a destination whose parent resolves outside the CWD and a final
+    name that already is a symlink or a directory. Writes through a unique
+    temp file in the real parent directory and os.replace()s it into place,
+    so a symlink raced in between check and write is replaced, not followed.
+    Preserves the mode of an existing regular file (or the caller-provided
+    mode). Cleans the temp file on failure. Exits with status 1 on refusal.
+    """
+    cwd_real = os.path.realpath(os.getcwd())
+    dest_dir = os.path.dirname(os.path.abspath(filepath))
+    dest_dir_real = _resolve_existing_parent(dest_dir)
+    if not is_inside_directory(dest_dir_real, cwd_real):
+        print(
+            f"Error: Security restriction — output path {filepath} resolves outside the current working directory.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    try:
+        lstat_result = os.lstat(filepath)
+    except OSError:
+        lstat_result = None
+    if lstat_result is not None:
+        if os.path.islink(filepath):
+            print(
+                f"Error: Security restriction — refusing to write through symlink: {filepath}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if os.path.isdir(filepath):
+            print(f"Error: Output path {filepath} is a directory.", file=sys.stderr)
+            sys.exit(1)
+        if mode is None:
+            mode = stat.S_IMODE(os.stat(filepath).st_mode)
+
+    descriptor, temp_path = tempfile.mkstemp(dir=dest_dir_real, prefix=".geo-opt-tmp-")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as temp_file:
+            temp_file.write(content)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        if mode is not None:
+            os.chmod(temp_path, mode)
+        os.replace(temp_path, filepath)
+    except Exception as exc:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise exc
+
+
+def copy_file_safe(src, dest):
+    """Copy an existing validated source file to a new destination (Plan 083).
+
+    The source must resolve inside the CWD; its mode is preserved and the
+    destination goes through write_file_safe.
+    """
+    assert_writable_target_inside_cwd(src)
+    mode = stat.S_IMODE(os.stat(src).st_mode)
+    with open(src, "r", encoding="utf-8", errors="replace") as src_file:
+        data = src_file.read()
+    write_file_safe(dest, data, mode=mode)
 
 
 def assert_writable_target_inside_cwd(filepath):
@@ -2289,8 +2368,7 @@ def inject_schema(filepath, schema_type, config, dry_run=False, no_branding=Fals
         return
 
     try:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(content)
+        write_file_safe(filepath, content)
     except Exception as e:
         print(f"Error: Failed to write to file {filepath}: {e}", file=sys.stderr)
         sys.exit(1)
@@ -2474,8 +2552,7 @@ def main():
                 print(content)
                 print(f"[dry-run] Would write to: {args.output}")
             else:
-                with open(args.output, "w", encoding="utf-8") as f:
-                    f.write(content)
+                write_file_safe(args.output, content)
                 print(f"robots.txt written to {args.output}")
         else:
             check_robots(args.filepath, output_format=args.format)
@@ -2557,14 +2634,12 @@ def main():
             else:
                 out_dir = os.path.abspath(args.output)
                 os.makedirs(out_dir, exist_ok=True)
-                with open(os.path.join(out_dir, "llms.txt"), "w", encoding="utf-8") as f:
-                    f.write(llms_content)
+                write_file_safe(os.path.join(out_dir, "llms.txt"), llms_content)
                 sections_n = len(set(e["section"] for e in entries))
                 print(f"✓ llms.txt written ({len(entries)} pages, {sections_n} sections) → {os.path.join(out_dir, 'llms.txt')}")
                 if args.full:
                     full_content = generate_llms_full_txt([e for e in entries if e.get("content")], site_title)
-                    with open(os.path.join(out_dir, "llms-full.txt"), "w", encoding="utf-8") as f:
-                        f.write(full_content)
+                    write_file_safe(os.path.join(out_dir, "llms-full.txt"), full_content)
                     print(f"✓ llms-full.txt written → {os.path.join(out_dir, 'llms-full.txt')}")
 
             if errors_list:
@@ -2643,10 +2718,8 @@ def main():
             if backup and not dry_run:
                 backup_path = args.filepath + ".bak"
                 assert_writable_target_inside_cwd(args.filepath)
-                assert_new_file_parent_inside_cwd(backup_path)
                 try:
-                    import shutil
-                    shutil.copy2(args.filepath, backup_path)
+                    copy_file_safe(args.filepath, backup_path)
                     print(f"Backup created: {backup_path}")
                 except Exception as e:
                     print(f"Error: Failed to create backup {backup_path}: {e}", file=sys.stderr)

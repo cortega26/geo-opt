@@ -1,5 +1,7 @@
 import fs from "fs";
 import path from "path";
+
+import { writeFileAtomic } from "./safe-write.js";
 import { cleanMarkdownToPlainText, cleanHtmlText, extractSections } from "./text.js";
 import { extractPageMetadata } from "./llms-txt.js";
 import { getNoBrandingError, hasProEntitlement, LICENSE_ENV_VAR } from "./integrity.js";
@@ -652,7 +654,7 @@ export function injectSchema(filepath, schemaType, config, options = {}) {
   }
 
   try {
-    fs.writeFileSync(filepath, modifiedContent, { encoding: "utf8" });
+    writeFileAtomic(filepath, modifiedContent);
   } catch (e) {
     throw new Error(`Failed to write to file ${filepath}: ${e.message}`, { cause: e });
   }

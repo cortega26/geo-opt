@@ -4,6 +4,8 @@ import fs from "fs";
 import chalk from "chalk";
 import path from "path";
 
+import { copyFileAtomic, writeFileAtomic } from "../src/safe-write.js";
+
 import {
   auditFiles,
   aggregateReport,
@@ -11,7 +13,6 @@ import {
   auditLlmsTxt,
   auditTechnicalHtml,
   batchInject,
-  assertNewFileParentInsideCwd,
   assertWritableTargetInsideCwd,
   checkRobots,
   discoverFiles,
@@ -367,8 +368,7 @@ robotsCmd
     } else {
       const outPath = path.resolve(options.output);
       try {
-        assertNewFileParentInsideCwd(outPath);
-        fs.writeFileSync(outPath, content, { encoding: "utf8" });
+        writeFileAtomic(outPath, content);
       } catch (e) {
         console.error(`Error: ${e.message}`);
         process.exit(1);
@@ -510,9 +510,7 @@ sitemapCmd
         process.exit(1);
       }
       fs.mkdirSync(outDir, { recursive: true });
-      fs.writeFileSync(path.join(outDir, "sitemap.xml"), sitemapXml, {
-        encoding: "utf8",
-      });
+      writeFileAtomic(path.join(outDir, "sitemap.xml"), sitemapXml);
       console.log(
         `✓ sitemap.xml written (${entries.length} URL(s)) → ${path.join(outDir, "sitemap.xml")}`
       );
@@ -703,9 +701,7 @@ llmstxtCmd
         process.exit(1);
       }
       fs.mkdirSync(outDir, { recursive: true });
-      fs.writeFileSync(path.join(outDir, "llms.txt"), llmsContent, {
-        encoding: "utf8",
-      });
+      writeFileAtomic(path.join(outDir, "llms.txt"), llmsContent);
       console.log(
         `✓ llms.txt written (${entries.length} pages, ${new Set(entries.map((e) => e.section)).size} sections) → ${path.join(outDir, "llms.txt")}`
       );
@@ -718,9 +714,7 @@ llmstxtCmd
           maxChars,
         });
         for (const file of fullFiles) {
-          fs.writeFileSync(path.join(outDir, file.name), file.content, {
-            encoding: "utf8",
-          });
+          writeFileAtomic(path.join(outDir, file.name), file.content);
         }
         if (fullFiles.length === 1) {
           console.log(
@@ -886,13 +880,7 @@ program
       if (backup && !dryRun) {
         const backupPath = file + ".bak";
         try {
-          assertNewFileParentInsideCwd(backupPath);
-        } catch (e) {
-          console.error(`Error: ${e.message}`);
-          process.exit(1);
-        }
-        try {
-          fs.copyFileSync(file, backupPath);
+          copyFileAtomic(file, backupPath);
           console.log(`Backup created: ${backupPath}`);
         } catch (e) {
           console.error(`Error: Failed to create backup ${backupPath}: ${e.message}`);
@@ -1026,9 +1014,7 @@ program
     }
 
     try {
-      fs.writeFileSync(targetPath, JSON.stringify(template, null, 2) + "\n", {
-        encoding: "utf8",
-      });
+      writeFileAtomic(targetPath, JSON.stringify(template, null, 2) + "\n");
       console.log(`Created ${targetPath}`);
       console.log("Edit this file to customize author, publisher, acronyms, and product details.");
     } catch (e) {
@@ -1135,8 +1121,7 @@ program
 
     const outPath = path.resolve(options.output);
     try {
-      assertNewFileParentInsideCwd(outPath);
-      fs.writeFileSync(outPath, html, { encoding: "utf8" });
+      writeFileAtomic(outPath, html);
     } catch (e) {
       console.error(`Error: ${e.message}`);
       process.exit(1);
@@ -1306,13 +1291,13 @@ program
         process.exit(1);
       }
       fs.mkdirSync(outDir, { recursive: true });
-      fs.writeFileSync(path.join(outDir, "audit-report.json"), reportJson, { encoding: "utf8" });
-      fs.writeFileSync(path.join(outDir, "llms.txt"), llmsContent, { encoding: "utf8" });
+      writeFileAtomic(path.join(outDir, "audit-report.json"), reportJson);
+      writeFileAtomic(path.join(outDir, "llms.txt"), llmsContent);
       for (const file of llmsFullFiles) {
-        fs.writeFileSync(path.join(outDir, file.name), file.content, { encoding: "utf8" });
+        writeFileAtomic(path.join(outDir, file.name), file.content);
       }
-      fs.writeFileSync(path.join(outDir, "sitemap.xml"), sitemapContent, { encoding: "utf8" });
-      fs.writeFileSync(path.join(outDir, "robots.txt"), robotsContent, { encoding: "utf8" });
+      writeFileAtomic(path.join(outDir, "sitemap.xml"), sitemapContent);
+      writeFileAtomic(path.join(outDir, "robots.txt"), robotsContent);
 
       console.log("");
       console.log("✅ GEO optimization package generated:");
@@ -1497,8 +1482,7 @@ function emitTechnicalResults(results, options) {
       try {
         // Misma guarda de cwd que report/robots/sitemap/llmstxt (F-12): el
         // resto de escrituras del CLI la aplican; -o no podía escapar.
-        assertNewFileParentInsideCwd(outPath);
-        fs.writeFileSync(outPath, output, { encoding: "utf8" });
+        writeFileAtomic(outPath, output);
       } catch (e) {
         console.error(`Error: Failed to write ${outPath}: ${e.message}`);
         process.exit(1);

@@ -458,6 +458,44 @@ describe("CLI robots", () => {
     const { status } = run(["robots", "audit", "--help"]);
     assert.equal(status, 0);
   });
+
+  it("generate rejects a final-path symlink and never writes outside cwd (Plan 083)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-robots-sym-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "geo-robots-sentinel-"));
+    try {
+      const sentinel = join(outsideDir, "sentinel.txt");
+      writeFileSync(sentinel, "original");
+      symlinkSync(sentinel, join(tmpDir, "robots.txt"));
+      const { status, stderr } = run(["robots", "generate", "--output", "robots.txt"], {
+        cwd: tmpDir,
+      });
+      assert.notEqual(status, 0);
+      assert.ok(stderr.includes("symlink"), "Debe explicar la negativa: " + stderr);
+      assert.equal(readFileSync(sentinel, "utf8"), "original", "el sentinel no cambia");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
+  it("generate rejects a symlinked parent directory (Plan 083)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-robots-parent-"));
+    const outsideDir = mkdtempSync(join(tmpdir(), "geo-robots-parent-sentinel-"));
+    try {
+      const sentinel = join(outsideDir, "sentinel.txt");
+      writeFileSync(sentinel, "original");
+      symlinkSync(outsideDir, join(tmpDir, "sub"));
+      const { status } = run(["robots", "generate", "--output", "sub/robots.txt"], {
+        cwd: tmpDir,
+      });
+      assert.notEqual(status, 0);
+      assert.equal(existsSync(join(outsideDir, "robots.txt")), false);
+      assert.equal(readFileSync(sentinel, "utf8"), "original");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
