@@ -1007,6 +1007,31 @@ class SymlinkSafeWriteTests(unittest.TestCase):
         with open(sentinel, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "original")
 
+    def test_write_file_safe_rejects_missing_directory(self):
+        with self.assertRaises(SystemExit):
+            write_file_safe("no-such-dir/out.txt", "x")
+        self.assertFalse(os.path.exists("no-such-dir"))
+
+    def test_write_file_safe_new_file_default_mode_matches_node(self):
+        write_file_safe("out.txt", "hola")
+        current_umask = os.umask(0)
+        os.umask(current_umask)
+        self.assertEqual(os.stat("out.txt").st_mode & 0o777, 0o644 & ~current_umask)
+
+    def test_write_file_safe_writes_through_parent_symlink_inside_cwd(self):
+        os.makedirs("real-dir")
+        os.symlink("real-dir", "link-in")
+        write_file_safe("link-in/out.txt", "hola")
+        with open("real-dir/out.txt", "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "hola")
+
+    def test_copy_file_safe_preserves_bytes_byte_for_byte(self):
+        with open("src.bin", "wb") as f:
+            f.write(b"\x00\xff\xfe\x80contenido\xff")
+        copy_file_safe("src.bin", "src.bin.bak")
+        with open("src.bin.bak", "rb") as f:
+            self.assertEqual(f.read(), b"\x00\xff\xfe\x80contenido\xff")
+
     def test_copy_file_safe_normal_backup(self):
         with open("src.md", "w", encoding="utf-8") as f:
             f.write("contenido")

@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-import { writeFileAtomic } from "./safe-write.js";
+import { isInsideDirectory, writeFileAtomic } from "./safe-write.js";
 import { cleanMarkdownToPlainText, cleanHtmlText, extractSections } from "./text.js";
 import { extractPageMetadata } from "./llms-txt.js";
 import { getNoBrandingError, hasProEntitlement, LICENSE_ENV_VAR } from "./integrity.js";
@@ -33,10 +33,9 @@ function stripToolticianBranding(content) {
     );
 }
 
-function isInsideDirectory(candidatePath, directoryPath) {
-  const relativePath = path.relative(directoryPath, candidatePath);
-  return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
-}
+// isInsideDirectory proviene de safe-write.js: una única implementación del
+// predicado de contención, compartida por validadores públicos y el boundary
+// de escritura (audit 2026-08-09).
 
 /**
  * Validate that a target path resolves inside the current working directory.

@@ -122,6 +122,57 @@ describe("writeFileAtomic — boundary atómica symlink-safe", () => {
     assert.throws(() => writeFileAtomic("adir", "x"), /is a directory/);
   });
 
+  it("escribe a través de un padre symlink que apunta dentro del CWD, en su destino real", () => {
+    const realDir = path.join(workDir, "real-dir");
+    fs.mkdirSync(realDir);
+    const linkDir = path.join(workDir, "link-in");
+    fs.symlinkSync(realDir, linkDir);
+    writeFileAtomic(path.join(linkDir, "out.txt"), "hola");
+    assert.equal(fs.readFileSync(path.join(realDir, "out.txt"), "utf8"), "hola");
+    assert.equal(fs.readFileSync(path.join(linkDir, "out.txt"), "utf8"), "hola");
+    const realDirTemps = fs.readdirSync(realDir).filter((n) => n.endsWith(".tmp"));
+    assert.deepEqual(realDirTemps, []);
+    assert.deepEqual(tmpFiles(), []);
+  });
+
+  it("no escapa si se recoloca el padre symlink entre validación y rename (audit 083)", () => {
+    const realDir = path.join(workDir, "real-dir");
+    fs.mkdirSync(realDir);
+    const linkDir = path.join(workDir, "link-race");
+    fs.symlinkSync(realDir, linkDir);
+    const realRenameSync = fs.renameSync;
+    let swapped = false;
+    fs.renameSync = (from, to) => {
+      if (!swapped) {
+        swapped = true;
+        fs.rmSync(linkDir);
+        fs.symlinkSync(outsideDir, linkDir);
+      }
+      return realRenameSync.call(fs, from, to);
+    };
+    try {
+      writeFileAtomic(path.join(linkDir, "escaped.txt"), "x");
+    } finally {
+      fs.renameSync = realRenameSync;
+    }
+    assert.equal(
+      fs.existsSync(path.join(outsideDir, "escaped.txt")),
+      false,
+      "el rename nunca puede caer fuera del CWD"
+    );
+    assert.equal(fs.existsSync(path.join(realDir, "escaped.txt")), true);
+    assert.deepEqual(tmpFiles(), []);
+  });
+
+  it("rechaza un directorio de destino inexistente con error claro y sin temporales", () => {
+    assert.throws(
+      () => writeFileAtomic(path.join(workDir, "no-such-dir", "out.txt"), "x"),
+      /Output directory does not exist/
+    );
+    assert.equal(fs.existsSync(path.join(workDir, "no-such-dir")), false);
+    assert.deepEqual(tmpFiles(), []);
+  });
+
   it("sustituye un symlink que se cuela entre la comprobación y el rename (race)", () => {
     const sentinel = path.join(outsideDir, "sentinel.txt");
     fs.writeFileSync(sentinel, "original");

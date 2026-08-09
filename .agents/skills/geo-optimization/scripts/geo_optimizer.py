@@ -668,30 +668,29 @@ def is_inside_directory(candidate_path, directory_path):
     )
 
 
-def _resolve_existing_parent(dir_path):
-    """Real path of the nearest existing ancestor of dir_path."""
-    probe = os.path.abspath(dir_path)
-    while not os.path.exists(probe):
-        parent = os.path.dirname(probe)
-        if parent == probe:
-            break
-        probe = parent
-    return os.path.realpath(probe)
-
-
 def write_file_safe(filepath, content, mode=None):
     """Atomically write content to filepath inside the CWD (Plan 083).
 
-    Rejects a destination whose parent resolves outside the CWD and a final
-    name that already is a symlink or a directory. Writes through a unique
-    temp file in the real parent directory and os.replace()s it into place,
-    so a symlink raced in between check and write is replaced, not followed.
-    Preserves the mode of an existing regular file (or the caller-provided
-    mode). Cleans the temp file on failure. Exits with status 1 on refusal.
+    Rejects a destination whose directory resolves outside the CWD, a missing
+    destination directory, and a final name that already is a symlink or a
+    directory. Writes through a unique temp file in the real destination
+    directory and os.replace()s it onto the fully resolved real destination
+    path, so a symlink — raced in at the final name or re-pointed on a parent
+    component — is replaced, not followed (audit 2026-08-09). Preserves the
+    mode of an existing regular file or applies the caller-provided mode, and
+    defaults to 0o644 masked by the umask for new files (Node parity). Bytes
+    pass through untouched; str content is encoded as UTF-8. Cleans the temp
+    file on failure. Exits with status 1 on refusal.
     """
     cwd_real = os.path.realpath(os.getcwd())
     dest_dir = os.path.dirname(os.path.abspath(filepath))
-    dest_dir_real = _resolve_existing_parent(dest_dir)
+    if not os.path.isdir(dest_dir):
+        print(
+            f"Error: Output directory does not exist: {os.path.relpath(dest_dir, os.getcwd()) or dest_dir}. Create it first, then run the command again.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    dest_dir_real = os.path.realpath(dest_dir)
     if not is_inside_directory(dest_dir_real, cwd_real):
         print(
             f"Error: Security restriction — output path {filepath} resolves outside the current working directory.",
@@ -699,32 +698,40 @@ def write_file_safe(filepath, content, mode=None):
         )
         sys.exit(1)
 
+    final_path = os.path.join(dest_dir_real, os.path.basename(filepath))
     try:
-        lstat_result = os.lstat(filepath)
+        lstat_result = os.lstat(final_path)
     except OSError:
         lstat_result = None
     if lstat_result is not None:
-        if os.path.islink(filepath):
+        if stat.S_ISLNK(lstat_result.st_mode):
             print(
                 f"Error: Security restriction — refusing to write through symlink: {filepath}",
                 file=sys.stderr,
             )
             sys.exit(1)
-        if os.path.isdir(filepath):
+        if stat.S_ISDIR(lstat_result.st_mode):
             print(f"Error: Output path {filepath} is a directory.", file=sys.stderr)
             sys.exit(1)
         if mode is None:
-            mode = stat.S_IMODE(os.stat(filepath).st_mode)
+            mode = stat.S_IMODE(lstat_result.st_mode)
+
+    if mode is None:
+        current_umask = os.umask(0)
+        os.umask(current_umask)
+        mode = 0o644 & ~current_umask
+
+    if isinstance(content, str):
+        content = content.encode("utf-8")
 
     descriptor, temp_path = tempfile.mkstemp(dir=dest_dir_real, prefix=".geo-opt-tmp-")
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as temp_file:
+        with os.fdopen(descriptor, "wb") as temp_file:
             temp_file.write(content)
             temp_file.flush()
             os.fsync(temp_file.fileno())
-        if mode is not None:
-            os.chmod(temp_path, mode)
-        os.replace(temp_path, filepath)
+        os.chmod(temp_path, mode)
+        os.replace(temp_path, final_path)
     except Exception as exc:
         try:
             os.remove(temp_path)
@@ -736,12 +743,14 @@ def write_file_safe(filepath, content, mode=None):
 def copy_file_safe(src, dest):
     """Copy an existing validated source file to a new destination (Plan 083).
 
-    The source must resolve inside the CWD; its mode is preserved and the
-    destination goes through write_file_safe.
+    The source must resolve inside the CWD; it is read through its real path
+    (never through symlinked components), its mode is preserved, and the
+    destination goes through write_file_safe. Bytes are copied untouched, so
+    non-UTF-8 sources back up byte-for-byte (audit 2026-08-09).
     """
-    assert_writable_target_inside_cwd(src)
-    mode = stat.S_IMODE(os.stat(src).st_mode)
-    with open(src, "r", encoding="utf-8", errors="replace") as src_file:
+    src_real_path, _ = assert_writable_target_inside_cwd(src)
+    mode = stat.S_IMODE(os.stat(src_real_path).st_mode)
+    with open(src_real_path, "rb") as src_file:
         data = src_file.read()
     write_file_safe(dest, data, mode=mode)
 
@@ -762,24 +771,6 @@ def assert_writable_target_inside_cwd(filepath):
         sys.exit(1)
 
     return target_real_path, cwd_real_path
-
-
-def assert_new_file_parent_inside_cwd(filepath):
-    try:
-        parent_real_path = os.path.realpath(os.path.dirname(filepath) or ".")
-        cwd_real_path = os.path.realpath(os.getcwd())
-    except OSError as exc:
-        print(f"Error: Failed to resolve real path for {filepath}: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    if not is_inside_directory(parent_real_path, cwd_real_path):
-        print(
-            f"Error: Security restriction — output path {filepath} resolves outside the current working directory.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    return parent_real_path, cwd_real_path
 
 
 def clean_html_text(value):

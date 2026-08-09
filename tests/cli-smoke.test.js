@@ -496,6 +496,20 @@ describe("CLI robots", () => {
       rmSync(outsideDir, { recursive: true, force: true });
     }
   });
+
+  it("generate into a missing directory fails cleanly (audit 083)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-robots-missing-"));
+    try {
+      const { status, stderr } = run(["robots", "generate", "--output", "no-such-dir/robots.txt"], {
+        cwd: tmpDir,
+      });
+      assert.notEqual(status, 0);
+      assert.ok(stderr.includes("Output directory does not exist"), stderr);
+      assert.equal(existsSync(join(tmpDir, "no-such-dir")), false);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
