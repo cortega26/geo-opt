@@ -37,7 +37,7 @@ declare module "geo-opt" {
     allowedExtensions?: string[];
     siteUrl?: string;
     siteDescription?: string;
-    profile?: string; // "auto" | ProfileId
+    profile?: "auto" | ProfileId;
   }
 
   // ═══ Licensing ═══
@@ -174,7 +174,8 @@ declare module "geo-opt" {
     | "editorial"
     | "commercial"
     | "ecommerce"
-    | "regulated";
+    | "regulated"
+    | "service";
 
   export interface ProfileDefinition {
     id: ProfileId;
@@ -305,6 +306,8 @@ declare module "geo-opt" {
   // ═══ Findings ═══
   export const REPORT_VERSION: string;
   export const MODEL_VERSION: string;
+  export const MODEL_VERSION_V1: string;
+  export const MODEL_VERSION_V2: string;
 
   export type FindingStatus = "pass" | "warn" | "fail" | "not_applicable";
   export type EvidenceLabel = "strong" | "probable" | "experimental" | "heuristic";
@@ -616,7 +619,7 @@ declare module "geo-opt" {
     file: string;
     status: "success" | "error";
     score?: number;
-    report?: AuditReport;
+    report?: AuditReport | V2Report;
     /** Raw source body. Internal reuse only (e.g. generate-all) — never serialized into reports or summaries. */
     content?: string;
     error?: string;
@@ -627,7 +630,7 @@ declare module "geo-opt" {
     file: string;
     status: "success" | "error";
     score?: number;
-    report?: AuditReport;
+    report?: AuditReport | V2Report;
     error?: string;
   }
 
@@ -658,7 +661,12 @@ declare module "geo-opt" {
     perFile?: AggregatePerFile[];
   }
 
-  export function auditFiles(files: string[], config: GeoConfig): AuditResult[];
+  export function auditFiles(
+    files: string[],
+    config: GeoConfig,
+    model?: "v1" | "v2",
+    onProgress?: (index: number, total: number, filepath: string) => void
+  ): AuditResult[];
   export function aggregateReport(results: AuditResult[]): AggregateReport;
 
   export interface BatchInjectResult {
@@ -783,8 +791,26 @@ declare module "geo-opt" {
     notes: string[];
     nodes: object[];
   }
-  export function validateSchema(parsed: object): SchemaValidationResult;
-  export function validateSchemaFile(filepath: string): void;
+  export function validateSchema(parsed: unknown): SchemaValidationResult;
+
+  export interface SchemaBlockValidationResult {
+    source: string;
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    notes: string[];
+  }
+
+  export interface SchemaFileValidationResult {
+    valid: boolean;
+    blockCount: number;
+    errors: string[];
+    warnings: string[];
+    notes: string[];
+    blocks: SchemaBlockValidationResult[];
+  }
+
+  export function validateSchemaFile(filepath: string): SchemaFileValidationResult;
 
   // ═══ LLMs.txt ═══
   export interface PageMetadata {
@@ -796,6 +822,7 @@ declare module "geo-opt" {
   export function extractPageMetadata(content: string, filepath: string): PageMetadata;
   export function extractFrontmatterContent(content: string, fields: string[]): string;
   export function resolvePageUrl(filepath: string, baseDir: string, siteUrl: string, opts?: { stripPrefix?: string }): string;
+  export function findCommonBaseDir(filePaths: string[]): string;
 
   export interface LlmsEntry {
     title: string;
@@ -909,6 +936,7 @@ declare module "geo-opt" {
   }
 
   export function parseSitemapXml(xml: string): ParsedSitemap;
+  export function validateSitemapXml(xml: string): { valid: boolean; issues: string[] };
 
   // ═══ Badge ═══
   export type BadgeColor = "brightgreen" | "green" | "yellow" | "orange" | "red";
@@ -1015,7 +1043,4 @@ declare module "geo-opt" {
 
   /** Parse raw robots.txt content into structured groups. */
   export function parseRobotsGroups(content: string): RobotsGroup[];
-
-  /** Parse a sitemap XML string. Returns parsed URLs and validation info. */
-  export function parseSitemapXml(xml: string): ParsedSitemap;
 }

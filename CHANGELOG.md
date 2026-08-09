@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **types:** narrow `GeoConfig.profile` to `"auto" | ProfileId`, add the `service` profile and `MODEL_VERSION_V1`/`MODEL_VERSION_V2` constants (Plan 081)
+- **types:** widen `AuditResult.report` to `AuditReport | V2Report` so v2 batch results match the runtime (Plan 080)
+- **batch:** tolerate success results without a report in `aggregateReport` (the d.ts contract allows it) instead of crashing (Plan 080)
+- **sitemap:** resolve sub-sitemap `<loc>` entries in generated indexes to absolute URLs when `baseUrl` is set, as the sitemap protocol requires (relative names are kept in local file mode)
+- **llms.txt:** `suggestSection` no longer leaks `../` into section labels for paths outside the cwd; it derives the label from the directory's own name instead
+- **validate:** `geo-opt validate` now exits nonzero when a file has no JSON-LD blocks, malformed JSON, or schema errors, so it can serve as a CI gate; `validateSchemaFile` returns a structured `{ valid, blockCount, errors, warnings, notes, blocks }` result and `validateSchema` is total over JSON values (null, primitives, arrays return errors instead of crashing) (Plan 082)
+- **validate (audit 2026-08-09):** block extraction is brace-balanced, so array roots are rejected with a clear error and `@graph` documents with nested nodes parse whole instead of truncating to invalid JSON; ```` ```jsonld ````/```` ```json-ld ```` and case variants are recognized (longest alternative first), HTML `<script type='application/ld+json'>` single-quoted attributes are matched, multiple JSON-LD values inside one fence become individual blocks, and fence bodies without a leading `{`/`[` or without `@context` are still skipped
+- **batch (audit 2026-08-09):** `aggregateReport` computes statistics over finite scores only — score-less successes can no longer produce `NaN` in `averageScore`/`medianScore`/`stdDev` or drop out of `worstFiles`; with zero scored files the numeric stats are omitted and the summary explains why
+- **sitemap (audit 2026-08-09):** `resolveIndexLoc` tolerates non-string `baseUrl` values (misconfigured `geo_config.json`) by falling back to relative locs, and strips query strings/fragments from `baseUrl` so sitemap-index `<loc>` entries stay clean absolute URLs
+
+### Tested
+
+- **consumer fixture:** exercise every public export — frontmatter, sitemap/badge/fetcher, HTML reporters, robots helpers, schema validation, model version constants, v2 batch reporting, and `service`/`auto` profiles (Plan 031)
+- **contract:** assert `index.d.ts` declares exactly the runtime value exports (Plan 081)
+- **aggregate:** v2 reports flow through `auditFiles` → `aggregateReport` → `perFile` without body leaks (Plan 080)
+
 ## [2.3.11](https://github.com/cortega26/geo-opt/compare/v2.3.10...v2.3.11) (2026-08-09)
 
 

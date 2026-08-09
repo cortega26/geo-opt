@@ -143,16 +143,105 @@ describe("CLI schema", () => {
 });
 
 describe("CLI validate", () => {
-  it("reports no JSON-LD blocks for plain markdown", () => {
+  it("exits nonzero for plain markdown with no JSON-LD blocks (plan 082)", () => {
     const fixture = "tests/fixtures/audit-v2/editorial/tech-blog.md";
     const { status, stdout } = run(["validate", fixture]);
-    assert.equal(status, 0);
+    assert.notEqual(status, 0);
     assert.ok(stdout.includes("No JSON-LD blocks") || stdout.includes("0 JSON-LD"));
   });
 
   it("errors on missing file", () => {
     const { status } = run(["validate", "/tmp/does-not-exist-xyz.md"]);
     assert.notEqual(status, 0);
+  });
+
+  it("exits zero for valid JSON-LD (plan 082)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-validate-"));
+    try {
+      const fp = join(tmpDir, "valid.md");
+      writeFileSync(
+        fp,
+        '```json\n{ "@context": "https://schema.org", "@type": "Organization", "name": "Acme" }\n```\n'
+      );
+      const { status, stdout } = run(["validate", fp]);
+      assert.equal(status, 0);
+      assert.ok(stdout.includes("✅"), "Debe mostrar éxito");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits zero for unknown type (note-only files stay valid, plan 082)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-validate-"));
+    try {
+      const fp = join(tmpDir, "note-only.md");
+      writeFileSync(
+        fp,
+        '```json\n{ "@context": "https://schema.org", "@type": "SomeCustomType", "name": "X" }\n```\n'
+      );
+      const { status, stdout } = run(["validate", fp]);
+      assert.equal(status, 0);
+      assert.ok(stdout.includes("not in the known-types list") || stdout.includes("Note"));
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits zero for a ```jsonld fence (audit 2026-08-09)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-validate-"));
+    try {
+      const fp = join(tmpDir, "jsonld-fence.md");
+      writeFileSync(
+        fp,
+        '```jsonld\n{ "@context": "https://schema.org", "@type": "Organization", "name": "Acme" }\n```\n'
+      );
+      const { status, stdout } = run(["validate", fp]);
+      assert.equal(status, 0);
+      assert.ok(stdout.includes("✅"), "Debe mostrar éxito");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits nonzero when passed a directory (audit 2026-08-09)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-validate-"));
+    try {
+      const { status } = run(["validate", tmpDir]);
+      assert.notEqual(status, 0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits nonzero for malformed JSON (plan 082)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-validate-"));
+    try {
+      const fp = join(tmpDir, "bad.md");
+      writeFileSync(
+        fp,
+        '```json\n{ "@context": "https://schema.org", "@type": "Organization", "name": "Test", }\n```\n'
+      );
+      const { status, stdout } = run(["validate", fp]);
+      assert.notEqual(status, 0);
+      assert.ok(stdout.includes("Invalid JSON"), "Debe reportar JSON inválido");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("exits nonzero for schema-invalid JSON-LD (plan 082)", () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "geo-cli-validate-"));
+    try {
+      const fp = join(tmpDir, "missing-fields.md");
+      writeFileSync(
+        fp,
+        '```json\n{ "@context": "https://schema.org", "@type": "NewsArticle" }\n```\n'
+      );
+      const { status } = run(["validate", fp]);
+      assert.notEqual(status, 0);
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

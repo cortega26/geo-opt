@@ -87,7 +87,11 @@ function toAggregatePerFile(result) {
  */
 export function aggregateReport(results) {
   const successes = results.filter((r) => r.status === "success");
-  const scores = successes.map((r) => r.score);
+  // Stats are computed over numerically-scored successes only; a success may
+  // legitimately arrive without a score (e.g. stored v2 results), and NaN/
+  // undefined must never leak into averageScore/medianScore/distribution.
+  const scored = successes.filter((r) => Number.isFinite(r.score));
+  const scores = scored.map((r) => r.score);
   const total = results.length;
   const succeeded = successes.length;
   const failed = total - succeeded;
@@ -98,6 +102,16 @@ export function aggregateReport(results) {
       succeeded: 0,
       failed,
       message: "No files could be audited.",
+      perFile: results.map(toAggregatePerFile),
+    };
+  }
+
+  if (scored.length === 0) {
+    return {
+      totalFiles: total,
+      succeeded,
+      failed,
+      message: "No files with scores could be aggregated.",
       perFile: results.map(toAggregatePerFile),
     };
   }
@@ -113,7 +127,7 @@ export function aggregateReport(results) {
   // Collect recommendation frequency across all files (legacy, prose-based)
   const recCounts = new Map();
   for (const r of successes) {
-    for (const rec of r.report.recommendations) {
+    for (const rec of r.report?.recommendations ?? []) {
       recCounts.set(rec, (recCounts.get(rec) || 0) + 1);
     }
   }
@@ -127,7 +141,7 @@ export function aggregateReport(results) {
   // summary entry can never omit category or evidenceLabel.
   const findingCounts = new Map();
   for (const r of successes) {
-    if (!Array.isArray(r.report.findings)) continue;
+    if (!r.report || !Array.isArray(r.report.findings)) continue;
     for (const f of r.report.findings) {
       if (!isValidatedFinding(f)) continue;
       const key = f.ruleId;
@@ -165,7 +179,7 @@ export function aggregateReport(results) {
     },
     topRecommendations,
     topFindings,
-    worstFiles: [...successes]
+    worstFiles: [...scored]
       .sort((a, b) => a.score - b.score)
       .slice(0, 5)
       .map((r) => ({ file: r.file, score: r.score })),

@@ -14,6 +14,7 @@ import {
   generateLlmsFullTxt,
   generateLlmsFullTxtFiles,
   resolvePageUrl,
+  suggestSection,
 } from "../src/llms-txt.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -137,5 +138,50 @@ describe("escapeLinkText — internal brackets (review 2026-08-01)", () => {
     })(tokens);
     assert.ok(!hrefs.some((h) => h.includes("evil")), "no injected link in parsed output");
     assert.ok(hrefs.includes("https://example.com/x"), "the real URL survives");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// suggestSection — etiquetas de sección para llms.txt
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("suggestSection", () => {
+  const cwd = "/project";
+
+  it("mapea directorios conocidos dentro de cwd", () => {
+    assert.equal(suggestSection("/project/docs/guide.md", undefined, cwd), "Documentation");
+    assert.equal(suggestSection("/project/tutorials/x.md", undefined, cwd), "Tutorials");
+    assert.equal(suggestSection("/project/blog/post.md", undefined, cwd), "Blog");
+  });
+
+  it("conserva el transform general para rutas anidadas dentro de cwd", () => {
+    assert.equal(suggestSection("/project/custom/deep/page.md", undefined, cwd), "Custom/deep");
+  });
+
+  it("devuelve Pages cuando no hay directorio", () => {
+    assert.equal(suggestSection("standalone.md", undefined, cwd), "Pages");
+    assert.equal(suggestSection("/project/root.md", undefined, cwd), "Pages");
+  });
+
+  it("no filtra '../' en etiquetas para rutas fuera de cwd", () => {
+    const label = suggestSection("/elsewhere/page.md", undefined, cwd);
+    assert.ok(!label.includes(".."), `label must not contain "../", got: ${label}`);
+    assert.equal(label, "Elsewhere");
+  });
+
+  it("mapea el nombre del directorio para rutas fuera de cwd", () => {
+    assert.equal(suggestSection("/var/www/docs/page.md", undefined, cwd), "Documentation");
+    assert.equal(suggestSection("/elsewhere/guides/x.md", undefined, cwd), "Guides");
+    assert.equal(suggestSection("../guides/x.md", undefined, cwd), "Guides");
+  });
+
+  it("usa señales de contenido cuando el directorio no es conocido", () => {
+    const label = suggestSection("/project/random/guide-page.md", "A step by step tutorial", cwd);
+    assert.equal(label, "Guides");
+  });
+
+  it("devuelve Pages para paths de solo directorio raíz fuera de cwd", () => {
+    assert.equal(suggestSection("/", undefined, cwd), "Pages");
+    assert.equal(suggestSection("/elsewhere", undefined, cwd), "Pages");
   });
 });

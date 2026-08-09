@@ -35,6 +35,7 @@ import {
   loadConfig,
   MODEL_VERSION,
   MODEL_VERSION_V1,
+  MODEL_VERSION_V2,
   parseFrontmatter,
   parseRobotsGroups,
   preprocessContent,
@@ -1495,6 +1496,120 @@ test("aggregateReport zero-success branch also omits content (plan 080)", () => 
   assert.strictEqual(results[0].content, "ZERO-SENTINEL");
 });
 
+test("aggregateReport passes v2 reports through per-file entries (plan 080/081)", () => {
+  const v2Report = {
+    file: "v2.md",
+    reportVersion: "1.0.0",
+    modelVersion: "2.1.0",
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    profile: {
+      detected: "documentation",
+      label: "Documentation",
+      confidence: 0.9,
+      overridden: false,
+      reasons: [],
+    },
+    readinessBand: "solid",
+    readinessLabel: "Solid",
+    readinessDescription: "Meets most thresholds.",
+    applicableDimensions: 5,
+    effectiveScore: 75,
+    dimensions: {},
+    structuralObservations: {
+      headingHierarchy: "pass",
+      sectionSelfContainment: "pass",
+      answerFirst: "pass",
+    },
+    attributionSummary: {
+      statsWithAttribution: 1,
+      statsWithoutAttribution: 0,
+      quotesWithAttribution: 0,
+      quotesWithoutAttribution: 0,
+    },
+    linkSummary: { externalLinks: 2, hasSourcesSection: true, hasExcessiveLinks: false },
+    contentFreshness: { publishedDate: "2026-01-01", reviewedDate: null },
+    findings: [
+      {
+        ruleId: "v2.citations.no_links",
+        category: "citations",
+        severity: "warn",
+        status: "warn",
+        message: "No external hyperlinks found.",
+        evidenceLabel: "strong",
+        applicability: "documentation",
+        sourceRefs: [],
+        observedFacts: { externalLinkCount: 0 },
+        remediation: "Add links.",
+      },
+    ],
+    notApplicableDimensions: [],
+    recommendations: ["Add more sources."],
+  };
+  const results = [
+    { file: "v2.md", status: "success", score: 75, report: v2Report },
+    { file: "bad.md", status: "error", error: "boom" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.succeeded, 1);
+  assert.strictEqual(summary.topRecommendations.length, 1);
+  assert.strictEqual(summary.topFindings.length, 1);
+  assert.strictEqual(summary.topFindings[0].ruleId, "v2.citations.no_links");
+  const entry = summary.perFile.find((e) => e.file === "v2.md");
+  assert.ok(entry, "v2 per-file entry must exist");
+  assert.strictEqual(entry.report.modelVersion, "2.1.0");
+  assert.strictEqual(entry.report.readinessBand, "solid");
+  assert.strictEqual(entry.report.effectiveScore, 75);
+});
+
+test("aggregateReport tolerates success results without a report (d.ts contract)", () => {
+  const results = [
+    { file: "a.md", status: "success", score: 80, report: { recommendations: ["Add links"] } },
+    { file: "b.md", status: "success", score: 60 },
+    { file: "c.md", status: "error", error: "not found" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.totalFiles, 3);
+  assert.strictEqual(summary.succeeded, 2);
+  assert.strictEqual(summary.failed, 1);
+  assert.strictEqual(summary.averageScore, 70);
+  assert.deepStrictEqual(summary.topRecommendations, [
+    { recommendation: "Add links", fileCount: 1 },
+  ]);
+  assert.strictEqual(summary.perFile[1].score, 60);
+  assert.strictEqual(summary.perFile[1].report, undefined);
+});
+
+test("aggregateReport never emits NaN stats for score-less successes (audit 2026-08-09)", () => {
+  const results = [
+    { file: "a.md", status: "success" },
+    { file: "b.md", status: "success", score: 40 },
+    { file: "c.md", status: "error", error: "boom" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.totalFiles, 3);
+  assert.strictEqual(summary.succeeded, 2);
+  assert.strictEqual(summary.averageScore, 40, "stats computed over scored files only");
+  assert.strictEqual(summary.medianScore, 40);
+  assert.strictEqual(summary.minScore, 40);
+  assert.strictEqual(summary.maxScore, 40);
+  assert.ok(Number.isFinite(summary.stdDev));
+  assert.deepStrictEqual(summary.worstFiles, [{ file: "b.md", score: 40 }]);
+  assert.ok(!JSON.stringify(summary).includes("NaN"), "no NaN anywhere in the summary");
+});
+
+test("aggregateReport with zero scored successes omits stats (audit 2026-08-09)", () => {
+  const results = [
+    { file: "a.md", status: "success" },
+    { file: "b.md", status: "success" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.succeeded, 2);
+  assert.strictEqual(summary.averageScore, undefined);
+  assert.strictEqual(summary.medianScore, undefined);
+  assert.strictEqual(summary.message, "No files with scores could be aggregated.");
+  assert.strictEqual(summary.perFile.length, 2);
+});
+
 test("auditFiles collects errors without crashing", () => {
   const results = auditFiles(["/nonexistent/file.md"], {});
   assert.strictEqual(results.length, 1);
@@ -1516,6 +1631,33 @@ test("auditFiles mixes successes and failures", () => {
     assert.ok(good, "should have one success");
     assert.ok(bad, "should have one error");
     assert.strictEqual(typeof good.score, "number");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("auditFiles with model v2 feeds v2 reports into aggregateReport (plan 081)", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-test-"));
+  try {
+    const goodFile = path.join(tmpDir, "good.md");
+    fs.writeFileSync(
+      goodFile,
+      "# Test\n\nIntro paragraph with over forty words of content to reach minimum for scoring here.\n"
+    );
+    const results = auditFiles([goodFile], {}, "v2", (index, total, filepath) => {
+      assert.strictEqual(index, 0);
+      assert.strictEqual(total, 1);
+      assert.strictEqual(filepath, goodFile);
+    });
+    assert.strictEqual(results.length, 1);
+    const good = results[0];
+    assert.strictEqual(good.status, "success");
+    assert.strictEqual(good.report.modelVersion, MODEL_VERSION_V2);
+
+    const summary = aggregateReport(results);
+    assert.strictEqual(summary.succeeded, 1);
+    assert.strictEqual(summary.perFile[0].report.modelVersion, MODEL_VERSION_V2);
+    assert.ok(!("content" in summary.perFile[0]), "perFile must never expose raw bodies");
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

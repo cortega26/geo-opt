@@ -545,7 +545,10 @@ program
   .description("Validate existing JSON-LD structured data in a file")
   .action((file, _options, _cmd) => {
     try {
-      validateSchemaFile(file);
+      const result = validateSchemaFile(file);
+      if (!result.valid) {
+        process.exitCode = 1;
+      }
     } catch (e) {
       console.error(`Error: ${e.message}`);
       process.exit(1);
