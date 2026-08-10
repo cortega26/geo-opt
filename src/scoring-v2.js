@@ -14,9 +14,8 @@
  */
 
 import { MAX_PRONOUN_DENSITY_V2 } from "./config.js";
-import { preprocessContent } from "./text.js";
 import { PROFILES, isApplicable, notApplicableDimensions, resolveProfile } from "./profiles.js";
-import { observeContent } from "./observations.js";
+import { prepareDocument, observeContentFromPrepared } from "./observations.js";
 import {
   buildReportMeta,
   createFinding,
@@ -729,14 +728,16 @@ function dedupeFindings(findings) {
  * @returns {{ score: number, report: Object }}
  */
 export function scoreContentV2(rawContent, filepath, config = {}) {
-  const textContent = preprocessContent(rawContent);
+  // Prepare the document ONCE per call; profile detection, observations and
+  // clarity scoring all consume the same immutable value (Plan 089).
+  const prepared = prepareDocument(rawContent, filepath);
 
   // 1. Resolve profile — use RAW content for detection so code blocks
   //    and HTML structure are visible to the profile heuristics.
-  const profileInfo = resolveProfile(config, rawContent, filepath);
+  const profileInfo = resolveProfile(config, prepared.rawContent, filepath);
 
   // 2. Collect observations
-  const observations = observeContent(rawContent, filepath);
+  const observations = observeContentFromPrepared(prepared);
 
   // 3. Score each applicable dimension
   const dimensions = {};
@@ -748,7 +749,7 @@ export function scoreContentV2(rawContent, filepath, config = {}) {
     statistics: () => scoreStatistics(observations, profile),
     quotations: () => scoreQuotations(observations, profile),
     citations: () => scoreCitations(observations, profile),
-    clarity: () => scoreClarity(observations, textContent, config, profile),
+    clarity: () => scoreClarity(observations, prepared.preprocessedText, config, profile),
   };
 
   let applicableCount = 0;

@@ -37,6 +37,18 @@ export function getAttributionScanChars() {
   return attributionScanChars;
 }
 
+// Test-only instrumentation (Plan 089): count of marked lexing calls made by
+// document preparation. Internal only — NOT part of the public API.
+let lexCalls = 0;
+
+export function resetLexCounter() {
+  lexCalls = 0;
+}
+
+export function getLexCalls() {
+  return lexCalls;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Observation data types (plain objects, not classes, for portability)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1043,15 +1055,18 @@ function observeLinkQuality(textContent, tokens, htmlMeta = null) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Collect all section-level observations for a piece of content.
+ * Per-call prepared representation of one document (Plan 089): raw content,
+ * the detector-view textContent, marked tokens, HTML metadata, and the
+ * v1-view preprocessed text — each computed ONCE. Internal per-call
+ * boundary: never cached across calls, never exposed in reports.
  *
  * @param {string} rawContent — raw file content (HTML or markdown)
  * @param {string} filepath — file path (used to detect HTML)
- * @param {Object} [opts] — configurable thresholds
- * @returns {ContentObservations}
+ * @returns {{ rawContent: string, filepath: string, isHtml: boolean, textContent: string, tokens: any[], htmlMeta: object|null, preprocessedText: string }}
  */
-export function observeContent(rawContent, filepath = "", opts = {}) {
+export function prepareDocument(rawContent, filepath = "") {
   const isHtml = isHtmlContent(rawContent) || filepath.endsWith(".html");
+  const preprocessedText = preprocessContent(rawContent);
   let textContent, tokens, htmlMeta;
 
   if (isHtml) {
@@ -1061,21 +1076,37 @@ export function observeContent(rawContent, filepath = "", opts = {}) {
     textContent = structure.textContent;
     // marked se usa solo para inline formatting; la estructura viene de cheerio
     tokens = marked.lexer(textContent);
+    lexCalls += 1;
     htmlMeta = { cheerio: $, structure };
   } else {
     // ── Markdown path ──
-    textContent = preprocessContent(rawContent);
+    textContent = preprocessedText;
     tokens = marked.lexer(textContent);
+    lexCalls += 1;
     htmlMeta = null;
   }
 
+  return { rawContent, filepath, isHtml, textContent, tokens, htmlMeta, preprocessedText };
+}
+
+/**
+ * Run all detectors against an already-prepared document. Internal — the
+ * public entry points prepare once and route through here so a single v2
+ * audit never preprocesses/lexes the same document twice (Plan 089).
+ *
+ * @param {ReturnType<typeof prepareDocument>} prepared
+ * @param {Object} [opts] — configurable thresholds
+ * @returns {ContentObservations}
+ */
+export function observeContentFromPrepared(prepared, opts = {}) {
+  const { textContent, tokens, htmlMeta, rawContent } = prepared;
   const headingHierarchy = observeHeadingHierarchy(tokens, htmlMeta);
   const sectionSelfContainment = observeSectionSelfContainment(tokens, opts, htmlMeta);
   const paragraphDistribution = observeParagraphDistribution(textContent, opts);
   const answerFirst = observeAnswerFirst(textContent, tokens, htmlMeta);
   const attributionProximity = observeAttributionProximity(textContent, tokens, htmlMeta);
   const contentFreshness = observeContentFreshness(textContent);
-  const semanticHtml = observeSemanticHtml(rawContent, filepath);
+  const semanticHtml = observeSemanticHtml(rawContent, prepared.filepath);
   const linkQuality = observeLinkQuality(textContent, tokens, htmlMeta);
 
   /** @type {ContentObservations} */
@@ -1098,6 +1129,18 @@ export function observeContent(rawContent, filepath = "", opts = {}) {
 }
 
 /**
+ * Collect all section-level observations for a piece of content.
+ *
+ * @param {string} rawContent — raw file content (HTML or markdown)
+ * @param {string} filepath — file path (used to detect HTML)
+ * @param {Object} [opts] — configurable thresholds
+ * @returns {ContentObservations}
+ */
+export function observeContent(rawContent, filepath = "", opts = {}) {
+  return observeContentFromPrepared(prepareDocument(rawContent, filepath), opts);
+}
+
+/**
  * Collect observations and also return the raw tokens for downstream use.
  * @param {string} rawContent
  * @param {string} filepath
@@ -1105,18 +1148,7 @@ export function observeContent(rawContent, filepath = "", opts = {}) {
  * @returns {{ observations: ContentObservations, tokens: any, textContent: string }}
  */
 export function observeAndParse(rawContent, filepath = "", opts = {}) {
-  const isHtml = isHtmlContent(rawContent) || filepath.endsWith(".html");
-  let textContent, tokens;
-
-  if (isHtml) {
-    const structure = extractHtmlVisibleText(rawContent);
-    textContent = structure.textContent;
-    tokens = marked.lexer(textContent);
-  } else {
-    textContent = preprocessContent(rawContent);
-    tokens = marked.lexer(textContent);
-  }
-
-  const observations = observeContent(rawContent, filepath, opts);
-  return { observations, tokens, textContent };
+  const prepared = prepareDocument(rawContent, filepath);
+  const observations = observeContentFromPrepared(prepared, opts);
+  return { observations, tokens: prepared.tokens, textContent: prepared.textContent };
 }

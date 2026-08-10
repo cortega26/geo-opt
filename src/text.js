@@ -3,6 +3,23 @@ import { marked } from "marked";
 import * as cheerio from "cheerio";
 import rs from "text-readability";
 
+// Test-only instrumentation (Plan 089): call counts for the document
+// preparation passes (markdown preprocess + HTML visible-text extraction).
+// Exported from this module only — NOT part of the public API — so the
+// one-preparation-per-call regression can assert parse counts without
+// wall-time gates.
+let preprocessCalls = 0;
+let htmlExtractCalls = 0;
+
+export function resetTextParseCounters() {
+  preprocessCalls = 0;
+  htmlExtractCalls = 0;
+}
+
+export function getTextParseCounters() {
+  return { preprocess: preprocessCalls, htmlExtract: htmlExtractCalls };
+}
+
 /**
  * Count syllables in Spanish text using phonetic rules.
  *
@@ -154,6 +171,7 @@ export function isHtmlContent(content) {
  * @returns {{ textContent: string, headingCount: number, h2h3Count: number, listCount: number, tableCount: number }}
  */
 export function extractHtmlVisibleText(rawHtml) {
+  htmlExtractCalls += 1;
   const $ = cheerio.load(rawHtml);
 
   // Remover elementos no-visibles antes de extraer texto
@@ -317,6 +335,7 @@ export function parseFrontmatter(content) {
  * @returns {string} cleaned content
  */
 export function preprocessContent(content) {
+  preprocessCalls += 1;
   let { body: text } = parseFrontmatter(content);
 
   // Strip markdown code blocks
