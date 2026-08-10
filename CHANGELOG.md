@@ -30,6 +30,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
+- **Tooling (Plan 086):** `npm run lint` now includes `tests/` (previously only `src/`, `bin/`, `scripts/`), restoring the ESLint gate over the largest JavaScript surface; a test-only `setImmediate` global declaration is added, and 16 dead-code violations across the test suite (unused imports/variables/arguments, a duplicate `via` key, dead `fetches` counters) were removed; a contract test pins the lint script scope
 - **types:** narrow `GeoConfig.profile` to `"auto" | ProfileId`, add the `service` profile and `MODEL_VERSION_V1`/`MODEL_VERSION_V2` constants (Plan 081)
 - **types:** widen `AuditResult.report` to `AuditReport | V2Report` so v2 batch results match the runtime (Plan 080)
 - **batch:** tolerate success results without a report in `aggregateReport` (the d.ts contract allows it) instead of crashing (Plan 080)

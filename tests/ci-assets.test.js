@@ -387,4 +387,19 @@ describe("Plan 072 — aggregate score semantics", () => {
       );
     }
   });
+
+  it("package.json lint script covers tests/ (Plan 080)", () => {
+    // Tests were linted ad hoc but excluded from `npm run lint`; appending
+    // tests/ here pins the scope so stray coverage cannot silently regress.
+    const lint = pkg.scripts.lint;
+    assert.ok(
+      /(^|\s)(eslint[^\s]*\s+.*tests\/|eslint[^\s]*\s+src\/[\s\S]*tests\/)/u.test(lint) ||
+        lint.includes("tests/"),
+      `lint script should lint tests/: ${lint}`
+    );
+    assert.ok(
+      !/--ignore-pattern/u.test(lint) || !/tests\//u.test(lint),
+      "lint script should not add tests/ then ignore it"
+    );
+  });
 });

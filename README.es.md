@@ -15,7 +15,7 @@ El toolkit de descubribilidad por IA — parte del ecosistema [Tooltician](https
 <!-- Build & quality -->
 <p>
   <a href="https://github.com/cortega26/geo-opt/actions"><img src="https://img.shields.io/github/actions/workflow/status/cortega26/geo-opt/ci.yml?branch=main&label=CI&logo=github" alt="Estado de CI"></a>
-  <img src="https://img.shields.io/badge/tests-939_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="939 tests pasados">
+  <img src="https://img.shields.io/badge/tests-940_pasados-16a34a?logo=nodedotjs&logoColor=white" alt="940 tests pasados">
   <img src="https://img.shields.io/badge/cobertura_de_ramas-80%25-16a34a" alt="Cobertura de ramas 80%">
   <img src="https://img.shields.io/badge/node-%E2%89%A522_LTS-brightgreen?logo=nodedotjs&logoColor=white" alt="Node.js >= 22 LTS">
   <img src="https://img.shields.io/badge/TypeScript-tipos_incluidos-3178C6?logo=typescript&logoColor=white" alt="Tipos TypeScript incluidos">
@@ -76,7 +76,7 @@ El modelo de puntuación está fundamentado en el [artículo GEO aceptado en KDD
 - 🧩 **Un solo toolkit, toda la superficie.** Auditoría, Schema.org JSON-LD para 8 tipos, `robots.txt`, `llms.txt`, `sitemap.xml`, comprobaciones técnicas de SEO y reportes HTML — desde una única CLI y una librería JavaScript tipada.
 - 🚦 **Nativo para CI.** Quality gates por umbral con códigos de salida distintos de cero; JSON legible por máquinas en stdout, diagnósticos en stderr. Se integra en GitHub Actions o GitLab CI en un solo paso.
 - 🤖 **Multirruntime.** Implementación canónica en Node.js más un port de Python 3 incluido para flujos de trabajo impulsados por agentes, mantenidos coherentes por una suite de conformance compartida.
-- ✅ **Diseñado para producción.** 939 tests en 167 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
+- ✅ **Diseñado para producción.** 940 tests en 167 suites, CI en Node 22 y 24, declaraciones TypeScript verificadas por una prueba de compilación de consumidor y una política de changelog aplicada automáticamente.
 
 ---
 
@@ -516,7 +516,7 @@ El diseño completo de telemetría opt-in (actualmente inactivo) está documenta
 
 ```bash
 npm run check          # suite completa: lint + formato + tests JS + tests Python + conformance + typecheck + changelog
-npm test               # 939 tests · 167 suites · 0 fallos (Node.js)
+npm test               # 940 tests · 167 suites · 0 fallos (Node.js)
 npm run test:python    # suite de tests del port de compatibilidad Python (40 tests)
 npm run lint           # ESLint + Python py_compile
 npm run format:check   # Prettier en modo dry-run

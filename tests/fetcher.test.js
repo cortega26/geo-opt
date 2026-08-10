@@ -684,14 +684,11 @@ describe("fetchUrl — hop scheme & origin policy (Plan 075)", () => {
     };
     const before = requestsB;
     const warnings = [];
-    const { pageUrls, fetched } = await collectSubSitemapPageUrls(
-      [{ loc: `${baseUrlB}/sub-sitemap.xml` }],
-      {
-        fetchFn: fetchUrl,
-        fetchOptions: strict,
-        onWarn: (m) => warnings.push(m),
-      }
-    );
+    const { pageUrls } = await collectSubSitemapPageUrls([{ loc: `${baseUrlB}/sub-sitemap.xml` }], {
+      fetchFn: fetchUrl,
+      fetchOptions: strict,
+      onWarn: (m) => warnings.push(m),
+    });
     assert.equal(pageUrls.length, 0);
     assert.equal(requestsB - before, 0, "el sub-sitemap cross-origin no debe conectarse");
     assert.ok(

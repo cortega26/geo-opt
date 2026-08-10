@@ -48,7 +48,6 @@ function entry(overrides = {}) {
     name: "brace-expansion",
     severity: "high",
     isDirect: false,
-    via,
     effects: [],
     range: "4.0.0 - 5.0.7",
     nodes: [REVIEWED_PATH],

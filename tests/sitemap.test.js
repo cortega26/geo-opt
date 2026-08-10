@@ -701,10 +701,8 @@ describe("collectSubSitemapPageUrls — sub-sitemap cap (F-11)", () => {
 
   it("sitemap-mode-caps-sub-sitemaps", async () => {
     const subs = Array.from({ length: 150 }, (_, i) => ({ loc: `http://x/sub-${i}.xml` }));
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async (url) => {
-      fetches += 1;
       const n = url.match(/sub-(\d+)/)[1];
       return { html: urlsetWith(`http://x/page-${n}.html`) };
     };
@@ -726,9 +724,7 @@ describe("collectSubSitemapPageUrls — sub-sitemap cap (F-11)", () => {
   it("nested sitemap indexes count against the same cap", async () => {
     // Nivel 1: 60 subs, cada uno índice con 2 subs anidados (total 120+).
     const level1 = Array.from({ length: 60 }, (_, i) => ({ loc: `http://x/l1-${i}.xml` }));
-    let fetches = 0;
     const fetchFn = async (url) => {
-      fetches += 1;
       const m = url.match(/l1-(\d+)/);
       if (m) {
         const i = Number(m[1]);
@@ -747,9 +743,7 @@ describe("collectSubSitemapPageUrls — sub-sitemap cap (F-11)", () => {
 
   it("respects a custom maxFetches", async () => {
     const subs = Array.from({ length: 10 }, (_, i) => ({ loc: `http://x/sub-${i}.xml` }));
-    let fetches = 0;
-    const fetchFn = async (url) => {
-      fetches += 1;
+    const fetchFn = async () => {
       return { html: urlsetWith("http://x/page.html") };
     };
     const { fetched } = await collectSubSitemapPageUrls(subs, { fetchFn, maxFetches: 3 });
@@ -793,10 +787,8 @@ describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
   it("exact limit keeps every URL without truncation", async () => {
     const subs = [{ loc: "http://x/a.xml" }, { loc: "http://x/b.xml" }];
     const pagesBySub = { "a.xml": ["p1", "p2", "p3"], "b.xml": ["p4", "p5", "p6"] };
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async (url) => {
-      fetches += 1;
       const name = url.split("/").pop();
       return { html: urlsetWithLocs(pagesBySub[name].map((p) => `http://x/${p}.html`)) };
     };
@@ -829,10 +821,8 @@ describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
 
   it("limit+1 truncates the overflow and emits exactly one warning", async () => {
     const subs = [{ loc: "http://x/a.xml" }, { loc: "http://x/b.xml" }];
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async (url) => {
-      fetches += 1;
       // Prefijos distintos por sub-sitemap: 8 URLs únicas en total.
       const prefix = url.split("/").pop().replace(".xml", "");
       return { html: urlsetWithMany(4, `http://x/${prefix}-`) };
@@ -856,9 +846,7 @@ describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
 
   it("duplicates are deduped and do not consume the budget", async () => {
     const subs = [{ loc: "http://x/a.xml" }, { loc: "http://x/b.xml" }, { loc: "http://x/c.xml" }];
-    let fetches = 0;
     const fetchFn = async (url) => {
-      fetches += 1;
       const name = url.split("/").pop();
       if (name === "a.xml") {
         return {
@@ -891,10 +879,8 @@ describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
     // Nivel 1: 2 índices; cada uno con 2 leafs; cada leaf con 2 páginas
     // → 4 leafs × 2 = 8 páginas, con tope 3.
     const level1 = [{ loc: "http://x/l1-0.xml" }, { loc: "http://x/l1-1.xml" }];
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async (url) => {
-      fetches += 1;
       const m = url.match(/l1-(\d+)/);
       if (m) {
         const i = Number(m[1]);
@@ -922,10 +908,8 @@ describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
     // Sin maxPageUrls: el default de 50.000 acota incluso un sub-sitemap con
     // 50.001 URLs (el parseador solo advierte, no trunca, por sí mismo).
     const subs = [{ loc: "http://x/big.xml" }];
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async () => {
-      fetches += 1;
       return { html: urlsetWithMany(50_001) };
     };
 
@@ -944,10 +928,8 @@ describe("collectSubSitemapPageUrls — page URL cap (Plan 076)", () => {
 
   it("no-limit-hit path keeps everything under the default", async () => {
     const subs = Array.from({ length: 3 }, (_, i) => ({ loc: `http://x/sub-${i}.xml` }));
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async (url) => {
-      fetches += 1;
       const n = url.match(/sub-(\d+)/)[1];
       return { html: urlsetWithMany(5, `http://x/s${n}-`) };
     };

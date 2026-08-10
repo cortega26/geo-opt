@@ -21,16 +21,24 @@ export default [
         Request: "readonly",
         Response: "readonly",
         structuredClone: "readonly",
-      }
+      },
     },
     rules: {
-      "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "no-console": "off",
-      "semi": ["error", "always"],
-      "quotes": ["error", "double", { "avoidEscape": true, "allowTemplateLiterals": true }],
+      semi: ["error", "always"],
+      quotes: ["error", "double", { avoidEscape: true, allowTemplateLiterals: true }],
       "no-undef": "error",
       "no-useless-escape": "off",
-      "no-useless-assignment": "off"
-    }
-  }
+      "no-useless-assignment": "off",
+    },
+  },
+  {
+    files: ["tests/**/*.test.js"],
+    languageOptions: {
+      globals: {
+        setImmediate: "readonly",
+      },
+    },
+  },
 ];

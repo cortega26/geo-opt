@@ -485,10 +485,8 @@ describe("F-11 tope de 100 fetches de sub-sitemaps (collectSubSitemapPageUrls)",
     const subs = Array.from({ length: 150 }, (_, i) => ({
       loc: `http://example.test/sub-${i}.xml`,
     }));
-    let fetches = 0;
     const warnings = [];
     const fetchFn = async (url) => {
-      fetches += 1;
       const n = url.match(/sub-(\d+)/)[1];
       return {
         html: `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>http://example.test/page-${n}.html</loc></url></urlset>`,
@@ -513,9 +511,7 @@ describe("F-11 tope de 100 fetches de sub-sitemaps (collectSubSitemapPageUrls)",
     const level1 = Array.from({ length: 60 }, (_, i) => ({
       loc: `http://example.test/l1-${i}.xml`,
     }));
-    let fetches = 0;
     const fetchFn = async (url) => {
-      fetches += 1;
       const m = url.match(/l1-(\d+)/);
       if (m) {
         const i = Number(m[1]);

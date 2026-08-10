@@ -465,7 +465,7 @@ independent work.
 | [083](archive/083-close-symlink-write-escapes.md) | Route every Node/Python artifact destination through atomic symlink-safe writes | security | P1 | L | — | DONE (2026-08-09; merged to main as `876edbd`; audited 2026-08-09 — parent-swap TOCTOU closed, strict dest-dir, binary-exact Python copies, mode parity — as `HEAD`) |
 | [084](archive/084-align-python-artifact-contracts.md) | Align documented Python schema/llms artifact outcomes with Node | bug/docs | P2 | M | 083 | DONE (2026-08-09; merged to main as `d0414e5`; audited 2026-08-10 — `.htm` parity, empty-section/missing-field tolerance, numeric-only score demotion — as `HEAD`) |
 | [085](archive/085-remove-v2-predictive-wording.md) | Remove remaining ranking/citation/discovery predictions from v2 copy | product-truth | P1 | M | — | DONE (2026-08-10; merged to main as `232f981`) |
-| [086](086-lint-javascript-tests.md) | Restore JavaScript test files to the ESLint gate | dx/tests | P2 | S | 069, 070 | TODO |
+| [086](archive/086-lint-javascript-tests.md) | Restore JavaScript test files to the ESLint gate | dx/tests | P2 | S | 069, 070 | DONE (2026-08-10; executed in worktree; lint gate covers all `tests/` incl. a `setImmediate` test-only global; check-audit dup-key and 11 dead `fetches` counters removed) |
 | [087](087-run-the-js-suite-once-per-gate.md) | Verify tests and badges from one suite/coverage run | perf/dx | P2 | M | 073, 086 | TODO |
 | [088](088-make-stat-attribution-linear.md) | Retain statistic offsets and remove quadratic rescans | perf | P3 | S | — | TODO |
 | [089](089-prepare-v2-documents-once.md) | Reuse one prepared document across v2 profile/observation/scoring | perf/architecture | P3 | L | 088 | TODO |
