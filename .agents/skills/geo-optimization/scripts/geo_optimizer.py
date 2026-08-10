@@ -1952,6 +1952,61 @@ def audit_file(filepath, config, output_format="text", _content=None):
         
     return total_score
 
+
+def _render_text_report(report, filepath):
+    """Render the text audit report from an already-produced report dict.
+
+    Pure renderer (Plan 090): consumes the exact report shape that
+    ``audit_files`` stores for each successful file, so CLI batch text mode
+    renders stored reports instead of re-reading and re-scoring files. The
+    output is byte-identical to the text branch of ``audit_file`` (asserted
+    by the test suite).
+    """
+    breakdown = report.get("breakdown", {})
+    struct = breakdown.get("structure", {})
+    stats = breakdown.get("statistics", {})
+    quotes = breakdown.get("quotations", {})
+    citations = breakdown.get("citations", {})
+    clarity = breakdown.get("clarity", {})
+    recs = report.get("recommendations") or []
+
+    stats_details = stats.get("details") or []
+    quotes_details = quotes.get("details") or []
+
+    print("==================================================")
+    print("            GEO OPTIMIZATION AUDIT REPORT         ")
+    print("==================================================")
+    print(f"File: {filepath}")
+    print(f"Total GEO Score: {report.get('total_score', 0)}/100")
+    print("--------------------------------------------------")
+    print(f"1. Answer-First & Structure: {struct.get('score', 0)}/20")
+    for item in struct.get("details", []):
+        print(f"   - {item}")
+    print("--------------------------------------------------")
+    print(f"2. Statistics Density: {stats.get('score', 0)}/20")
+    print(f"   - {stats_details[0] if stats_details else ''}")
+    print("--------------------------------------------------")
+    print(f"3. Quotation Density: {quotes.get('score', 0)}/20")
+    print(f"   - {quotes_details[0] if quotes_details else ''}")
+    print("--------------------------------------------------")
+    print(f"4. Citation & Authority: {citations.get('score', 0)}/20")
+    for item in citations.get("details", []):
+        print(f"   - {item}")
+    print("--------------------------------------------------")
+    print(f"5. Semantic Clarity: {clarity.get('score', 0)}/20")
+    for item in clarity.get("details", []):
+        print(f"   - {item}")
+    print("==================================================")
+
+    print("\nActionable Recommendations:")
+    if not recs:
+        print("Excellent! This page meets all checks in the current geo-opt heuristic.")
+    else:
+        for r in recs:
+            print(f"- {r}")
+    print("==================================================")
+
+
 def parse_robots_groups(content):
     groups = []
     current = None
@@ -2553,7 +2608,9 @@ def main():
         else:
             successes = [r for r in batch_results if r["status"] == "success"]
             for r in successes:
-                audit_file(r["file"], config, "text")
+                # Render the already-scored report — never re-read/re-score
+                # the file (Plan 090).
+                _render_text_report(r["report"], r["file"])
             errors = [r for r in batch_results if r["status"] == "error"]
             for e in errors:
                 print(f"\nError auditing {e['file']}: {e['error']}", file=sys.stderr)

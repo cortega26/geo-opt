@@ -6,11 +6,14 @@ import tempfile
 import sys
 import json
 import subprocess
+import contextlib
 from datetime import datetime, timezone
 from io import StringIO
+from unittest import mock
 
 # Add current directory to path to import script
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import geo_optimizer
 from geo_optimizer import (
     AI_CRAWLER_AGENTS,
     AI_CRAWLER_REGISTRY,
@@ -39,6 +42,7 @@ from geo_optimizer import (
     write_engagement_state,
     write_file_safe,
     copy_file_safe,
+    _render_text_report,
 )
 
 class TestGeoOptimizer(unittest.TestCase):
@@ -448,6 +452,121 @@ class TestGeoOptimizer(unittest.TestCase):
         finally:
             os.remove(first_path)
             os.remove(second_path)
+
+    def test_text_renderer_matches_audit_file_text_output(self):
+        """Plan 090: the pure renderer reproduces audit_file's text exactly."""
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as temp:
+            temp.write(
+                "# Test Title\n\n"
+                "This is a short intro. It has GDPR in it but AWS is not defined here.\n\n"
+                "- Bullet 1\n- Bullet 2\n"
+            )
+            temp_path = temp.name
+        try:
+            text_buf = StringIO()
+            with contextlib.redirect_stdout(text_buf):
+                audit_file(temp_path, self.config, output_format="text")
+
+            json_buf = StringIO()
+            with contextlib.redirect_stdout(json_buf):
+                audit_file(temp_path, self.config, output_format="json")
+            report = json.loads(json_buf.getvalue())
+
+            render_buf = StringIO()
+            with contextlib.redirect_stdout(render_buf):
+                _render_text_report(report, temp_path)
+
+            self.assertEqual(
+                render_buf.getvalue(),
+                text_buf.getvalue(),
+                "rendered text must be byte-identical to audit_file's text output",
+            )
+        finally:
+            os.remove(temp_path)
+
+    def test_cli_text_mode_scores_each_file_once(self):
+        """Plan 090: CLI batch text mode scores each file exactly once."""
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "geo_optimizer.py"
+        )
+        fd_one, first_path = tempfile.mkstemp(suffix='.md', dir=os.getcwd())
+        fd_two, second_path = tempfile.mkstemp(suffix='.md', dir=os.getcwd())
+        with os.fdopen(fd_one, 'w') as first:
+            first.write("# One\n\nTiny page with 42 percent evidence.\n")
+        with os.fdopen(fd_two, 'w') as second:
+            second.write("# Two\n\nTiny page with 43 percent evidence.\n")
+
+        real_audit_file = geo_optimizer.audit_file
+        calls = []
+
+        def counting(filepath, config, output_format="text", _content=None):
+            calls.append((filepath, output_format))
+            return real_audit_file(filepath, config, output_format, _content)
+
+        saved_argv = sys.argv
+        try:
+            with mock.patch.object(geo_optimizer, "audit_file", new=counting):
+                sys.argv = [script_path, "audit", first_path, second_path]
+                with contextlib.redirect_stdout(StringIO()), contextlib.redirect_stderr(StringIO()):
+                    geo_optimizer.main()
+            self.assertEqual(
+                len(calls), 2, f"expected one scoring pass per file, got {len(calls)}: {calls}"
+            )
+            self.assertTrue(
+                all(fmt == "json" for _, fmt in calls),
+                f"text mode must render stored reports, not re-score: {calls}",
+            )
+        finally:
+            sys.argv = saved_argv
+            os.remove(first_path)
+            os.remove(second_path)
+
+    def test_batch_text_renders_the_stored_report_not_a_re_read_file(self):
+        """Plan 090: rendering uses the report from the batch pass, so a file
+        mutated after scoring cannot change the rendered output."""
+        fd, path = tempfile.mkstemp(suffix='.md', dir=os.getcwd())
+        with os.fdopen(fd, 'w') as fh:
+            fh.write("# Original\n\nTiny page with 42 percent evidence.\n")
+        try:
+            results = audit_files([path], self.config)
+            self.assertEqual(results[0]["status"], "success")
+            original_score = results[0]["score"]
+
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write("# Rewritten\n\nA completely different page without any evidence.\n")
+
+            buf = StringIO()
+            with contextlib.redirect_stdout(buf):
+                _render_text_report(results[0]["report"], path)
+            self.assertIn(
+                f"Total GEO Score: {original_score}/100",
+                buf.getvalue(),
+                "rendered score must come from the stored report, not the mutated file",
+            )
+        finally:
+            os.remove(path)
+
+    def test_cli_text_mode_prints_reports_and_exits_zero(self):
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "geo_optimizer.py"
+        )
+        fd_one, first_path = tempfile.mkstemp(suffix='.md', dir=os.getcwd())
+        with os.fdopen(fd_one, 'w') as first:
+            first.write("# One\n\nTiny page with 42 percent evidence.\n")
+        try:
+            single = subprocess.run(
+                [sys.executable, script_path, "audit", first_path],
+                cwd=os.getcwd(),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(single.returncode, 0, single.stderr)
+            self.assertIn("GEO OPTIMIZATION AUDIT REPORT", single.stdout)
+            self.assertIn("Total GEO Score:", single.stdout)
+            self.assertEqual(single.stderr, "")
+        finally:
+            os.remove(first_path)
 
     def test_explicit_malformed_config_exits(self):
         fd, config_path = tempfile.mkstemp(suffix='.json')
