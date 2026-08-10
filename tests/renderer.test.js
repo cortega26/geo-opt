@@ -54,4 +54,22 @@ describe("Plan 085 — plain-English summaries describe observed markers", () =>
       assert.doesNotMatch(lines, PREDICTIVE, `band ${band} (${score}): ${lines}`);
     }
   });
+
+  it("summary branches mirror the readiness-band boundaries (85/65/45)", () => {
+    // A score and a band that contradict each other (e.g. "strong style
+    // markers" in a Solid-band report) would surface as a mixed message.
+    const cases = [
+      [85, "production-ready", "strong style markers"],
+      [84, "solid", "solid style markers"],
+      [65, "solid", "solid style markers"],
+      [64, "needs-work", "partial style markers"],
+      [45, "needs-work", "partial style markers"],
+      [44, "at-risk", "weak style markers"],
+      [0, "at-risk", "weak style markers"],
+    ];
+    for (const [score, band, phrase] of cases) {
+      const lines = plainEnglishSummary(report(score, band)).join(" ");
+      assert.match(lines, new RegExp(phrase, "u"), `band ${band} (${score}): ${lines}`);
+    }
+  });
 });

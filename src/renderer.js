@@ -386,7 +386,9 @@ export function renderV2Summary(summary) {
 /**
  * Generate a plain-English summary of a v2 report for non-technical users.
  * Wording describes observed style markers; it never promises ranking,
- * discovery, readiness, or citation outcomes (plan 085, audit F-06).
+ * discovery, readiness, or citation outcomes (plan 085, audit F-06). Branch
+ * thresholds mirror the readiness-band boundaries (85/65/45) so the summary
+ * line and the band label never contradict each other.
  * @param {object} report - V2Report
  * @returns {string[]} lines for display
  */
@@ -396,13 +398,17 @@ export function plainEnglishSummary(report) {
   const profile = report.profile?.label || "content";
   const band = report.readinessBand;
 
-  if (score >= 80) {
+  if (score >= 85) {
     lines.push(
       `  Your ${profile} page shows strong style markers for structure, attribution, and citations.`
     );
-  } else if (score >= 50) {
+  } else if (score >= 65) {
     lines.push(
-      `  Your ${profile} page shows moderate style markers; targeted improvements can strengthen them.`
+      `  Your ${profile} page shows solid style markers — most quality thresholds are met; targeted improvements remain.`
+    );
+  } else if (score >= 45) {
+    lines.push(
+      `  Your ${profile} page shows partial style markers — structural or attribution gaps remain.`
     );
   } else {
     lines.push(
@@ -434,9 +440,9 @@ export function plainEnglishSummary(report) {
   const bandAdvice = {
     "production-ready":
       "Strong style markers. Note: the score reflects formatting signals, not factual accuracy or ranking (audit F-06).",
-    solid: "Meets most quality thresholds — a few targeted improvements remain.",
-    "at-risk": "Address the flagged issues before publishing widely.",
-    "needs-work": "Partial style markers — address the flagged structural or attribution gaps.",
+    solid: "Solid — address the remaining gaps listed below.",
+    "at-risk": "At risk — address the flagged issues before publishing widely.",
+    "needs-work": "Needs work — address the flagged structural or attribution gaps.",
   };
   if (bandAdvice[band]) {
     lines.push(`  ${bandAdvice[band]}`);

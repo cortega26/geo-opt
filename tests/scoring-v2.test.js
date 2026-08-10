@@ -635,4 +635,20 @@ describe("Plan 085 — v2 band copy does not predict outcomes", () => {
       );
     }
   });
+
+  it("band thresholds pin the four boundaries exactly", () => {
+    const boundaries = [
+      [100, "production-ready"],
+      [85, "production-ready"],
+      [84, "solid"],
+      [65, "solid"],
+      [64, "needs-work"],
+      [45, "needs-work"],
+      [44, "at-risk"],
+      [0, "at-risk"],
+    ];
+    for (const [pct, expectedId] of boundaries) {
+      assert.equal(readinessBand(pct).band, expectedId, `boundary ${pct} should be ${expectedId}`);
+    }
+  });
 });

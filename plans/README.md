@@ -277,6 +277,8 @@ silent. The gate itself carries the full justification.
 | Advisory | Package | Sev | Accepted | Recheck | Why unfixable |
 |---|---|---|---|---|---|
 | [GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg) | `brace-expansion` `<=5.0.7` | high | 2026-07-31 | 2026-10-31 | Bundled inside the npm CLI tarball via `semantic-release` → `@semantic-release/npm` → `npm`; `overrides` cannot reach bundled deps and npm 11.19.0 / 12.0.2 both still ship 5.0.7. Dev-only — `semantic-release` runs only in the Release workflow and is not reachable from published code. |
+| [GHSA-rgw5-rvv9-x895](https://github.com/advisories/GHSA-rgw5-rvv9-x895) | `brace-expansion` `5.0.7` (npm-bundled) | high | 2026-08-10 | 2026-10-31 | CVE-2026-14257 bypass (unbounded intermediate arrays). Same bundled-copy class as GHSA-mh99: re-verified 2026-08-10 that npm 11.19.0 (max in-range) and 12.0.2 (latest) still bundle 5.0.7. The direct toolchain copy is fixed at 5.0.9. Dev-only (Release workflow). |
+| [GHSA-mwp4-54f8-5fhr](https://github.com/advisories/GHSA-mwp4-54f8-5fhr) | `ip-address` `10.2.0` (npm-bundled) | high | 2026-08-10 | 2026-11-30 | Leading-zero octet parsing (octal vs decimal) enables SSRF/trust-boundary bypass. Bundled inside the npm CLI tarball; `overrides` cannot reach bundled deps and npm 11.19.0 / 12.0.2 both still ship 10.2.0. Dev-only — reachable only from the Release workflow's npm publish path. |
 
 ### Deferred (by owner decision 2026-06-27)
 
