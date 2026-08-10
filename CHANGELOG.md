@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.5](https://github.com/cortega26/geo-opt/compare/v2.4.4...v2.4.5) (2026-08-10)
+
+
+### Performance Improvements
+
+* **python:** render cached audit reports (Plan 090) ([06d16d2](https://github.com/cortega26/geo-opt/commit/06d16d2b3cf0190537229afb2d2ec3baab96c133))
+
 ## [2.4.4](https://github.com/cortega26/geo-opt/compare/v2.4.3...v2.4.4) (2026-08-10)
 
 
