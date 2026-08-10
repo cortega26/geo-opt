@@ -23,16 +23,18 @@ import {
   normalizeHref,
 } from "./url-safety.js";
 
-// Returns the index of the (n+1)-th (0-based) occurrence of needle, or -1.
-function nthIndexOf(haystack, needle, n) {
-  let idx = -1;
-  let from = 0;
-  for (let k = 0; k <= n; k++) {
-    idx = haystack.indexOf(needle, from);
-    if (idx === -1) return -1;
-    from = idx + needle.length;
-  }
-  return idx;
+// Test-only instrumentation (Plan 088): characters scanned by the linear
+// attribution passes (stat regex scan + one pass per distinct stat/quote
+// needle). Exported from this module only — NOT part of the public API —
+// so the scaling regression can assert linear work without wall-time gates.
+let attributionScanChars = 0;
+
+export function resetAttributionScanCounter() {
+  attributionScanChars = 0;
+}
+
+export function getAttributionScanChars() {
+  return attributionScanChars;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -589,23 +591,38 @@ function isContextualIdentifier(textContent, index) {
 function observeAttributionProximity(textContent, _tokens, _htmlMeta = null) {
   // ── Para HTML, el textContent ya es texto visible limpio (sin atributos HTML).
   // Find statistics (numbers with % or $) and check if a source reference
-  // appears within 150 characters after them.
-  const statMatches =
-    textContent.match(
-      /\b\d+(?:\.\d+)?%|\$\d+(?:\.\d+)?[kKmMbB]?|\b\d{2,}(?:,\d{3})*(?:\.\d+)?\b/g
-    ) || [];
-
-  // Filter years y contextos técnicos (versiones, puertos, IDs) — F-07
-  const stats = [];
+  // appears within 150 characters after them. One regex iteration captures
+  // every occurrence's index, so filtering and window evaluation reuse the
+  // same records instead of re-searching the text per occurrence (Plan 088).
+  const statRecords = [];
   {
-    const seen = new Map();
-    for (const raw of statMatches) {
-      if (/^(19|20)\d{2}$/.test(raw)) continue;
-      const occurrence = seen.get(raw) || 0;
-      seen.set(raw, occurrence + 1);
-      const idx = nthIndexOf(textContent, raw, occurrence);
-      if (idx !== -1 && isContextualIdentifier(textContent, idx)) continue;
-      stats.push(raw);
+    const statRegex = /\b\d+(?:\.\d+)?%|\$\d+(?:\.\d+)?[kKmMbB]?|\b\d{2,}(?:,\d{3})*(?:\.\d+)?\b/g;
+    attributionScanChars += textContent.length;
+    for (const m of textContent.matchAll(statRegex)) {
+      statRecords.push({ raw: m[0], index: m.index });
+    }
+  }
+
+  // Filter years y contextos técnicos (versiones, puertos, IDs) — F-07.
+  // The captured index is the same position the old nthIndexOf returned.
+  const stats = [];
+  for (const { raw, index } of statRecords) {
+    if (/^(19|20)\d{2}$/.test(raw)) continue;
+    if (isContextualIdentifier(textContent, index)) continue;
+    stats.push(raw);
+  }
+
+  // Occurrence-index list per distinct stat value, in document order. The
+  // k-th filtered record of a value resolves to the k-th occurrence of that
+  // value in the text — exactly what the pre-refactor nthIndexOf pass did,
+  // including occurrences that were filtered out as years/technical IDs.
+  const statOccurrences = new Map();
+  for (const { raw, index } of statRecords) {
+    const list = statOccurrences.get(raw);
+    if (list) {
+      list.push(index);
+    } else {
+      statOccurrences.set(raw, [index]);
     }
   }
 
@@ -629,7 +646,8 @@ function observeAttributionProximity(textContent, _tokens, _htmlMeta = null) {
   for (const stat of stats) {
     const occurrence = statSeen.get(stat) || 0;
     statSeen.set(stat, occurrence + 1);
-    const idx = nthIndexOf(textContent, stat, occurrence);
+    const list = statOccurrences.get(stat);
+    const idx = list && occurrence < list.length ? list[occurrence] : -1;
     if (idx === -1) continue;
     const window = textContent.slice(Math.max(0, idx - 50), idx + 200);
     const hasSource = sourcePatterns.some((p) => p.test(window));
@@ -642,11 +660,19 @@ function observeAttributionProximity(textContent, _tokens, _htmlMeta = null) {
 
   // Check quote attribution. Evaluate attribution over the SAME quotes that
   // totalQuotes counts: blockquote lines + inline quotes (straight OR curly),
-  // each located at its own occurrence so repeated quotes get their own window.
-  const blockquoteLines = textContent.match(/^>\s*.+$/gm) || [];
-  const inlineQuotes = textContent.match(/["“]([^"”]{15,})["”]/g) || [];
-  const evaluatedQuotes = [...blockquoteLines, ...inlineQuotes];
-  const totalQuotes = evaluatedQuotes.length;
+  // each resolved to its own text occurrence so repeated quotes get their own
+  // window (Plan 088: one indexOf pass per distinct needle replaces one full
+  // search per record).
+  const blockquoteRecords = [];
+  for (const m of textContent.matchAll(/^>\s*.+$/gm)) {
+    blockquoteRecords.push({ raw: m[0], index: m.index });
+  }
+  const inlineQuoteRecords = [];
+  for (const m of textContent.matchAll(/["“]([^"”]{15,})["”]/g)) {
+    inlineQuoteRecords.push({ raw: m[0], index: m.index });
+  }
+  const quoteRecords = [...blockquoteRecords, ...inlineQuoteRecords];
+  const totalQuotes = quoteRecords.length;
 
   // Look for attribution patterns near blockquotes.
   // We require either a named person (— Full Name, Title) or an
@@ -664,14 +690,36 @@ function observeAttributionProximity(textContent, _tokens, _htmlMeta = null) {
     /(?:according\s+to|reported\s+by|per)\s+(?:the\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Institute|University|Foundation|Association|Corporation|Inc\.?|LLC|Report|Study|Survey)/i,
   ];
 
+  // Per-needle occurrence lists, resolved with plain indexOf (literal
+  // needle, so quotes containing regex metacharacters are safe). The k-th
+  // evaluated record of a needle maps to its k-th text occurrence, exactly
+  // like the pre-refactor nthIndexOf resolution.
+  const quoteOccurrences = new Map();
+  const collectOccurrences = (needle) => {
+    let list = quoteOccurrences.get(needle);
+    if (list) return list;
+    list = [];
+    quoteOccurrences.set(needle, list);
+    attributionScanChars += textContent.length;
+    let from = 0;
+    for (;;) {
+      const idx = textContent.indexOf(needle, from);
+      if (idx === -1) break;
+      list.push(idx);
+      from = idx + needle.length;
+    }
+    return list;
+  };
+
   let quotesWithAttribution = 0;
   let quotesWithoutAttribution = 0;
   const quoteSeen = new Map();
-  for (const quote of evaluatedQuotes) {
-    const needle = quote.trim();
+  for (const record of quoteRecords) {
+    const needle = record.raw.trim();
     const occurrence = quoteSeen.get(needle) || 0;
     quoteSeen.set(needle, occurrence + 1);
-    const idx = nthIndexOf(textContent, needle, occurrence);
+    const list = collectOccurrences(needle);
+    const idx = occurrence < list.length ? list[occurrence] : -1;
     if (idx === -1) continue;
     const window = textContent.slice(Math.max(0, idx - 80), idx + needle.length + 150);
     const hasAttr = attributionPatterns.some((p) => p.test(window));

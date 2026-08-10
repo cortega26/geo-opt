@@ -17,7 +17,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "fs";
 
-import { observeContent, observeAndParse } from "../src/observations.js";
+import {
+  observeContent,
+  observeAndParse,
+  resetAttributionScanCounter,
+  getAttributionScanChars,
+} from "../src/observations.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Heading hierarchy
@@ -233,6 +238,172 @@ describe("attribution proximity", () => {
     assert.ok(
       obs.attributionProximity.statsWithoutNearbySource >= 1,
       `Expected >=1 stat without nearby source, got ${obs.attributionProximity.statsWithoutNearbySource}`
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Attribution linear scan (Plan 088)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("attribution proximity — linear scan (Plan 088)", () => {
+  function counts(obs) {
+    const p = obs.attributionProximity;
+    return {
+      with: p.statsWithNearbySource,
+      without: p.statsWithoutNearbySource,
+      quotesWith: p.quotesWithAttribution,
+      quotesWithout: p.quotesWithoutAttribution,
+      totalQuotes: p.quotesWithAttribution + p.quotesWithoutAttribution,
+    };
+  }
+
+  it("years are filtered but do not disturb repeated-value occurrence mapping", () => {
+    // "2024" must not count; the two "50%" occurrences keep their indices
+    // (first attributed, second unattributed).
+    const content =
+      "According to a study, 50% of users prefer X. In 2024 the number rose. Later, 50% more without a source.";
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    assert.deepEqual(c, { with: 1, without: 1, quotesWith: 0, quotesWithout: 0, totalQuotes: 0 });
+  });
+
+  it("a filtered technical-ID occurrence still consumes the text occurrence slot", () => {
+    // "Version 50%" is filtered as a contextual identifier, but the second
+    // filtered "50%" record resolves to the NEXT text occurrence — the
+    // contextual one — exactly like the pre-refactor nthIndexOf pass. The
+    // third occurrence (near a source) is never evaluated as a window.
+    const content =
+      "According to a comprehensive study published by the research institute, 50% of users prefer X. Version 50% is the current release. Later, 50% more without any source.";
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    // Two filtered stats; the second window sits at the contextual
+    // occurrence, which has no source within 50 chars before it.
+    assert.deepEqual(c, { with: 1, without: 1, quotesWith: 0, quotesWithout: 0, totalQuotes: 0 });
+  });
+
+  it("overlapping-looking values (50 and 50%) are counted independently", () => {
+    const content =
+      "According to a study, over 50 users prefer X. 50% of them are happy. Later, 50% more without any source.";
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    assert.equal(c.with + c.without, 3, "50%, 50, 50% = three stats");
+    assert.ok(c.with >= 2, `first 50% and 50 near the study source: ${JSON.stringify(c)}`);
+    assert.ok(c.without >= 1, `last 50% unattributed: ${JSON.stringify(c)}`);
+  });
+
+  it("technical ids (ports, node versions) are filtered", () => {
+    const content =
+      "The service listens on port 8080 and runs node 22 with 99.9% uptime, according to data from the team.";
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    assert.deepEqual(c, { with: 1, without: 0, quotesWith: 0, quotesWithout: 0, totalQuotes: 0 });
+  });
+
+  it("sources before and after the stat are both detected", () => {
+    const before = "According to a study, 50% of users prefer X.";
+    const after = "50% of users prefer X, reported by the survey team.";
+    for (const content of [before, after]) {
+      const obs = observeContent(content, "test.md");
+      const c = counts(obs);
+      assert.equal(c.with, 1, `expected attribution for: ${content}`);
+      assert.equal(c.without, 0);
+    }
+  });
+
+  it("Unicode around a stat does not break window evaluation", () => {
+    const content =
+      "According to a study, 50% of users reported success 😊 — a detailed analysis ✨ by the institute confirmed the findings.";
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    // Emoji/accents around the stat must not shift window slicing; the
+    // source pattern sits within 50 chars before the stat.
+    assert.equal(c.with, 1, `expected the stat attributed: ${JSON.stringify(c)}`);
+    assert.equal(c.without, 0);
+  });
+
+  it("duplicate inline quotes resolve to successive text occurrences, not their own match index", () => {
+    // The same quoted span appears inside a blockquote line AND standalone.
+    // Inline record 1 must resolve to the FIRST span, inline record 2 to the
+    // SECOND span — a naive "use the match's own index" refactor would point
+    // record 2 back at the first span and miss the attribution that only
+    // sits next to the second span. Blockquote records resolve to the whole
+    // trimmed line, so all four records evaluate windows.
+    const q = "“Repeated claim long enough to match inline”";
+    const filler = "x".repeat(220);
+    const content = `“another separate quote” first.\n\n> ${q} first.\n\n${filler} ${q} again — Jane Doe, research lead.`;
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    assert.equal(c.totalQuotes, 4, "four records counted");
+    assert.equal(c.quotesWith, 1, "only the window at the second occurrence may see Jane Doe");
+    assert.equal(
+      c.quotesWithout,
+      3,
+      "blockquote, first-span, and separate-quote windows have no attribution"
+    );
+  });
+
+  it("quote needles containing regex metacharacters are matched literally", () => {
+    const q = "“Budget rose $500 (estimate, Q3+Q4) by [plan]”";
+    const content = `${q} — Jane Doe, research lead.`;
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    assert.equal(c.quotesWith, 1, `metachar quotes must resolve literally: ${JSON.stringify(c)}`);
+    assert.equal(c.quotesWithout, 0);
+  });
+
+  it("interleaved distinct values keep per-value occurrence mapping under filtering", () => {
+    // "Version 10%" and "port 8080" are filtered. Each kept value still
+    // resolves to its own k-th text occurrence: the kept "8080" record maps
+    // to the contextual first occurrence's window, which still reaches the
+    // later "data from Y" source 200 chars ahead (window semantics).
+    const content =
+      "According to a study, 10% of users and 20% of devs agree. Version 10% and port 8080 are technical. Later, 20% more per survey data from Y, and 8080 again without source.";
+    const obs = observeContent(content, "test.md");
+    const c = counts(obs);
+    assert.equal(c.with + c.without, 4, "10%, 20%, 20%, 8080 = four stats");
+    assert.deepEqual(c, { with: 4, without: 0, quotesWith: 0, quotesWithout: 0, totalQuotes: 0 });
+  });
+
+  it("the lookback window clips partial source patterns", () => {
+    // A source pattern that is only partially inside the idx-50 lookback
+    // must not match. 20 filler chars keep "according to a study" fully in
+    // the window; 30 clip its start — flipping stat1's attribution while
+    // stat2 stays bare in both variants. (Stats must be space-separated
+    // from the filler: "y50%" has no word boundary and is not a stat.)
+    const inside =
+      "According to a study, " + "y".repeat(20) + " 50% of users agree. 50% more without source.";
+    const clipped =
+      "According to a study, " + "y".repeat(30) + " 50% of users agree. 50% more without source.";
+    const cIn = counts(observeContent(inside, "test.md"));
+    const cCl = counts(observeContent(clipped, "test.md"));
+    assert.deepEqual(cIn, { with: 1, without: 1, quotesWith: 0, quotesWithout: 0, totalQuotes: 0 });
+    assert.deepEqual(cCl, { with: 0, without: 2, quotesWith: 0, quotesWithout: 0, totalQuotes: 0 });
+  });
+
+  it("scan work scales linearly with repeated identical stats", () => {
+    const make = (n) =>
+      "According to a study, " + Array(n).fill("50%").join(" ") + " later without any source.";
+    const small = make(500);
+    const large = make(2000);
+    resetAttributionScanCounter();
+    observeContent(small, "test.md");
+    const smallChars = getAttributionScanChars();
+    resetAttributionScanCounter();
+    observeContent(large, "test.md");
+    const largeChars = getAttributionScanChars();
+    // Each pass is one full scan of the text: the stat regex scan plus one
+    // occurrence pass per distinct needle. 4x the repeats means ~4x the text
+    // and ~4x the work — never ~16x (quadratic re-searching would blow past
+    // this even with generous slack).
+    assert.ok(
+      smallChars <= 4 * small.length,
+      `small scan work must be a few text-length passes, got ${smallChars} chars for ${small.length} chars`
+    );
+    const ratio = largeChars / smallChars;
+    assert.ok(
+      ratio < 6,
+      `4x repeats must scale ~4x, not more (ratio ${ratio.toFixed(2)}: ${smallChars} -> ${largeChars})`
     );
   });
 });
