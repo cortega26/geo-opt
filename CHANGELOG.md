@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.3](https://github.com/cortega26/geo-opt/compare/v2.4.2...v2.4.3) (2026-08-10)
+
+
+### Performance Improvements
+
+* **observations:** retain statistic match offsets (Plan 088) ([1e70be8](https://github.com/cortega26/geo-opt/commit/1e70be8893b231ad767b2d54da83e1b1a3c9cdfc))
+
 ## [2.4.2](https://github.com/cortega26/geo-opt/compare/v2.4.1...v2.4.2) (2026-08-10)
 
 

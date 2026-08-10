@@ -1,6 +1,6 @@
 {
   "name": "geo-opt",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "description": "Source-available AI-discoverability CLI: GEO content audit, Schema.org JSON-LD, technical SEO, robots.txt, sitemap.xml, and llms.txt — 100% local.",
   "main": "dist/index.js",
   "types": "index.d.ts",
@@ -28,9 +28,9 @@
   ],
   "type": "module",
   "scripts": {
-"test": "node --test tests/*.test.js",
- "test:coverage": "c8 node --test tests/*.test.js",
- "test:verify": "node scripts/verify-badges.js",
+    "test": "node --test tests/*.test.js",
+    "test:coverage": "c8 node --test tests/*.test.js",
+    "test:verify": "node scripts/verify-badges.js",
     "test:python": "python3 .agents/skills/geo-optimization/scripts/test_optimizer.py",
     "test:conformance": "node --test tests/conformance.test.js",
     "lint": "eslint src/ bin/ scripts/ tests/ && python3 -m py_compile .agents/skills/geo-optimization/scripts/geo_optimizer.py .agents/skills/geo-optimization/scripts/test_optimizer.py",
