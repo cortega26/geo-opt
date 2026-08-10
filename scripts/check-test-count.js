@@ -6,11 +6,10 @@
 // Exits non-zero if the badge has drifted from the real count.
 //
 // Preferred invocation: `--from-log <file>` pointing at the stdout/stderr of a
-// just-completed `node --test tests/*.test.js` run (spec reporter). The count is
-// read from that log, so the suite is NOT re-run — re-running the full suite
-// back-to-back in CI used to get killed on memory-constrained runners mid-run
-// (the parse then failed and the badge gate went red with no drift). Without
-// `--from-log` the script falls back to running the suite itself.
+// just-completed `node --test tests/*.test.js` run. The count is read from that
+// log, so the suite is NOT re-run. Without `--from-log` the script falls back
+// to running the suite itself. (The runner prints the spec summary "ℹ tests N"
+// on a TTY and the TAP summary "# tests N" when stdout is piped — parse both.)
 
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -34,17 +33,20 @@ function badgeNumber(text, label) {
   return m[1];
 }
 
-function countFromLog(logPath) {
-  const log = readFileSync(logPath, "utf8");
-  const m = log.match(/ℹ tests\s+(\d+)/u);
+function testCountFrom(text, source) {
+  const m = text.match(/ℹ tests\s+(\d+)/u) || text.match(/^#\s+tests\s+(\d+)/mu);
   if (!m) {
     console.error(
-      `✖ could not parse test count from log ${logPath} ` +
-        `(looked for the "ℹ tests N" spec-reporter summary):\n${log.slice(-800)}`
+      `✖ could not parse test count from ${source} (looked for the "ℹ tests N" ` +
+        `spec-reporter or "# tests N" TAP summary):\n${text.slice(-800)}`
     );
     process.exit(1);
   }
   return m[1];
+}
+
+function countFromLog(logPath) {
+  return testCountFrom(readFileSync(logPath, "utf8"), `log ${logPath}`);
 }
 
 function countFromSpawn() {
@@ -61,13 +63,7 @@ function countFromSpawn() {
     );
     process.exit(1);
   }
-  const out = (r.stdout || "") + (r.stderr || "");
-  const m = out.match(/ℹ tests\s+(\d+)/u);
-  if (!m) {
-    console.error(`✖ could not parse test count from node --test output:\n${out.slice(-800)}`);
-    process.exit(1);
-  }
-  return m[1];
+  return testCountFrom((r.stdout || "") + (r.stderr || ""), "node --test output");
 }
 
 const fromLogIdx = process.argv.indexOf("--from-log");
