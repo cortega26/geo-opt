@@ -5,6 +5,85 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2](https://github.com/cortega26/geo-opt/compare/v2.4.1...v2.4.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* **python:** close post-084 parity gaps in metadata and llms generation (audit) ([de76f36](https://github.com/cortega26/geo-opt/commit/de76f36bdd9f6689ded4760b05b28ac240d95b0b))
+
+## [2.4.1](https://github.com/cortega26/geo-opt/compare/v2.4.0...v2.4.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **python:** align compatible artifact outputs (Plan 084) ([d0414e5](https://github.com/cortega26/geo-opt/commit/d0414e52bf68303d14698a0b64b8308bec34b7a4))
+
+# [2.4.0](https://github.com/cortega26/geo-opt/compare/v2.3.11...v2.4.0) (2026-08-09)
+
+
+### Features
+
+* **validate:** CI-grade JSON-LD validation gate (Plans 081+082) ([13bdfeb](https://github.com/cortega26/geo-opt/commit/13bdfeb36c476de59dc631eb6a1506b500d41620))
+
+## [Unreleased]
+
+### Changed
+
+- **types:** narrow `GeoConfig.profile` to `"auto" | ProfileId`, add the `service` profile and `MODEL_VERSION_V1`/`MODEL_VERSION_V2` constants (Plan 081)
+- **types:** widen `AuditResult.report` to `AuditReport | V2Report` so v2 batch results match the runtime (Plan 080)
+- **batch:** tolerate success results without a report in `aggregateReport` (the d.ts contract allows it) instead of crashing (Plan 080)
+- **sitemap:** resolve sub-sitemap `<loc>` entries in generated indexes to absolute URLs when `baseUrl` is set, as the sitemap protocol requires (relative names are kept in local file mode)
+- **llms.txt:** `suggestSection` no longer leaks `../` into section labels for paths outside the cwd; it derives the label from the directory's own name instead
+- **Security (Plan 083 audit 2026-08-09):** the write boundary is hardened against a parent-symlink swap between validation and rename — Node and Python now stage the temp file and rename onto the fully resolved real destination path, so re-pointing a symlinked parent component cannot redirect the write outside the CWD (deterministic regression test pins it); destination directories must exist (clean "Output directory does not exist" error instead of a raw ENOENT, matching the pre-083 CLI guards); Python copy/schema tasks copy bytes byte-for-byte (no more silent UTF-8 replacement on backups) and new files default to `0o644` masked by the umask (Node parity, previously `0600`); the containment predicate has a single implementation shared by the validators and the boundary
+- **Security (Plan 083):** every user-directed artifact write now goes through one shared atomic, symlink-safe boundary in Node and Python: `robots generate`, `sitemap generate`, `llmstxt generate` (incl. `--full`), `generate-all` outputs, `report` and `technical -o`, the `geo_config.json` template, schema injection (single and batch), and `--backup` copies. Destinations whose real parent directory resolves outside the CWD are rejected; an existing final symlink is refused instead of followed; writes stage through a unique temp file and atomic rename, so a symlink raced in between check and write is replaced, not followed; existing file modes are preserved; temp files are cleaned up on failure. Injection of files that are themselves symlinks is now refused at the final destination (previously only outside-CWD links were)
+- **validate:** `geo-opt validate` now exits nonzero when a file has no JSON-LD blocks, malformed JSON, or schema errors, so it can serve as a CI gate; `validateSchemaFile` returns a structured `{ valid, blockCount, errors, warnings, notes, blocks }` result and `validateSchema` is total over JSON values (null, primitives, arrays return errors instead of crashing) (Plan 082)
+- **python (Plan 084):** Python artifact output now matches the documented compatible tier: schema titles use the same metadata fallback chain as Node (markdown H1 → HTML `<h1>` → frontmatter title → file basename) instead of a bare "Untitled Document"; score-based `## Optional` placement in `generate_llms_txt` is opt-in via `optional_threshold` (deprecation warning on stderr, Node parity) while `entry["optional"] = True` is honored without a threshold; and link labels (titles, descriptions, section names, llms-full headings) are Markdown-escaped so hostile text cannot inject links — backslashes, brackets and opening parentheses escaped exactly like Node
+- **validate (audit 2026-08-09):** block extraction is brace-balanced, so array roots are rejected with a clear error and `@graph` documents with nested nodes parse whole instead of truncating to invalid JSON; ```` ```jsonld ````/```` ```json-ld ```` and case variants are recognized (longest alternative first), HTML `<script type='application/ld+json'>` single-quoted attributes are matched, multiple JSON-LD values inside one fence become individual blocks, and fence bodies without a leading `{`/`[` or without `@context` are still skipped
+- **batch (audit 2026-08-09):** `aggregateReport` computes statistics over finite scores only — score-less successes can no longer produce `NaN` in `averageScore`/`medianScore`/`stdDev` or drop out of `worstFiles`; with zero scored files the numeric stats are omitted and the summary explains why
+- **sitemap (audit 2026-08-09):** `resolveIndexLoc` tolerates non-string `baseUrl` values (misconfigured `geo_config.json`) by falling back to relative locs, and strips query strings/fragments from `baseUrl` so sitemap-index `<loc>` entries stay clean absolute URLs
+- **python (audit 2026-08-10):** Python metadata and llms parity closed post-Plan-084 gaps: `.htm` files count as HTML exactly like `.html` (Node parity), so `<h1>` titles and meta-description fallbacks match; `generate_llms_txt`/`generate_llms_full_txt` tolerate empty section names (defaulting to `## Pages`, like Node's falsy-section fallback) and entries missing `title`/`url` instead of raising `KeyError`; score-based `## Optional` placement demotes numeric scores only — `null`, non-numeric or absent scores never demote (Node coerces `null` to 0 and demotes; Python deliberately does not, noted in the capability matrix)
+- **python (audit 2026-08-10):** the Python port is clean under `ruff check` (unused `st` assignment, three placeholder-less f-strings, one ambiguous `l` variable — all behavior-preserving), and a shared `page-basic.htm` conformance fixture now pins cross-runtime parity for `.htm` files: llms.txt entry title/description and the schema `headline` are asserted identical between Node and Python
+- **docs (audit 2026-08-10):** README badge, highlights and dev-section test counts realigned to the live `node --test` count (935 tests · 165 suites) in both languages; the Plan 058 README-consistency gate had pinned a stale 162-suites literal and now matches the real suite count
+
+### Tested
+
+- **consumer fixture:** exercise every public export — frontmatter, sitemap/badge/fetcher, HTML reporters, robots helpers, schema validation, model version constants, v2 batch reporting, and `service`/`auto` profiles (Plan 031)
+- **contract:** assert `index.d.ts` declares exactly the runtime value exports (Plan 081)
+- **aggregate:** v2 reports flow through `auditFiles` → `aggregateReport` → `perFile` without body leaks (Plan 080)
+
+## [2.3.11](https://github.com/cortega26/geo-opt/compare/v2.3.10...v2.3.11) (2026-08-09)
+
+
+### Bug Fixes
+
+* **report:** omit audited bodies from summaries (Plan 080) ([b240a24](https://github.com/cortega26/geo-opt/commit/b240a246f61a79e8e57c3783f7051230616db041))
+
+## [2.3.10](https://github.com/cortega26/geo-opt/compare/v2.3.9...v2.3.10) (2026-08-04)
+
+
+### Bug Fixes
+
+* **fetcher:** honor custom user agent (Plan 079) ([428372b](https://github.com/cortega26/geo-opt/commit/428372ba95d1fc4ad0cd7a840a5942a5663a578d))
+* **fetcher:** propagate UA validation and key robots cache (Plan 096) ([cee5383](https://github.com/cortega26/geo-opt/commit/cee538324110f8cf4b21994682dd7ae5202a138f))
+
+## [2.3.9](https://github.com/cortega26/geo-opt/compare/v2.3.8...v2.3.9) (2026-08-04)
+
+
+### Bug Fixes
+
+* **robots:** combine groups and match queries (Plan 078) ([c85ee5d](https://github.com/cortega26/geo-opt/commit/c85ee5d58a67675a9620a26e2aeb86a322852281))
+* **robots:** parse comma agents, keep groups across comments, align Python (Plan 094) ([529dd3b](https://github.com/cortega26/geo-opt/commit/529dd3b0a530c0d8d17a843737bba383fac8cad2))
+* **robots:** skip empty User-agent token lists; pin CRLF/BOM and CLI parity (Plan 095) ([3a08151](https://github.com/cortega26/geo-opt/commit/3a081511230aa82f1062ca62dd912548b6a71315))
+
+## [2.3.8](https://github.com/cortega26/geo-opt/compare/v2.3.7...v2.3.8) (2026-08-03)
+
+
+### Bug Fixes
+
+* **fetcher:** harden shared-deadline edges (coverage, timer cleanup) ([0a7844b](https://github.com/cortega26/geo-opt/commit/0a7844b00913934c5ce56afd8cb5b5264113b2b6))
+* **fetcher:** share timeout across redirects ([7f29992](https://github.com/cortega26/geo-opt/commit/7f29992d8a9dc0e256d376f19daaeb9d8ba68809))
+
 ## [2.3.7](https://github.com/cortega26/geo-opt/compare/v2.3.6...v2.3.7) (2026-08-03)
 
 
@@ -23,6 +102,18 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
+- **fix:** user-agent validation errors now propagate out of `fetchRobotsTxt` with `code = "ERR_INVALID_USER_AGENT"` instead of silently caching an empty result — a control-character `userAgent` previously poisoned the origin-keyed robots cache so later valid calls never fetched real rules; the rejection now covers all control characters except HTAB and happens before any network I/O, and the robots cache is keyed by origin + effective user-agent so different agents refetch (Plan 096)
+- **test:** pin the validation-error propagation, the extended control-character rejection (incl. non-string values) with zero requests, the user-agent-aware robots cache key, the HTAB-allowed case, and the unchanged network-failure degradation (Plan 096)
+- **fix:** `fetchUrl`/`fetchRobotsTxt` now honor the public `userAgent` option on every request: redirect hops inherit it, omitting the option keeps the default user agent, an empty string falls back to the default, and CR/LF values are rejected with a clear error before any network I/O (header-injection guard) (Plan 079)
+- **test:** pin the default/custom user agent, redirect-hop preservation, robots fetch, and CR/LF rejection with zero requests (Plan 079)
+- **fix:** `User-agent:` lines with comma-separated tokens now split into separate agents (Google de-facto spec), comment-only lines no longer end a group (dropping following rules), and the Python port matches Node's combined-group semantics — equally specific groups merge their rules, `matchedGroup` dedup is case-insensitive in both runtimes, and percent-encoding byte-for-byte matching plus `$`-anchored query exclusion are pinned by tests (Plan 094)
+- **test:** pin comma-agent splitting, comment-line group continuity, Node↔Python combined-group parity, case-insensitive `matchedGroup` dedup, percent-encoding byte-for-byte matching and `$`-anchor query exclusion (Plan 094)
+- **fix:** a `User-agent:` line whose comma-separated token list is entirely empty (e.g. `User-agent: ,`) no longer creates a ghost group with zero agents that silently swallows the following rules; the Python port strips a leading UTF-8 BOM in `parse_robots_groups` and reads robots files as `utf-8-sig`, so BOM-prefixed files audit the same as plain ones (Plan 095)
+- **test:** pin the no-ghost-group invariant, CRLF/BOM parser tolerance in both runtimes, and field-by-field Node↔Python CLI JSON parity for `robots audit` (top-level keys plus `allowed`, `matchedGroup`, `matchedRule`) (Plan 095)
+- **fix:** robots.txt groups with equally specific user-agent tokens now combine their rules (RFC 9309 §2.2.1) in both `auditRobots` and `checkRobotsRule`, and rule matching includes the URL query string as part of the path (Plan 078)
+- **fix:** the shared total deadline (Plan 077) no longer leaks a pending timer when request creation throws synchronously — the timer armed before the promise is now cleared before rethrowing (Plan 092)
+- **test:** pin the entry-check no-connection semantics (Plan 093)
+- **fix:** `timeoutMs` is now one shared total deadline for the whole fetch transaction — DNS/connect, headers, body, and every redirect hop consume the same budget, so a redirect chain can no longer hold the process for (hops + 1) × `timeoutMs` (Plan 077)
 - **docs:** enforce the DONE-to-`plans/archive/` governance rule via scripts/check-plan-archive.js in `npm run check` and CI, covered by tests/plan-archive.test.js (plan 022 archived)
 - **fix:** concurrent builds over the shared dist/ are serialized via an exclusive lock (was corrupting dist/ under parallel test runners — EACCES/half-written artifacts)
 - **fix:** fetcher connects IPv6-literal URLs via the vetted address (was getaddrinfo ENOTFOUND on Node 22+ because the bracketed hostname leaked into the request)
@@ -36,6 +127,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Security
 
+- **security:** aggregate audit summaries (`audit --summary --format json`, `generate-all`'s `audit-report.json`, and the per-file entries returned by `aggregateReport`) no longer embed raw audited source bodies — serialized reports carry findings, scores and error metadata only, while internal audit results keep `content` for `generate-all` reuse; a public `AggregatePerFile` type replaces `AuditResult` on `AggregateReport.perFile`, the multi-file HTML `report` renders from the redacted per-file view, and `renderAggregateReportHtml` now takes `AggregatePerFile[]` so source bodies cannot reach byte-emitting output (Plan 080; adversarial audit 2026-08-09)
 - **fix:** bound total page-URL retention during sub-sitemap traversal to a finite hard cap (50,000 unique URLs, the sitemap-spec scale) — deduplication while collecting, first-seen ordering, exactly one truncation warning, and a machine-checkable `truncatedPageUrls`/`urlLimitReached` result; root and collected URLs share the budget before robots evaluation; independent from the 100-fetch cap and the final `--max-urls` (Plan 076)
 - **feat:** enforce one scheme/origin policy on every remote hop — root URL, redirects, `robots.txt`, nested sitemaps, and discovered pages are HTTPS-only and root-origin-only by default, rejected before DNS/connect; `--allow-http` is the only HTTP opt-in for sitemap-discovered hops and `--allow-cross-origin` the only cross-origin opt-in (the legacy `--url` exception where IP flags also admit HTTP remains unchanged); SSRF/IP guards and TLS verification are never weakened (Plan 075)
 - **fix:** a `robots.txt` hop rejected by the hop policy is now reported via the CLI warning (with the policy reason) instead of being silently swallowed as "no robots.txt"; 404/network failures still degrade to full access (Plan 075)

@@ -435,10 +435,11 @@ ${
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Render an aggregate site report as a standalone HTML string.
+ * Render a site-level aggregate report as a standalone HTML string.
  *
- * @param {object[]} results — from auditFiles()
- * @param {object} summary — from aggregateReport()
+ * @param {Array} results - aggregate per-file entries (redacted: findings and
+ *   scores only, never raw source bodies)
+ * @param {object} summary - aggregate report from aggregateReport()
  * @param {{ noBranding?: boolean }} [options]
  * @returns {string}
  */

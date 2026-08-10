@@ -16,7 +16,7 @@ import https from "node:https";
 import tls from "node:tls";
 import net from "node:net";
 
-import { parseRobotsGroups } from "./robots.js";
+import { parseRobotsGroups, selectGroups, evaluateSelectedGroups } from "./robots.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Constants
@@ -466,10 +466,16 @@ function createPlainAgent(hostname, resolvedIp, port) {
  * @param {boolean} [options.allowHttp=true] — permite hops http: (CLI: solo con --allow-http)
  * @param {boolean} [options.allowCrossOrigin=true] — permite hops fuera del root origin
  * @param {string|null} [options.rootOrigin] — origin raíz que deben respetar todos los hops
- * @param {number} [options.totalTimeoutMs]
+ * @param {number} [options.totalTimeoutMs] — presupuesto total de la transacción
+ * @param {number} [options.deadlineMs] — fecha límite absoluta compartida por
+ *   todos los hops (Plan 077); si se omite, se deriva de totalTimeoutMs
  * @param {number} [options.responseTimeoutMs]
  * @param {number} [options.maxResponseSize]
  * @param {number} [options.maxRedirects]
+ * @param {string} [options.userAgent=USER_AGENT] — User-Agent header; el
+ *   string vacío cae al default (Plan 079); valores con caracteres de
+ *   control se rechazan con code = "ERR_INVALID_USER_AGENT" antes de
+ *   cualquier I/O de red
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
  */
 async function performRequest(url, options = {}) {
@@ -481,10 +487,36 @@ async function performRequest(url, options = {}) {
     allowCrossOrigin = true,
     rootOrigin = null,
     totalTimeoutMs = TOTAL_TIMEOUT_MS,
+    deadlineMs = null,
     responseTimeoutMs = RESPONSE_TIMEOUT_MS,
     maxResponseSize = MAX_RESPONSE_SIZE,
     maxRedirects = MAX_REDIRECTS,
+    userAgent = USER_AGENT,
   } = options;
+
+  // Validación del User-Agent (Plan 079, ampliada en Plan 096): ocurre aquí,
+  // antes de cualquier I/O de red (DNS y conexión) — un valor con caracteres
+  // de control permitiría inyección de headers y no hay forma consistente de
+  // dejar que Node lo valide en httpMod.request. El regex es exactamente el
+  // set que Node rechaza en valores de header menos HTAB (\x09), que HTTP sí
+  // permite. El string vacío se normaliza al default: el header siempre
+  // identifica al auditor. El error lanza con code "ERR_INVALID_USER_AGENT"
+  // para que los llamadores (p. ej. fetchRobotsTxt) distingan una validación
+  // fallida de un fallo de red/HTTP. Esta función es el punto de paso único
+  // (fetchUrl y cada hop de redirect recursivo la invocan), así que la
+  // validación cubre toda la cadena.
+  const effectiveUserAgent = userAgent || USER_AGENT;
+  if (
+    typeof effectiveUserAgent !== "string" ||
+    // eslint-disable-next-line no-control-regex -- set deliberado: el regex REJECTA caracteres de control
+    /[\x00-\x08\x0a-\x1f\x7f]/u.test(effectiveUserAgent)
+  ) {
+    const err = new Error(
+      "Invalid User-Agent value: expected a single-line string without control characters"
+    );
+    err.code = "ERR_INVALID_USER_AGENT";
+    throw err;
+  }
 
   const parsed = new URL(url);
   const hostname = parsed.hostname;
@@ -504,156 +536,200 @@ async function performRequest(url, options = {}) {
     throw err;
   }
 
-  // 1. Resolver y validar IP
-  const { address: resolvedIp } = await resolveAndValidateHost(
-    hostname,
-    allowPrivate,
-    allowLocalhost
-  );
+  // 1. Fecha límite compartida (Plan 077): una sola transacción pública
+  //    (fetchUrl) tiene un solo presupuesto total a través de TODOS los
+  //    hops. Cada recursión de redirect recibe la misma deadlineMs absoluta
+  //    y arma su timer con el tiempo restante — el presupuesto NO se
+  //    renueva por hop. Si el presupuesto ya se agotó, abortar de inmediato
+  //    sin resolver ni conectar.
+  const deadline = deadlineMs ?? Date.now() + totalTimeoutMs;
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) {
+    throw new Error(`Request total timeout after ${totalTimeoutMs}ms`);
+  }
 
-  // 2. Crear agente con IP pre-resuelta (mitigación de DNS rebinding)
+  // 2. Timer total: se arma ANTES de resolver DNS y conectar para que la
+  //    fecha límite cubra también esas fases; si dispara durante la
+  //    resolución, el check posterior cierra la transacción en cuanto esta
+  //    termine. El timeout de respuesta (post-conexión) queda subordinado
+  //    por construcción: este timer dispara antes cuando el tiempo restante
+  //    es menor que responseTimeoutMs.
+  const totalController = new globalThis.AbortController();
+  const totalTimer = setTimeout(() => {
+    totalController.abort();
+  }, remaining);
+
+  // 3. Resolver y validar IP
+  let resolvedIp;
+  try {
+    ({ address: resolvedIp } = await resolveAndValidateHost(
+      hostname,
+      allowPrivate,
+      allowLocalhost
+    ));
+  } catch (error) {
+    clearTimeout(totalTimer);
+    throw error;
+  }
+
+  // El presupuesto se agotó mientras se resolvía el host: el timer ya
+  // abortó el controller; cerrar con el error de timeout total.
+  if (totalController.signal.aborted) {
+    clearTimeout(totalTimer);
+    throw new Error(`Request total timeout after ${totalTimeoutMs}ms`);
+  }
+
+  // 4. Crear agente con IP pre-resuelta (mitigación de DNS rebinding)
   const agent = isHttps
     ? createSecureAgent(hostname, resolvedIp, port)
     : createPlainAgent(hostname, resolvedIp, port);
 
   const httpMod = isHttps ? https : http;
 
-  // 3. Timeout total y de respuesta
-  const totalController = new globalThis.AbortController();
-  const totalTimer = setTimeout(() => {
-    totalController.abort();
-  }, totalTimeoutMs);
-
   let responseTimer;
 
   return new Promise((resolve, reject) => {
-    const req = httpMod.request(
-      {
-        // Conectar a la IP ya validada (resolvedIp) y no al hostname original:
-        // para literales IPv6 parsed.hostname trae brackets ("[::1]") y
-        // getaddrinfo falla con ENOTFOUND; para hostnames se elimina la segunda
-        // resolución (refuerza la mitigación de DNS rebinding).
-        hostname: resolvedIp,
-        port,
-        path: parsed.pathname + parsed.search,
-        method: "GET",
-        agent,
-        signal: totalController.signal,
-        // Si Node omite el agente custom (hostname literal), el SNI debe seguir
-        // siendo el nombre original; el agente ya lo fija en tls.connect.
-        ...(isHttps ? { servername: hostname } : {}),
-        headers: {
-          "User-Agent": USER_AGENT,
-          Host: parsed.host,
-          Accept: "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8",
+    try {
+      const req = httpMod.request(
+        {
+          // Conectar a la IP ya validada (resolvedIp) y no al hostname original:
+          // para literales IPv6 parsed.hostname trae brackets ("[::1]") y
+          // getaddrinfo falla con ENOTFOUND; para hostnames se elimina la segunda
+          // resolución (refuerza la mitigación de DNS rebinding).
+          hostname: resolvedIp,
+          port,
+          path: parsed.pathname + parsed.search,
+          method: "GET",
+          agent,
+          signal: totalController.signal,
+          // Si Node omite el agente custom (hostname literal), el SNI debe seguir
+          // siendo el nombre original; el agente ya lo fija en tls.connect.
+          ...(isHttps ? { servername: hostname } : {}),
+          headers: {
+            "User-Agent": effectiveUserAgent,
+            Host: parsed.host,
+            Accept: "text/html, application/xhtml+xml, application/xml;q=0.9, */*;q=0.8",
+          },
         },
-      },
-      (res) => {
-        // Primer byte recibido — limpiar timeout de respuesta
+        (res) => {
+          // Primer byte recibido — limpiar timeout de respuesta
+          clearTimeout(responseTimer);
+
+          const { statusCode, headers } = res;
+
+          // Seguir redirects con re-validación SSRF
+          if ([301, 302, 303, 307, 308].includes(statusCode) && headers.location) {
+            // Consumir el body del redirect antes de seguir
+            res.resume();
+
+            if (redirectDepth >= maxRedirects) {
+              clearTimeout(totalTimer);
+              reject(new Error(`Too many redirects (max ${maxRedirects}) for ${url}`));
+              return;
+            }
+
+            // Resolver la URL de destino relativa a la original
+            let redirectUrl;
+            try {
+              redirectUrl = new URL(headers.location, url).href;
+            } catch {
+              clearTimeout(totalTimer);
+              reject(new Error(`Invalid redirect location: ${headers.location}`));
+              return;
+            }
+
+            // Validar que el destino sea http(s)
+            const redirectParsed = new URL(redirectUrl);
+            if (!["http:", "https:"].includes(redirectParsed.protocol)) {
+              clearTimeout(totalTimer);
+              reject(new Error(`Redirect to unsupported protocol: ${redirectParsed.protocol}`));
+              return;
+            }
+
+            clearTimeout(totalTimer);
+            // Re-validar el destino del redirect contra SSRF guards. La
+            // recursión hereda la MISMA fecha límite absoluta (deadlineMs vía
+            // ...options) y arma un timer con el tiempo restante — el
+            // presupuesto total no se renueva por hop (Plan 077).
+            performRequest(redirectUrl, {
+              ...options,
+              redirectDepth: redirectDepth + 1,
+            })
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
+          // Leer body con control de tamaño
+          const chunks = [];
+          let totalBytes = 0;
+
+          res.on("data", (chunk) => {
+            totalBytes += chunk.length;
+            if (totalBytes > maxResponseSize) {
+              req.destroy(
+                new Error(`Response size ${totalBytes} exceeds limit ${maxResponseSize}`)
+              );
+              return;
+            }
+            chunks.push(chunk);
+          });
+
+          res.on("end", () => {
+            clearTimeout(totalTimer);
+            const html = Buffer.concat(chunks).toString("utf8");
+            resolve({
+              html,
+              statusCode,
+              finalUrl: url,
+              headers: Object.fromEntries(
+                Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
+              ),
+            });
+          });
+
+          res.on("error", (err) => {
+            clearTimeout(totalTimer);
+            reject(err);
+          });
+        }
+      );
+
+      // Timeout de respuesta: empieza cuando el socket se conecta
+      req.on("socket", (socket) => {
+        socket.on("connect", () => {
+          responseTimer = setTimeout(() => {
+            req.destroy(
+              new Error(`Response timeout: no data received within ${responseTimeoutMs}ms`)
+            );
+          }, responseTimeoutMs);
+        });
+      });
+
+      req.on("error", (err) => {
+        clearTimeout(totalTimer);
         clearTimeout(responseTimer);
-
-        const { statusCode, headers } = res;
-
-        // Seguir redirects con re-validación SSRF
-        if ([301, 302, 303, 307, 308].includes(statusCode) && headers.location) {
-          // Consumir el body del redirect antes de seguir
-          res.resume();
-
-          if (redirectDepth >= maxRedirects) {
-            clearTimeout(totalTimer);
-            reject(new Error(`Too many redirects (max ${maxRedirects}) for ${url}`));
-            return;
-          }
-
-          // Resolver la URL de destino relativa a la original
-          let redirectUrl;
-          try {
-            redirectUrl = new URL(headers.location, url).href;
-          } catch {
-            clearTimeout(totalTimer);
-            reject(new Error(`Invalid redirect location: ${headers.location}`));
-            return;
-          }
-
-          // Validar que el destino sea http(s)
-          const redirectParsed = new URL(redirectUrl);
-          if (!["http:", "https:"].includes(redirectParsed.protocol)) {
-            clearTimeout(totalTimer);
-            reject(new Error(`Redirect to unsupported protocol: ${redirectParsed.protocol}`));
-            return;
-          }
-
-          clearTimeout(totalTimer);
-          // Re-validar el destino del redirect contra SSRF guards
-          performRequest(redirectUrl, {
-            ...options,
-            redirectDepth: redirectDepth + 1,
-          })
-            .then(resolve)
-            .catch(reject);
+        // No rechazar si ya fue abortado por timeout
+        if (totalController.signal.aborted) {
+          reject(new Error(`Request total timeout after ${totalTimeoutMs}ms`));
           return;
         }
-
-        // Leer body con control de tamaño
-        const chunks = [];
-        let totalBytes = 0;
-
-        res.on("data", (chunk) => {
-          totalBytes += chunk.length;
-          if (totalBytes > maxResponseSize) {
-            req.destroy(new Error(`Response size ${totalBytes} exceeds limit ${maxResponseSize}`));
-            return;
-          }
-          chunks.push(chunk);
-        });
-
-        res.on("end", () => {
-          clearTimeout(totalTimer);
-          const html = Buffer.concat(chunks).toString("utf8");
-          resolve({
-            html,
-            statusCode,
-            finalUrl: url,
-            headers: Object.fromEntries(
-              Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])
-            ),
-          });
-        });
-
-        res.on("error", (err) => {
-          clearTimeout(totalTimer);
-          reject(err);
-        });
-      }
-    );
-
-    // Timeout de respuesta: empieza cuando el socket se conecta
-    req.on("socket", (socket) => {
-      socket.on("connect", () => {
-        responseTimer = setTimeout(() => {
-          req.destroy(
-            new Error(`Response timeout: no data received within ${responseTimeoutMs}ms`)
-          );
-        }, responseTimeoutMs);
+        reject(err);
       });
-    });
 
-    req.on("error", (err) => {
+      req.on("timeout", () => {
+        req.destroy(new Error(`Request timed out after ${totalTimeoutMs}ms`));
+      });
+
+      req.end();
+    } catch (err) {
+      // El timer total se armó ANTES del promise body: si la creación del
+      // request lanza sincrónicamente (p. ej. opciones internas inválidas),
+      // el promise rechaza solo, pero el timer quedaría pendiente hasta la
+      // fecha límite — limpiarlo para no filtrar un timer activo.
       clearTimeout(totalTimer);
-      clearTimeout(responseTimer);
-      // No rechazar si ya fue abortado por timeout
-      if (totalController.signal.aborted) {
-        reject(new Error(`Request total timeout after ${totalTimeoutMs}ms`));
-        return;
-      }
-      reject(err);
-    });
-
-    req.on("timeout", () => {
-      req.destroy(new Error(`Request timed out after ${totalTimeoutMs}ms`));
-    });
-
-    req.end();
+      throw err;
+    }
   });
 }
 
@@ -684,7 +760,17 @@ const robotsCache = new Map();
  * @throws {Error} con code "ERR_HOP_POLICY" si la política bloquea el hop
  */
 export async function fetchRobotsTxt(origin, options = {}) {
-  const cached = robotsCache.get(origin);
+  const { userAgent = USER_AGENT } = options;
+  // Mismo normalizado que performRequest: el string vacío cae al default.
+  // La clave de caché incluye el UA efectivo porque un mismo origin puede
+  // servir robots.txt distinto por agente.
+  const effectiveUserAgent = userAgent || USER_AGENT;
+  // Separador \u0000: no puede aparecer ni en un origin (viene de URL
+  // parsing) ni en un UA válido (la validación rechaza caracteres de
+  // control), así que la clave no es ambigua.
+  const cacheKey = `${origin}\u0000${effectiveUserAgent}`;
+
+  const cached = robotsCache.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -696,28 +782,34 @@ export async function fetchRobotsTxt(origin, options = {}) {
     result = await fetchUrl(robotsUrl, options);
   } catch (error) {
     // Degradación silenciosa SOLO para fallos de red/HTTP. Un rechazo de
-    // política tragado haría indistinguible un robots.txt bloqueado de uno
-    // inexistente — el bug que este fix cierra — así que se propaga sin
+    // política (ERR_HOP_POLICY) tragado haría indistinguible un robots.txt
+    // bloqueado de uno inexistente — el bug que el Plan 075 cerró — y un
+    // userAgent inválido (ERR_INVALID_USER_AGENT) es un error del llamador,
+    // no un fallo de red: cachear el vacío bajo esa clave envenenaría
+    // también las llamadas válidas posteriores. Ambos se propagan sin
     // cachear el resultado vacío.
-    if (error?.code === "ERR_HOP_POLICY") {
+    if (error?.code === "ERR_HOP_POLICY" || error?.code === "ERR_INVALID_USER_AGENT") {
       throw error;
     }
     const empty = { groups: [], raw: "" };
-    robotsCache.set(origin, empty);
+    robotsCache.set(cacheKey, empty);
     return empty;
   }
 
   const groups = parseRobotsGroups(result.html);
   const entry = { groups, raw: result.html };
-  robotsCache.set(origin, entry);
+  robotsCache.set(cacheKey, entry);
   return entry;
 }
 
 /**
  * Verifica si una URL está bloqueada por las reglas de robots.txt.
  *
- * Reimplementa la lógica de selección de grupo y matching de path
- * de src/robots.js para evitar dependencia circular.
+ * Comparte la implementación de selección y evaluación con src/robots.js
+ * (selectGroups + evaluateSelectedGroups, sin dependencia circular): combina
+ * las reglas de TODOS los grupos con el token de user-agent más específico
+ * y compara contra `pathname + search` — la query string participa en el
+ * matching, como muestran los ejemplos del RFC 9309 §2.2.2.
  *
  * @param {string} url — URL absoluta a verificar
  * @param {Array} groups — resultado de parseRobotsGroups()
@@ -731,52 +823,13 @@ export function checkRobotsRule(url, groups, userAgent) {
 
   let targetPath;
   try {
-    targetPath = new URL(url).pathname || "/";
+    const parsed = new URL(url);
+    targetPath = `${parsed.pathname || "/"}${parsed.search}`;
   } catch {
     return { allowed: true, matchedRule: null };
   }
 
-  // Seleccionar el grupo más específico que aplique al user-agent
-  let selectedGroup = null;
-  let selectedLength = -1;
-
-  for (const group of groups) {
-    for (const agent of group.agents) {
-      const applies = agent === "*" || userAgent.toLowerCase().includes(agent.toLowerCase());
-      if (applies && agent.length > selectedLength) {
-        selectedGroup = group;
-        selectedLength = agent.length;
-      }
-    }
-  }
-
-  if (!selectedGroup) {
-    return { allowed: true, matchedRule: null };
-  }
-
-  // Verificar reglas del grupo seleccionado
-  let strongestRule = null;
-  for (const rule of selectedGroup.rules) {
-    const escaped = rule.path
-      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-      .replaceAll("*", ".*")
-      .replace(/\\\$$/, "$");
-    const regex = new RegExp(`^${escaped}`);
-    if (regex.test(targetPath)) {
-      if (
-        !strongestRule ||
-        rule.path.length > strongestRule.path.length ||
-        (rule.path.length === strongestRule.path.length && rule.directive === "allow")
-      ) {
-        strongestRule = rule;
-      }
-    }
-  }
-
-  return {
-    allowed: strongestRule?.directive !== "disallow",
-    matchedRule: strongestRule,
-  };
+  return evaluateSelectedGroups(selectGroups(groups, userAgent), targetPath);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -800,9 +853,14 @@ export function checkRobotsRule(url, groups, userAgent) {
  * @param {boolean} [options.allowHttp=true] — permite el esquema http: (por defecto, compat)
  * @param {boolean} [options.allowCrossOrigin=true] — permite hops fuera del root origin (por defecto, compat)
  * @param {string|null} [options.rootOrigin=null] — origin raíz; si se omite, el de esta URL
- * @param {number} [options.timeoutMs=TOTAL_TIMEOUT_MS] — timeout total
+ * @param {number} [options.timeoutMs=TOTAL_TIMEOUT_MS] — timeout total de la
+ *   transacción completa (DNS, redirects y body) con UNA fecha límite
+ *   compartida entre todos los hops
  * @param {number} [options.maxSize=MAX_RESPONSE_SIZE] — tamaño máximo de respuesta
- * @param {string} [options.userAgent=USER_AGENT] — User-Agent header
+ * @param {string} [options.userAgent=USER_AGENT] — User-Agent header; el
+ *   string vacío cae al default (Plan 079); valores con caracteres de
+ *   control se rechazan con code = "ERR_INVALID_USER_AGENT" antes de
+ *   cualquier I/O de red
  * @returns {Promise<{ html: string, statusCode: number, finalUrl: string, headers: object }>}
  */
 export async function fetchUrl(url, options = {}) {
@@ -814,6 +872,7 @@ export async function fetchUrl(url, options = {}) {
     rootOrigin = null,
     timeoutMs = TOTAL_TIMEOUT_MS,
     maxSize = MAX_RESPONSE_SIZE,
+    userAgent = USER_AGENT,
   } = options;
 
   // Validar esquema
@@ -836,6 +895,11 @@ export async function fetchUrl(url, options = {}) {
   // sub-sitemaps descubiertos).
   const effectiveRootOrigin = rootOrigin ?? origin;
 
+  // Fecha límite única de la transacción (Plan 077): se calcula al entrar
+  // (antes de adquirir slots de rate limiting, que también consumen
+  // presupuesto) y se propaga a cada hop de redirect vía performRequest.
+  const deadlineMs = Date.now() + timeoutMs;
+
   // Rate limiting: adquirir slots
   await hostSemaphoreFor(origin).acquire();
   await globalSemaphore.acquire();
@@ -848,7 +912,9 @@ export async function fetchUrl(url, options = {}) {
       allowCrossOrigin,
       rootOrigin: effectiveRootOrigin,
       totalTimeoutMs: timeoutMs,
+      deadlineMs,
       maxResponseSize: maxSize,
+      userAgent,
     });
     return result;
   } finally {

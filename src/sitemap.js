@@ -165,6 +165,22 @@ export function determineChangefreq(entry = {}) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
+ * Resolve a generated sub-sitemap file name against baseUrl for a sitemap
+ * index <loc>. The sitemap protocol requires every <loc> in an index to be
+ * an absolute URL; with no baseUrl (local file mode) the relative file name
+ * is preserved. Mirrors the concatenation convention used for entry URLs:
+ * trailing slashes are stripped and the name is joined with "/".
+ *
+ * @param {string} baseUrl — site base URL or "" for local file mode
+ * @param {string} fileName — e.g. "sitemap-1.xml"
+ * @returns {string} absolute loc when baseUrl is set, fileName otherwise
+ */
+function resolveIndexLoc(baseUrl, fileName) {
+  if (typeof baseUrl !== "string" || !baseUrl) return fileName;
+  return baseUrl.replace(/[?#].*$/, "").replace(/\/+$/, "") + "/" + fileName;
+}
+
+/**
  * Generate a sitemap.xml string from content entries.
  *
  * Each entry must have a `url` (absolute). Optional fields:
@@ -184,7 +200,10 @@ export function determineChangefreq(entry = {}) {
  *   images?: Array<{loc: string, caption?: string, title?: string}>
  * }>} entries
  * @param {object} [options]
- * @param {string} [options.baseUrl] — prepended to relative URLs
+ * @param {string} [options.baseUrl] — prepended to relative URLs; when set,
+ *   sub-sitemap <loc> entries in a generated index are resolved to absolute
+ *   URLs (required by the sitemap protocol), otherwise they stay relative
+ *   (local file mode)
  * @returns {string} XML sitemap content
  */
 export function generateSitemapXml(entries, options = {}) {
@@ -226,7 +245,7 @@ export function generateSitemapXml(entries, options = {}) {
   const indexEntries = [];
   for (let i = 0; i < pages; i++) {
     indexEntries.push({
-      url: `sitemap-${i + 1}.xml`,
+      url: resolveIndexLoc(baseUrl, `sitemap-${i + 1}.xml`),
       lastmod: resolved
         .slice(i * MAX_URLS_PER_SITEMAP, (i + 1) * MAX_URLS_PER_SITEMAP)
         .reduce((latest, e) => {
@@ -246,7 +265,8 @@ export function generateSitemapXml(entries, options = {}) {
  * sitemap-1.xml, sitemap-2.xml, ... plus the index sitemap.xml.
  *
  * @param {Array} entries — same as generateSitemapXml
- * @param {object} [options] — same as generateSitemapXml
+ * @param {object} [options] — same as generateSitemapXml; sub-sitemap <loc>
+ *   entries in the index resolve against baseUrl (absolute when set)
  * @returns {Array<{name: string, content: string}>}
  */
 export function generateSitemapFiles(entries, options = {}) {
@@ -281,7 +301,7 @@ export function generateSitemapFiles(entries, options = {}) {
       content: _renderUrlset(chunk),
     });
     indexEntries.push({
-      url: files[files.length - 1].name,
+      url: resolveIndexLoc(baseUrl, files[files.length - 1].name),
       lastmod: chunk.reduce((latest, e) => {
         if (!e.lastmod) return latest;
         if (!latest) return e.lastmod;

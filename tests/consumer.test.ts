@@ -81,14 +81,17 @@ import type {
   DiscoverOptions,
   AuditResult,
   AggregateReport,
+  AggregatePerFile,
   BatchInjectResult,
   SchemaGraphObject,
   InjectOptions,
+  SchemaFileValidationResult,
   CrawlerPurpose,
   CrawlerRegistryEntry,
   RobotsRule,
   RobotsAgentAudit,
   RobotsAuditReport,
+  RobotsGroup,
   PageMetadata,
   LlmsEntry,
   LlmsFullEntry,
@@ -169,8 +172,41 @@ import {
   resolvePageUrl,
   generateLlmsTxt,
   generateLlmsFullTxt,
+  generateLlmsFullTxtFiles,
   auditLlmsTxt,
   generateRobotsTxt,
+  findCommonBaseDir,
+  suggestSection,
+  generateSitemapXml,
+  generateSitemapFiles,
+  scoreToPriority,
+  determineChangefreq,
+  parseSitemapXml,
+  validateSitemapXml,
+  renderV1ReportHtml,
+  renderV2ReportHtml,
+  renderAggregateReportHtml,
+  renderComparisonHtml,
+  scoreToBadgeColor,
+  scoreToBadgeGrade,
+  generateBadgeUrl,
+  generateBadgeMarkdown,
+  fetchUrl,
+  fetchRobotsTxt,
+  checkRobotsRule,
+  clearRobotsCache,
+  parseRobotsGroups,
+  validateSchema,
+  COMMUNITY_SCHEMA_TYPES,
+  PRO_SCHEMA_TYPES,
+  parseFrontmatter,
+  MODEL_VERSION_V1,
+  MODEL_VERSION_V2,
+  FETCHER_USER_AGENT,
+  RESPONSE_TIMEOUT_MS,
+  TOTAL_TIMEOUT_MS,
+  MAX_RESPONSE_SIZE,
+  MAX_REDIRECTS,
 } from "geo-opt";
 
 // ═══ Type-level assertions ═══
@@ -199,6 +235,10 @@ const _config: GeoConfig = {
   profile: "documentation",
 };
 
+// --- Config profile domain (plan 081) ---
+const _serviceConfig: GeoConfig = { profile: "service" };
+const _autoConfig: GeoConfig = { profile: "auto" };
+
 // --- Licensing ---
 const _licEnv: string = LICENSE_ENV_VAR;
 const _licKey: string = resolveLicenseKey(_config);
@@ -223,6 +263,9 @@ const _plainText: string = cleanMarkdownToPlainText("**bold** text");
 const _isHtml: boolean = isHtmlContent("<p>test</p>");
 const _htmlVisible: HtmlVisibleText = extractHtmlVisibleText("<p>test</p>");
 const _sections: Section[] = extractSections("## A\n\nBody\n\n## B\n\nMore.");
+const _frontmatter: { data: Record<string, unknown>; body: string } = parseFrontmatter(
+  "---\ntitle: Test\n---\nBody."
+);
 
 // --- Evidence ---
 const _srcType: SourceType = "paper";
@@ -330,6 +373,8 @@ const _finding: Finding = createFinding({
 });
 const _repVer: string = REPORT_VERSION;
 const _modVer: string = MODEL_VERSION;
+const _modV1: string = MODEL_VERSION_V1;
+const _modV2: string = MODEL_VERSION_V2;
 const _meta: ReportMeta = buildReportMeta();
 const _legacyFindings: Finding[] = mapLegacyToFindings({
   introWordCount: 50,
@@ -448,6 +493,16 @@ const _summary: AggregateReport = { totalFiles: 1, succeeded: 1, failed: 0 };
 const _v1Summary: string = renderV1Summary(_summary);
 const _v2Summary: string = renderV2Summary(_summary);
 
+// --- Rendering (HTML) ---
+const _aggPerFile: AggregatePerFile[] = [
+  { file: "test.md", status: "success", score: 85, report: _auditReport },
+  { file: "v2.md", status: "success", score: 75, report: _v2Report },
+];
+const _v1Html: string = renderV1ReportHtml(_auditReport, "test.md");
+const _v2Html: string = renderV2ReportHtml(_v2Report, "test.md");
+const _aggHtml: string = renderAggregateReportHtml(_aggPerFile, _summary);
+const _cmpHtml: string = renderComparisonHtml(_auditReport, _v2Report, "test.md");
+
 // --- Discovery ---
 const _discOpts: DiscoverOptions = {
   recursive: true,
@@ -460,11 +515,23 @@ const _files: string[] = discoverFiles([docsDir], _discOpts);
 
 // --- Batch ---
 const _auditResults: AuditResult[] = auditFiles(_files, _config);
+const _auditResultsV2: AuditResult[] = auditFiles(
+  _files,
+  _config,
+  "v2",
+  (_index, _total, _filepath) => {}
+);
 const _auditResult: AuditResult = {
   file: "test.md",
   status: "success",
   score: 85,
   report: _auditReport,
+};
+const _auditResultV2: AuditResult = {
+  file: "test.md",
+  status: "success",
+  score: 75,
+  report: _v2Report,
 };
 const _aggReport: AggregateReport = aggregateReport(_auditResults);
 const _batchResult: BatchInjectResult = batchInject(_files, "article", _config, { dryRun: true });
@@ -484,6 +551,17 @@ const _validateWritable:
   validateWritableTargetInsideCwd(testMd);
 // injectSchema returns void (side-effect function)
 injectSchema(testMd, "article", _config, _injOpts);
+
+// --- Schema validation ---
+const _schemaValidation: {
+  errors: string[];
+  warnings: string[];
+  notes: string[];
+  nodes: object[];
+} = validateSchema({ "@context": "https://schema.org" });
+const _communityTypes: ReadonlySet<"article" | "news-article" | "faq" | "product"> =
+  COMMUNITY_SCHEMA_TYPES;
+const _proTypes: ReadonlySet<"course" | "event" | "recipe" | "howto"> = PRO_SCHEMA_TYPES;
 
 // --- Robots ---
 const _crawlerPurpose: CrawlerPurpose = "search";
@@ -514,10 +592,22 @@ const _crawlerReg: readonly CrawlerRegistryEntry[] = AI_CRAWLER_REGISTRY;
 const _crawlerAgents: string[] = AI_CRAWLER_AGENTS;
 const _robotsAudit: RobotsAuditReport = auditRobots("User-agent: *\nAllow: /");
 const _robotsCheck: RobotsAuditReport | void = checkRobots(robotsTxt);
+const _robotsGroups: Array<{
+  agents: string[];
+  rules: Array<{ directive: string; path: string }>;
+}> = parseRobotsGroups("User-agent: *\nAllow: /");
+const _robotsRuleCheck: {
+  allowed: boolean;
+  matchedRule: { directive: string; path: string } | null;
+} = checkRobotsRule("https://example.com/page", _robotsGroups, "geo-opt");
+// clearRobotsCache returns void (side-effect function)
+clearRobotsCache();
 
 // --- JSON-LD validation ---
-// validateSchemaFile returns void (side-effect function)
-validateSchemaFile(testMd);
+const _schemaFileResult: SchemaFileValidationResult = validateSchemaFile(testMd);
+const _schemaFileValid: boolean = _schemaFileResult.valid;
+const _schemaFileBlockCount: number = _schemaFileResult.blockCount;
+const _schemaFileBlocks: string[] = _schemaFileResult.blocks.map((b) => b.source);
 
 // --- LLMs.txt ---
 const _pageMeta: PageMetadata = extractPageMetadata("content", fileMd);
@@ -543,6 +633,12 @@ const _llmsTxt: string = generateLlmsTxt([_llmsEntry], {
   optionalThreshold: 70,
 });
 const _llmsFullTxt: string = generateLlmsFullTxt([_llmsFullEntry], { siteTitle: "Site" });
+const _llmsFullFiles: Array<{ name: string; content: string }> = generateLlmsFullTxtFiles(
+  [_llmsFullEntry],
+  { siteTitle: "Site" }
+);
+const _commonBase: string = findCommonBaseDir(_files);
+const _suggestedSection: string = suggestSection(fileMd, "content", FIXTURE_DIR);
 const _llmsAudit: LlmsAuditReport = auditLlmsTxt("llms.txt content", _files, {
   siteUrl: "https://example.com",
   baseDir: "/base",
@@ -552,3 +648,53 @@ const _robotsTxt: string = generateRobotsTxt({
   sitemapUrl: "https://example.com/sitemap.xml",
   preset: "search-visible",
 });
+
+// --- Sitemap ---
+const _priority: number = scoreToPriority(85);
+const _changefreq: string = determineChangefreq({
+  publishedDate: "2026-01-01",
+  reviewedDate: null,
+  filePath: fileMd,
+});
+const _sitemapXml: string = generateSitemapXml(
+  [{ url: "https://example.com/page", score: 85, lastmod: "2026-01-01" }],
+  { baseUrl: "https://example.com" }
+);
+const _sitemapFiles: Array<{ name: string; content: string }> = generateSitemapFiles(
+  [{ url: "https://example.com/page" }],
+  { baseUrl: "https://example.com" }
+);
+const _parsedSitemap: {
+  urls: Array<{ loc: string; lastmod: string | null }>;
+  sitemapUrls: Array<{ loc: string; lastmod: string | null }>;
+  valid: boolean;
+  issues: string[];
+} = parseSitemapXml('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+const _sitemapValidation: { valid: boolean; issues: string[] } = validateSitemapXml(
+  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>'
+);
+
+// --- Badge ---
+const _badgeColor: "brightgreen" | "green" | "yellow" | "orange" | "red" = scoreToBadgeColor(85);
+const _badgeGrade: "A" | "B" | "C" | "D" | "F" = scoreToBadgeGrade(85);
+const _badgeUrl: string = generateBadgeUrl(85, { label: "geo-opt", style: "flat" });
+const _badgeMarkdown: string = generateBadgeMarkdown(85, {
+  label: "geo-opt",
+  style: "flat",
+  alt: "geo-opt score",
+});
+
+// --- Fetcher (compile-time only: no network I/O in this fixture) ---
+const _fetcherUserAgent: string = FETCHER_USER_AGENT;
+const _responseTimeout: number = RESPONSE_TIMEOUT_MS;
+const _totalTimeout: number = TOTAL_TIMEOUT_MS;
+const _maxResponseSize: number = MAX_RESPONSE_SIZE;
+const _maxRedirects: number = MAX_REDIRECTS;
+const _fetchPromise: Promise<{
+  html: string;
+  statusCode: number;
+  finalUrl: string;
+  headers: Record<string, string>;
+}> = fetchUrl("https://example.com");
+const _robotsFetchPromise: Promise<{ groups: RobotsGroup[]; raw: string }> =
+  fetchRobotsTxt("https://example.com");

@@ -17,6 +17,7 @@ import {
   buildReportMeta,
   calculateReadability,
   checkRobots,
+  checkRobotsRule,
   cleanMarkdownToPlainText,
   COMMUNITY_SCHEMA_TYPES,
   createFinding,
@@ -34,7 +35,9 @@ import {
   loadConfig,
   MODEL_VERSION,
   MODEL_VERSION_V1,
+  MODEL_VERSION_V2,
   parseFrontmatter,
+  parseRobotsGroups,
   preprocessContent,
   isHtmlContent,
   extractHtmlVisibleText,
@@ -1441,6 +1444,172 @@ test("aggregateReport handles zero successes", () => {
   assert.ok(summary.message);
 });
 
+test("aggregateReport omits raw source bodies from per-file data (plan 080)", () => {
+  const SECRET = "LEAK-SENTINEL-080-CORP-BUDGET-42";
+  const results = [
+    {
+      file: "a.md",
+      status: "success",
+      score: 80,
+      report: { recommendations: ["Add links"] },
+      content: SECRET,
+    },
+    { file: "bad.md", status: "error", error: "Read failed: ENOENT", content: "other-secret" },
+  ];
+  const summary = aggregateReport(results);
+  const serialized = JSON.stringify(summary);
+  assert.ok(!serialized.includes(SECRET), "aggregate JSON must not contain success bodies");
+  assert.ok(!serialized.includes("other-secret"), "aggregate JSON must not contain error bodies");
+  assert.strictEqual(results[0].content, SECRET, "original results must keep content for reuse");
+  assert.ok(Array.isArray(summary.perFile));
+  for (const entry of summary.perFile) {
+    assert.ok(!("content" in entry), "perFile entries must not expose content");
+  }
+  assert.strictEqual(summary.perFile[0].score, 80);
+  assert.deepStrictEqual(summary.perFile[0].report, { recommendations: ["Add links"] });
+  assert.strictEqual(summary.perFile[1].error, "Read failed: ENOENT");
+});
+
+test("aggregateReport preserves metadata on non-success per-file entries (plan 080)", () => {
+  const partial = {
+    file: "partial.md",
+    status: "error",
+    score: 45,
+    report: { recommendations: ["Add links"] },
+    error: "network",
+    content: "PARTIAL-SENTINEL",
+  };
+  const summary = aggregateReport([partial]);
+  const entry = summary.perFile[0];
+  assert.strictEqual(entry.score, 45, "score must survive on non-success entries");
+  assert.deepStrictEqual(entry.report, { recommendations: ["Add links"] });
+  assert.strictEqual(entry.error, "network");
+  assert.ok(!("content" in entry), "content must never survive");
+  assert.ok(!JSON.stringify(summary).includes("PARTIAL-SENTINEL"));
+  assert.strictEqual(partial.content, "PARTIAL-SENTINEL", "input must not be mutated");
+});
+
+test("aggregateReport zero-success branch also omits content (plan 080)", () => {
+  const results = [{ file: "a.md", status: "error", error: "bad", content: "ZERO-SENTINEL" }];
+  const summary = aggregateReport(results);
+  assert.ok(!JSON.stringify(summary).includes("ZERO-SENTINEL"));
+  assert.strictEqual(results[0].content, "ZERO-SENTINEL");
+});
+
+test("aggregateReport passes v2 reports through per-file entries (plan 080/081)", () => {
+  const v2Report = {
+    file: "v2.md",
+    reportVersion: "1.0.0",
+    modelVersion: "2.1.0",
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    profile: {
+      detected: "documentation",
+      label: "Documentation",
+      confidence: 0.9,
+      overridden: false,
+      reasons: [],
+    },
+    readinessBand: "solid",
+    readinessLabel: "Solid",
+    readinessDescription: "Meets most thresholds.",
+    applicableDimensions: 5,
+    effectiveScore: 75,
+    dimensions: {},
+    structuralObservations: {
+      headingHierarchy: "pass",
+      sectionSelfContainment: "pass",
+      answerFirst: "pass",
+    },
+    attributionSummary: {
+      statsWithAttribution: 1,
+      statsWithoutAttribution: 0,
+      quotesWithAttribution: 0,
+      quotesWithoutAttribution: 0,
+    },
+    linkSummary: { externalLinks: 2, hasSourcesSection: true, hasExcessiveLinks: false },
+    contentFreshness: { publishedDate: "2026-01-01", reviewedDate: null },
+    findings: [
+      {
+        ruleId: "v2.citations.no_links",
+        category: "citations",
+        severity: "warn",
+        status: "warn",
+        message: "No external hyperlinks found.",
+        evidenceLabel: "strong",
+        applicability: "documentation",
+        sourceRefs: [],
+        observedFacts: { externalLinkCount: 0 },
+        remediation: "Add links.",
+      },
+    ],
+    notApplicableDimensions: [],
+    recommendations: ["Add more sources."],
+  };
+  const results = [
+    { file: "v2.md", status: "success", score: 75, report: v2Report },
+    { file: "bad.md", status: "error", error: "boom" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.succeeded, 1);
+  assert.strictEqual(summary.topRecommendations.length, 1);
+  assert.strictEqual(summary.topFindings.length, 1);
+  assert.strictEqual(summary.topFindings[0].ruleId, "v2.citations.no_links");
+  const entry = summary.perFile.find((e) => e.file === "v2.md");
+  assert.ok(entry, "v2 per-file entry must exist");
+  assert.strictEqual(entry.report.modelVersion, "2.1.0");
+  assert.strictEqual(entry.report.readinessBand, "solid");
+  assert.strictEqual(entry.report.effectiveScore, 75);
+});
+
+test("aggregateReport tolerates success results without a report (d.ts contract)", () => {
+  const results = [
+    { file: "a.md", status: "success", score: 80, report: { recommendations: ["Add links"] } },
+    { file: "b.md", status: "success", score: 60 },
+    { file: "c.md", status: "error", error: "not found" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.totalFiles, 3);
+  assert.strictEqual(summary.succeeded, 2);
+  assert.strictEqual(summary.failed, 1);
+  assert.strictEqual(summary.averageScore, 70);
+  assert.deepStrictEqual(summary.topRecommendations, [
+    { recommendation: "Add links", fileCount: 1 },
+  ]);
+  assert.strictEqual(summary.perFile[1].score, 60);
+  assert.strictEqual(summary.perFile[1].report, undefined);
+});
+
+test("aggregateReport never emits NaN stats for score-less successes (audit 2026-08-09)", () => {
+  const results = [
+    { file: "a.md", status: "success" },
+    { file: "b.md", status: "success", score: 40 },
+    { file: "c.md", status: "error", error: "boom" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.totalFiles, 3);
+  assert.strictEqual(summary.succeeded, 2);
+  assert.strictEqual(summary.averageScore, 40, "stats computed over scored files only");
+  assert.strictEqual(summary.medianScore, 40);
+  assert.strictEqual(summary.minScore, 40);
+  assert.strictEqual(summary.maxScore, 40);
+  assert.ok(Number.isFinite(summary.stdDev));
+  assert.deepStrictEqual(summary.worstFiles, [{ file: "b.md", score: 40 }]);
+  assert.ok(!JSON.stringify(summary).includes("NaN"), "no NaN anywhere in the summary");
+});
+
+test("aggregateReport with zero scored successes omits stats (audit 2026-08-09)", () => {
+  const results = [
+    { file: "a.md", status: "success" },
+    { file: "b.md", status: "success" },
+  ];
+  const summary = aggregateReport(results);
+  assert.strictEqual(summary.succeeded, 2);
+  assert.strictEqual(summary.averageScore, undefined);
+  assert.strictEqual(summary.medianScore, undefined);
+  assert.strictEqual(summary.message, "No files with scores could be aggregated.");
+  assert.strictEqual(summary.perFile.length, 2);
+});
+
 test("auditFiles collects errors without crashing", () => {
   const results = auditFiles(["/nonexistent/file.md"], {});
   assert.strictEqual(results.length, 1);
@@ -1462,6 +1631,33 @@ test("auditFiles mixes successes and failures", () => {
     assert.ok(good, "should have one success");
     assert.ok(bad, "should have one error");
     assert.strictEqual(typeof good.score, "number");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("auditFiles with model v2 feeds v2 reports into aggregateReport (plan 081)", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "geo-test-"));
+  try {
+    const goodFile = path.join(tmpDir, "good.md");
+    fs.writeFileSync(
+      goodFile,
+      "# Test\n\nIntro paragraph with over forty words of content to reach minimum for scoring here.\n"
+    );
+    const results = auditFiles([goodFile], {}, "v2", (index, total, filepath) => {
+      assert.strictEqual(index, 0);
+      assert.strictEqual(total, 1);
+      assert.strictEqual(filepath, goodFile);
+    });
+    assert.strictEqual(results.length, 1);
+    const good = results[0];
+    assert.strictEqual(good.status, "success");
+    assert.strictEqual(good.report.modelVersion, MODEL_VERSION_V2);
+
+    const summary = aggregateReport(results);
+    assert.strictEqual(summary.succeeded, 1);
+    assert.strictEqual(summary.perFile[0].report.modelVersion, MODEL_VERSION_V2);
+    assert.ok(!("content" in summary.perFile[0]), "perFile must never expose raw bodies");
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -2041,6 +2237,355 @@ Allow: /private/public
     assert.strictEqual(publicReport.agents.find((entry) => entry.token === token).allowed, true);
     assert.strictEqual(privateReport.agents.find((entry) => entry.token === token).allowed, false);
   }
+});
+
+test("auditRobots combines rules from repeated equally specific groups", () => {
+  const content = `User-agent: GPTBot
+Disallow: /no-gpt
+User-agent: GPTBot
+Disallow: /also-gpt
+Allow: /no-gpt/public
+`;
+  const gpt = (path) =>
+    auditRobots(content, { path }).agents.find((entry) => entry.token === "GPTBot");
+
+  assert.strictEqual(gpt("/no-gpt/draft").allowed, false, "first group rule applies");
+  assert.strictEqual(
+    gpt("/also-gpt/draft").allowed,
+    false,
+    "rules of the second equally specific group must apply too"
+  );
+  assert.strictEqual(gpt("/no-gpt/public/read").allowed, true, "longest Allow still wins");
+});
+
+test("auditRobots matches rules against the query string", () => {
+  const content = `User-agent: GPTBot
+Disallow: /search?q=spam
+Allow: /search
+`;
+  const gpt = (path) =>
+    auditRobots(content, { path }).agents.find((entry) => entry.token === "GPTBot");
+
+  assert.strictEqual(
+    gpt("/search?q=spam").allowed,
+    false,
+    "query-targeted Disallow blocks the URL"
+  );
+  assert.strictEqual(gpt("/search?q=news").allowed, true, "plain-path Allow covers other queries");
+  assert.strictEqual(gpt("/search").allowed, true);
+});
+
+test("auditRobots combines repeated wildcard groups, keeps Allow ties, ignores empty Disallow", () => {
+  const content = `User-agent: *
+Disallow: /wild-a
+User-agent: *
+Disallow: /wild-b
+User-agent: *
+Disallow: /tie
+User-agent: *
+Allow: /tie
+User-agent: *
+Disallow:
+`;
+  const wildcard = (path) => auditRobots(content, { path }).wildcard;
+
+  assert.strictEqual(wildcard("/wild-b/x").allowed, false, "second wildcard group applies");
+  assert.deepStrictEqual(
+    wildcard("/wild-b/x").matchedGroup,
+    ["*"],
+    "wildcard agents merge deduped"
+  );
+  assert.strictEqual(wildcard("/tie").allowed, true, "Allow wins on equal length");
+  assert.strictEqual(wildcard("/tie").matchedRule.directive, "allow");
+  assert.strictEqual(wildcard("/anything").allowed, true, "empty Disallow matches nothing");
+});
+
+test("auditRobots only combines groups with equally specific agents", () => {
+  const content = `User-agent: *
+Disallow: /x
+User-agent: GPTBot
+Disallow: /y
+`;
+  const gpt = (path) =>
+    auditRobots(content, { path }).agents.find((entry) => entry.token === "GPTBot");
+
+  assert.strictEqual(gpt("/y/one").allowed, false, "most specific group wins");
+  assert.strictEqual(
+    gpt("/x/one").allowed,
+    true,
+    "wildcard rules do not leak into a more specific agent"
+  );
+  assert.strictEqual(
+    auditRobots(content, { path: "/x/one" }).wildcard.allowed,
+    false,
+    "wildcard audit still sees wildcard rules"
+  );
+});
+
+test("auditRobots and checkRobotsRule agree on combined groups and query matching", () => {
+  const content = `User-agent: GPTBot
+Disallow: /no-gpt
+Disallow: /search?q=spam
+User-agent: GPTBot
+Disallow: /also-gpt
+Allow: /no-gpt/public
+User-agent: *
+Disallow: /wild-a
+User-agent: *
+Disallow: /wild-b
+User-agent: *
+Disallow: /tie
+User-agent: *
+Allow: /tie
+`;
+  const groups = parseRobotsGroups(content);
+  const cases = [
+    ["GPTBot", "/no-gpt/draft", false],
+    ["GPTBot", "/also-gpt/draft", false],
+    ["GPTBot", "/no-gpt/public/read", true],
+    ["GPTBot", "/search?q=spam", false],
+    ["GPTBot", "/search?q=news", true],
+    ["GPTBot", "/search", true],
+    ["GPTBot", "/tie", true],
+    ["GPTBot", "/wild-a/x", true],
+    ["MyBot", "/wild-a/x", false],
+    ["MyBot", "/wild-b/x", false],
+    ["MyBot", "/tie", true],
+    ["MyBot", "/open", true],
+  ];
+
+  for (const [userAgent, target, expected] of cases) {
+    const local = auditRobots(content, { path: target });
+    const localDecision =
+      userAgent === "MyBot"
+        ? local.wildcard
+        : local.agents.find((entry) => entry.token === userAgent);
+    const remote = checkRobotsRule(`https://example.com${target}`, groups, userAgent);
+
+    assert.strictEqual(localDecision.allowed, expected, `${userAgent} local ${target}`);
+    assert.strictEqual(remote.allowed, expected, `${userAgent} remote ${target}`);
+    assert.deepStrictEqual(
+      remote.matchedRule,
+      localDecision.matchedRule,
+      `${userAgent} matchedRule parity ${target}`
+    );
+  }
+});
+
+test("auditRobots and checkRobotsRule split comma-separated User-agent tokens", () => {
+  const content = `User-agent: GPTBot, Googlebot
+Disallow: /private
+`;
+  const groups = parseRobotsGroups(content);
+  assert.deepStrictEqual(
+    groups.map((g) => g.agents),
+    [["GPTBot", "Googlebot"]],
+    "comma tokens become separate agents"
+  );
+
+  const gpt = auditRobots(content, { path: "/private/d" }).agents.find((e) => e.token === "GPTBot");
+  assert.strictEqual(gpt.allowed, false, "GPTBot blocked by the shared group");
+  assert.strictEqual(gpt.matchedRule.path, "/private");
+  for (const agent of ["GPTBot", "Googlebot"]) {
+    const remote = checkRobotsRule("https://x.com/private/d", groups, agent);
+    assert.strictEqual(remote.allowed, false, `${agent} blocked remotely`);
+    assert.strictEqual(remote.matchedRule.path, "/private", `${agent} matchedRule`);
+  }
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/public", groups, "Googlebot").allowed,
+    true,
+    "unrelated path stays allowed"
+  );
+});
+
+test("wildcard inside a comma-separated User-agent list applies to every agent", () => {
+  const content = `User-agent: *, GPTBot
+Disallow: /private
+`;
+  const groups = parseRobotsGroups(content);
+  assert.deepStrictEqual(groups[0].agents, ["*", "GPTBot"]);
+
+  const audit = auditRobots(content, { path: "/private/d" });
+  assert.strictEqual(audit.wildcard.allowed, false, "wildcard token applies");
+  assert.deepStrictEqual(audit.wildcard.matchedGroup, ["*", "GPTBot"]);
+  assert.strictEqual(
+    audit.agents.find((e) => e.token === "GPTBot").allowed,
+    false,
+    "GPTBot still blocked via its own token"
+  );
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/private/d", groups, "TotallyUnrelatedBot").allowed,
+    false,
+    "star in a comma list applies to unrelated agents"
+  );
+});
+
+test("trailing commas and stray spaces in User-agent lists are tolerated", () => {
+  const groups = parseRobotsGroups(`User-agent: GPTBot,
+Disallow: /private
+User-agent:  Googlebot  ,ClaudeBot
+Disallow: /other
+`);
+  assert.deepStrictEqual(
+    groups.map((g) => g.agents),
+    [["GPTBot"], ["Googlebot", "ClaudeBot"]]
+  );
+  for (const agent of ["GPTBot", "Googlebot", "ClaudeBot"]) {
+    assert.strictEqual(
+      checkRobotsRule("https://x.com/other/x", groups, agent).allowed,
+      agent === "GPTBot",
+      `${agent} follows its own group's rules`
+    );
+  }
+});
+
+test("all-empty User-agent comma lists create no ghost robots group (Plan 095)", () => {
+  for (const ghost of ["User-agent: ,", "User-agent: , ,", "User-agent:   ,  "]) {
+    const groups = parseRobotsGroups(`${ghost}\nDisallow: /x\nUser-agent: GPTBot\nDisallow: /y\n`);
+    assert.deepStrictEqual(
+      groups.map((g) => g.agents),
+      [["GPTBot"]],
+      `"${ghost}" must not create an empty-agents group`
+    );
+    assert.strictEqual(groups[0].rules.length, 1, "the ghost line's rule is not captured");
+    assert.strictEqual(groups[0].rules[0].path, "/y", "only the valid group's rule survives");
+    assert.strictEqual(
+      checkRobotsRule("https://x.com/x", groups, "GPTBot").allowed,
+      true,
+      "the swallowed rule never blocks"
+    );
+    assert.strictEqual(
+      checkRobotsRule("https://x.com/y/z", groups, "GPTBot").allowed,
+      false,
+      "the following valid group still blocks"
+    );
+  }
+});
+
+test("CRLF line endings and a UTF-8 BOM parse identically in robots input (pinned, Plan 095)", () => {
+  const crlf = parseRobotsGroups("User-agent: GPTBot\r\nDisallow: /private\r\n");
+  assert.deepStrictEqual(
+    crlf.map((g) => g.agents),
+    [["GPTBot"]],
+    "CRLF input yields one GPTBot group"
+  );
+  assert.strictEqual(crlf[0].rules.length, 1);
+  assert.strictEqual(crlf[0].rules[0].path, "/private");
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/private/x", crlf, "GPTBot").allowed,
+    false,
+    "CRLF input blocks via the same rules"
+  );
+
+  const bom = parseRobotsGroups("﻿User-agent: GPTBot\nDisallow: /private\n");
+  assert.deepStrictEqual(bom, crlf, "BOM prefix parses to identical groups");
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/private/x", bom, "GPTBot").allowed,
+    false,
+    "BOM input blocks via the same rules"
+  );
+});
+
+test("comment-only lines do not end a group; blank lines still do", () => {
+  const withComment = `User-agent: GPTBot
+# maintenance note
+Disallow: /private
+`;
+  const gpt = auditRobots(withComment, { path: "/private/d" }).agents.find(
+    (e) => e.token === "GPTBot"
+  );
+  assert.strictEqual(gpt.allowed, false, "rule after a mid-group comment applies");
+  assert.strictEqual(gpt.matchedRule.path, "/private");
+
+  const merged = parseRobotsGroups(`User-agent: GPTBot
+# between
+User-agent: Googlebot
+Disallow: /private
+`);
+  assert.deepStrictEqual(
+    merged.map((g) => g.agents),
+    [["GPTBot", "Googlebot"]],
+    "comment between User-agent lines keeps ONE group with merged agents"
+  );
+  assert.strictEqual(merged[0].rules.length, 1, "the rule lands in the merged group");
+
+  const separated = parseRobotsGroups(`User-agent: GPTBot
+
+User-agent: Googlebot
+Disallow: /private
+`);
+  assert.deepStrictEqual(
+    separated.map((g) => g.agents),
+    [["GPTBot"], ["Googlebot"]],
+    "a real blank line still separates groups"
+  );
+});
+
+test("matchedGroup dedup is case-insensitive and keeps first-seen casing", () => {
+  const content = `User-agent: GPTBot
+Disallow: /a
+User-agent: gptbot
+Disallow: /b
+`;
+  const gpt = auditRobots(content, { path: "/b/x" }).agents.find((e) => e.token === "GPTBot");
+  assert.deepStrictEqual(gpt.matchedGroup, ["GPTBot"], "mixed-case duplicate collapses");
+  assert.strictEqual(gpt.allowed, false, "second group rules apply (combined)");
+  assert.strictEqual(gpt.matchedRule.path, "/b");
+});
+
+test("percent-encoded rule paths match byte-for-byte (pinned, both Node APIs)", () => {
+  const encoded = `User-agent: GPTBot
+Disallow: /mi%20carpeta
+`;
+  const literalSpace = `User-agent: GPTBot
+Disallow: /mi carpeta
+`;
+  const gptEncoded = auditRobots(encoded, { path: "/mi%20carpeta/a" }).agents.find(
+    (e) => e.token === "GPTBot"
+  );
+  assert.strictEqual(gptEncoded.allowed, false, "%20 rule blocks the %20 URL");
+  assert.strictEqual(gptEncoded.matchedRule.path, "/mi%20carpeta");
+  const gptLiteral = auditRobots(literalSpace, { path: "/mi%20carpeta/a" }).agents.find(
+    (e) => e.token === "GPTBot"
+  );
+  assert.strictEqual(
+    gptLiteral.allowed,
+    true,
+    "a literal-space rule does NOT match the %20 form (pinned byte-for-byte)"
+  );
+
+  const groupsEnc = parseRobotsGroups(encoded);
+  const groupsLit = parseRobotsGroups(literalSpace);
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/mi%20carpeta/a", groupsEnc, "GPTBot").allowed,
+    false,
+    "checkRobotsRule: %20 rule blocks the %20 URL"
+  );
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/mi%20carpeta/a", groupsLit, "GPTBot").allowed,
+    true,
+    "checkRobotsRule: literal-space rule does not match the %20 form"
+  );
+});
+
+test("dollar-anchored rules match the plain path but not the query form (pinned, both Node APIs)", () => {
+  const content = `User-agent: GPTBot
+Disallow: /page$
+`;
+  const gpt = (p) => auditRobots(content, { path: p }).agents.find((e) => e.token === "GPTBot");
+  const plain = gpt("/page");
+  assert.strictEqual(plain.allowed, false, "$ rule blocks the plain path");
+  assert.strictEqual(plain.matchedRule.path, "/page$");
+  assert.strictEqual(gpt("/page?x=1").allowed, true, "$ rule does not match the query form");
+  assert.strictEqual(gpt("/page/x").allowed, true, "$ anchors the end of the path");
+
+  const groups = parseRobotsGroups(content);
+  assert.strictEqual(checkRobotsRule("https://x.com/page", groups, "GPTBot").allowed, false);
+  assert.strictEqual(
+    checkRobotsRule("https://x.com/page?x=1", groups, "GPTBot").allowed,
+    true,
+    "checkRobotsRule parity for the query form"
+  );
 });
 
 // CLI integration tests
@@ -2871,6 +3416,24 @@ test("renderAggregateReportHtml escapes hostile input", () => {
   } finally {
     fs.unlinkSync(tempFile);
   }
+});
+
+test("renderAggregateReportHtml never emits source bodies (plan 080)", () => {
+  const SECRET = "LEAK-SENTINEL-080-CORP-BUDGET-42";
+  const results = [
+    {
+      file: "secret.md",
+      status: "success",
+      score: 70,
+      report: { recommendations: ["Add links"] },
+      content: SECRET,
+    },
+  ];
+  const summary = aggregateReport(results);
+  const html = renderAggregateReportHtml(results, summary);
+  assert.ok(!html.includes(SECRET), "HTML aggregate report must not embed source bodies");
+  assert.ok(html.includes("secret.md"), "file name must still appear");
+  assert.ok(html.includes("70"), "score must still appear");
 });
 
 test("esc function escapes single quotes", () => {

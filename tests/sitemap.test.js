@@ -305,6 +305,58 @@ describe("generateSitemapFiles split", () => {
     for (const f of splitFiles) {
       assert.ok(f.content.includes("<urlset"), "Cada split debe contener urlset");
     }
+
+    // El protocolo exige <loc> absolutos en un sitemap index.
+    const index = parseSitemapXml(files[0].content);
+    assert.ok(index.valid, "El índice debe ser parseable");
+    const locs = index.sitemapUrls.map((u) => u.loc);
+    assert.deepEqual(locs, [
+      "https://example.com/sitemap-1.xml",
+      "https://example.com/sitemap-2.xml",
+    ]);
+  });
+
+  it("sitemap index mantiene locs relativos sin baseUrl (modo local)", () => {
+    const entries = Array.from({ length: 51000 }, (_, i) => ({
+      url: "/p" + i,
+      score: 50,
+    }));
+    const files = generateSitemapFiles(entries);
+    const content = files[0].content;
+    assert.ok(content.includes("<loc>sitemap-1.xml</loc>"), "modo local conserva el nombre");
+    assert.ok(content.includes("<loc>sitemap-2.xml</loc>"));
+  });
+
+  it("sitemap index sanea baseUrl con query string o fragmento (audit 2026-08-09)", () => {
+    const entries = Array.from({ length: 51000 }, (_, i) => ({ url: "/p" + i }));
+    for (const baseUrl of ["https://example.com?utm=x", "https://example.com/#top"]) {
+      const files = generateSitemapFiles(entries, { baseUrl });
+      const index = parseSitemapXml(files[0].content);
+      for (const loc of index.sitemapUrls.map((u) => u.loc)) {
+        assert.ok(
+          loc.startsWith("https://example.com/sitemap-"),
+          `loc limpio para ${baseUrl}: ${loc}`
+        );
+        assert.ok(!/[?#]/.test(loc), `sin query/fragmento para ${baseUrl}: ${loc}`);
+      }
+    }
+  });
+
+  it("sitemap index tolera baseUrl no-string (config inválida) sin crashear (audit 2026-08-09)", () => {
+    const entries = Array.from({ length: 51000 }, (_, i) => ({ url: "/p" + i }));
+    const files = generateSitemapFiles(entries, { baseUrl: 42 });
+    const content = files[0].content;
+    assert.ok(content.includes("<loc>sitemap-1.xml</loc>"), "baseUrl inválida conserva relativo");
+  });
+
+  it("sitemap index no duplica el separador cuando baseUrl termina en /", () => {
+    const entries = Array.from({ length: 51000 }, (_, i) => ({ url: "/p" + i }));
+    const files = generateSitemapFiles(entries, { baseUrl: "https://example.com/" });
+    const index = parseSitemapXml(files[0].content);
+    assert.deepEqual(
+      index.sitemapUrls.map((u) => u.loc),
+      ["https://example.com/sitemap-1.xml", "https://example.com/sitemap-2.xml"]
+    );
   });
 
   it("generateSitemapXml retorna sitemapindex para >50k entradas", () => {
@@ -314,6 +366,11 @@ describe("generateSitemapFiles split", () => {
     }));
     const xml = generateSitemapXml(entries, { baseUrl: "https://example.com" });
     assert.ok(xml.includes("<sitemapindex"), "Debe usar sitemapindex para >50k");
+    const index = parseSitemapXml(xml);
+    assert.deepEqual(
+      index.sitemapUrls.map((u) => u.loc),
+      ["https://example.com/sitemap-1.xml", "https://example.com/sitemap-2.xml"]
+    );
   });
 });
 

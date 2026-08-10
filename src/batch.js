@@ -5,6 +5,7 @@ import {
   generateSchemaData,
   validateWritableTargetInsideCwd,
 } from "./schema.js";
+import { writeFileAtomic } from "./safe-write.js";
 
 /**
  * Audit multiple files, collecting results without process.exit.
@@ -62,6 +63,24 @@ function isValidatedFinding(finding) {
 }
 
 /**
+ * Build the public per-file view of an audit result. Serialized aggregates
+ * must never carry raw source bodies; `generate-all` consumes `content` from
+ * the original results, so this returns a new object and never mutates input.
+ * Metadata (score/report/error) is preserved whenever present, regardless of
+ * status, so partially-scored stored results keep their data.
+ *
+ * @param {object} result - output from auditFiles()
+ * @returns {{ file: string, status: string, score?: number, report?: object, error?: string }}
+ */
+function toAggregatePerFile(result) {
+  const perFile = { file: result.file, status: result.status };
+  if (result.score !== undefined) perFile.score = result.score;
+  if (result.report !== undefined) perFile.report = result.report;
+  if (result.error !== undefined) perFile.error = result.error;
+  return perFile;
+}
+
+/**
  * Aggregate per-file audit results into a site-level summary report.
  *
  * @param {Array} results - output from auditFiles()
@@ -69,7 +88,11 @@ function isValidatedFinding(finding) {
  */
 export function aggregateReport(results) {
   const successes = results.filter((r) => r.status === "success");
-  const scores = successes.map((r) => r.score);
+  // Stats are computed over numerically-scored successes only; a success may
+  // legitimately arrive without a score (e.g. stored v2 results), and NaN/
+  // undefined must never leak into averageScore/medianScore/distribution.
+  const scored = successes.filter((r) => Number.isFinite(r.score));
+  const scores = scored.map((r) => r.score);
   const total = results.length;
   const succeeded = successes.length;
   const failed = total - succeeded;
@@ -80,7 +103,17 @@ export function aggregateReport(results) {
       succeeded: 0,
       failed,
       message: "No files could be audited.",
-      perFile: results,
+      perFile: results.map(toAggregatePerFile),
+    };
+  }
+
+  if (scored.length === 0) {
+    return {
+      totalFiles: total,
+      succeeded,
+      failed,
+      message: "No files with scores could be aggregated.",
+      perFile: results.map(toAggregatePerFile),
     };
   }
 
@@ -95,7 +128,7 @@ export function aggregateReport(results) {
   // Collect recommendation frequency across all files (legacy, prose-based)
   const recCounts = new Map();
   for (const r of successes) {
-    for (const rec of r.report.recommendations) {
+    for (const rec of r.report?.recommendations ?? []) {
       recCounts.set(rec, (recCounts.get(rec) || 0) + 1);
     }
   }
@@ -109,7 +142,7 @@ export function aggregateReport(results) {
   // summary entry can never omit category or evidenceLabel.
   const findingCounts = new Map();
   for (const r of successes) {
-    if (!Array.isArray(r.report.findings)) continue;
+    if (!r.report || !Array.isArray(r.report.findings)) continue;
     for (const f of r.report.findings) {
       if (!isValidatedFinding(f)) continue;
       const key = f.ruleId;
@@ -147,11 +180,11 @@ export function aggregateReport(results) {
     },
     topRecommendations,
     topFindings,
-    worstFiles: [...successes]
+    worstFiles: [...scored]
       .sort((a, b) => a.score - b.score)
       .slice(0, 5)
       .map((r) => ({ file: r.file, score: r.score })),
-    perFile: results,
+    perFile: results.map(toAggregatePerFile),
   };
 }
 
@@ -171,7 +204,7 @@ export function batchInject(files, schemaType, config, options = {}) {
 
   for (const filepath of files) {
     try {
-      // Use generateSchemaData + fs.writeFileSync instead of injectSchema
+      // Use generateSchemaData + writeFileAtomic instead of injectSchema
       // to avoid process.exit inside the batch loop. injectSchema calls
       // assertWritableTargetInsideCwd which exits on failure.
       // We replicate the inject logic here with batch-safe error handling.
@@ -190,7 +223,7 @@ export function batchInject(files, schemaType, config, options = {}) {
         continue;
       }
 
-      // Use generateSchemaData + fs.writeFileSync with explicit path validation
+      // Use generateSchemaData + writeFileAtomic with explicit path validation
       // instead of injectSchema to keep error handling batch-safe (no process.exit).
       let content;
       try {
@@ -215,7 +248,7 @@ export function batchInject(files, schemaType, config, options = {}) {
         noBranding: options.noBranding,
       });
 
-      fs.writeFileSync(filepath, modifiedContent, { encoding: "utf8" });
+      writeFileAtomic(filepath, modifiedContent);
       successCount++;
     } catch (err) {
       errors.push({ file: filepath, error: err.message });

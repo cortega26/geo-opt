@@ -140,10 +140,14 @@ These are verified differences that do not break the compatible-tier contract
 | Path resolution in error messages | Absolute path from CWD | Path relative to script location | Error text differs; exit codes match |
 | Dry-run output format | Structured preview | Compressed preview | Both communicate the intended change |
 | Engagement state directory default | `$XDG_STATE_HOME` or `~/.local/state` | `$GEO_OPT_STATE_DIR` or script directory | Different default, same env-var override |
+| Frontmatter title/description fallback (metadata) | Full YAML parse (quoted, typed values) | Flat `key: value` lines; single-line quoted strings | Same precedence chain (H1 → HTML h1 → frontmatter → basename); only H1-less frontmatter pages can differ, on exotic YAML only |
+| `optional_threshold` with `score: null` or non-numeric scores (deprecated llms option) | `null` coerces to `0` and demotes the entry to `## Optional`; numeric strings compare | `None`/non-numeric scores never demote | Node's null-coercion is an undocumented quirk; Python keeps the intent of "no score means no judgment", so a `score: null` entry can stay in its section in Python while Node moves it |
 
-None of these divergences affect audit scores, findings, schema output, robots
-policy, or `llms.txt` content — the committed contracts for `equivalent` and
-`compatible` tiers.
+None of these divergences affect audit scores, findings, schema output, or
+default `llms.txt` content — the committed contracts for `equivalent` and
+`compatible` tiers. The `optional_threshold` row above can change generated
+`llms.txt` content, but only when that deprecated option is combined with
+null/non-numeric scores.
 
 ### Forbidden in documentation
 

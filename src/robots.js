@@ -144,19 +144,34 @@ export function parseRobotsGroups(content) {
   let current = null;
 
   for (let rawLine of content.split("\n")) {
-    rawLine = rawLine.replace(/#.*/, "").trim();
-    if (!rawLine) {
-      current = null;
-      continue;
+    const trimmed = rawLine.trim();
+    const withoutComment = trimmed.replace(/#.*/, "").trim();
+    if (!withoutComment) {
+      if (!trimmed) {
+        current = null; // real blank line ends the group
+      }
+      continue; // comment-only line: keep the current group open
     }
+    rawLine = withoutComment;
 
     const agentMatch = rawLine.match(/^User-agent:\s*(.+)$/i);
     if (agentMatch) {
+      // Google's de-facto spec permits comma-separated product tokens on one
+      // line; each token is a separate agent (RFC 9309 ABNF only covers one
+      // token per line). An all-empty list (e.g. "User-agent: ,") is an
+      // invalid line: it must not create a ghost group that swallows rules.
+      const tokens = agentMatch[1]
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (tokens.length === 0) {
+        continue;
+      }
       if (!current || current.rules.length > 0) {
         current = { agents: [], rules: [] };
         groups.push(current);
       }
-      current.agents.push(agentMatch[1].trim());
+      current.agents.push(...tokens);
       continue;
     }
 
@@ -179,16 +194,35 @@ function agentApplies(agentPattern, targetAgent) {
   return targetAgent.toLowerCase().includes(agentPattern.toLowerCase());
 }
 
-function selectGroup(groups, targetAgent) {
-  let selected = null;
-  let selectedLength = -1;
+/**
+ * Selecciona todos los grupos cuyo token de user-agent aplica con la mayor
+ * especificidad (token coincidente más largo). Todos los grupos con un token
+ * de la misma longitud se COMBINAN: el RFC 9309 exige unir las reglas de los
+ * grupos que aplican al mismo user-agent.
+ *
+ * Compartida con src/fetcher.js (checkRobotsRule) — una única implementación
+ * para la auditoría local y la verificación remota.
+ *
+ * @param {Array} groups — grupos de parseRobotsGroups()
+ * @param {string} targetAgent — user-agent contra el que verificar
+ * @returns {Array} grupos igualmente específicos, en orden de documento
+ */
+export function selectGroups(groups, targetAgent) {
+  let bestLength = -1;
+  const selected = [];
 
   for (const group of groups) {
-    for (const agent of group.agents) {
-      if (agentApplies(agent, targetAgent) && agent.length > selectedLength) {
-        selected = group;
-        selectedLength = agent.length;
-      }
+    const applicable = group.agents.filter((agent) => agentApplies(agent, targetAgent));
+    if (applicable.length === 0) {
+      continue;
+    }
+    const groupLength = Math.max(...applicable.map((agent) => agent.length));
+    if (groupLength > bestLength) {
+      bestLength = groupLength;
+      selected.length = 0;
+      selected.push(group);
+    } else if (groupLength === bestLength) {
+      selected.push(group);
     }
   }
 
@@ -207,22 +241,34 @@ function ruleMatchesPath(rulePath, targetPath) {
   return new RegExp(`^${escaped}`).test(targetPath);
 }
 
-function evaluateGroup(group, targetPath) {
-  if (!group) {
-    return { allowed: true, matchedRule: null };
-  }
-
+/**
+ * Evalúa las reglas combinadas de los grupos seleccionados contra un target
+ * (pathname + query string). Conserva la regla coincidente más larga y, en
+ * empate de longitud, la Allow. Un array vacío equivale a "sin reglas":
+ * acceso permitido sin regla coincidente.
+ *
+ * Compartida con src/fetcher.js (checkRobotsRule) — una única implementación
+ * para la auditoría local y la verificación remota.
+ *
+ * @param {Array} groups — grupos seleccionados por selectGroups()
+ * @param {string} targetPath — pathname + search del recurso
+ * @returns {{ allowed: boolean, matchedRule: { directive: string, path: string } | null }}
+ */
+export function evaluateSelectedGroups(groups, targetPath) {
   let strongestRule = null;
-  for (const rule of group.rules) {
-    if (!ruleMatchesPath(rule.path, targetPath)) {
-      continue;
-    }
-    if (
-      !strongestRule ||
-      rule.path.length > strongestRule.path.length ||
-      (rule.path.length === strongestRule.path.length && rule.directive === "allow")
-    ) {
-      strongestRule = rule;
+
+  for (const group of groups) {
+    for (const rule of group.rules) {
+      if (!ruleMatchesPath(rule.path, targetPath)) {
+        continue;
+      }
+      if (
+        !strongestRule ||
+        rule.path.length > strongestRule.path.length ||
+        (rule.path.length === strongestRule.path.length && rule.directive === "allow")
+      ) {
+        strongestRule = rule;
+      }
     }
   }
 
@@ -230,6 +276,33 @@ function evaluateGroup(group, targetPath) {
     allowed: strongestRule?.directive !== "disallow",
     matchedRule: strongestRule,
   };
+}
+
+/**
+ * Une los agentes de los grupos seleccionados para el reporte, deduplicados
+ * y en orden de documento. `null` cuando no hay ningún grupo seleccionado.
+ *
+ * @param {Array} groups — grupos seleccionados por selectGroups()
+ * @returns {string[] | null}
+ */
+function collectMatchedAgents(groups) {
+  if (groups.length === 0) {
+    return null;
+  }
+  const seen = new Set();
+  const agents = [];
+  for (const group of groups) {
+    for (const agent of group.agents) {
+      // Matching is case-insensitive (agentApplies), so dedup is too; keep
+      // the first-seen original casing in the report.
+      const key = agent.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        agents.push(agent);
+      }
+    }
+  }
+  return agents;
 }
 
 function warningsFor(entry) {
@@ -251,29 +324,36 @@ function warningsFor(entry) {
 /**
  * Evaluate effective robots.txt policy for the versioned crawler registry.
  *
+ * Todos los grupos cuyo token de user-agent aplica con la mayor especificidad
+ * se combinan (RFC 9309 §2.2.1): sus reglas se evalúan juntas, conservando la
+ * regla coincidente más larga y la Allow en empate de longitud. Las reglas se
+ * comparan contra `options.path` completo, incluida la query string si la
+ * lleva (los ejemplos del RFC 9309 §2.2.2 tratan la query como parte del
+ * path a comparar).
+ *
  * @param {string} content - robots.txt content
- * @param {{ path?: string }} [options]
+ * @param {{ path?: string }} [options] - path (y query, si aplica) a evaluar
  * @returns {object} structured policy audit
  */
 export function auditRobots(content, options = {}) {
   const targetPath = options.path || "/";
   const groups = parseRobotsGroups(content);
-  const wildcardGroup = selectGroup(groups, "*");
-  const wildcardPolicy = evaluateGroup(wildcardGroup, targetPath);
+  const wildcardGroups = selectGroups(groups, "*");
+  const wildcardPolicy = evaluateSelectedGroups(wildcardGroups, targetPath);
 
   return {
     registryVersion: CRAWLER_REGISTRY_VERSION,
     path: targetPath,
     wildcard: {
-      matchedGroup: wildcardGroup?.agents || null,
+      matchedGroup: collectMatchedAgents(wildcardGroups),
       ...wildcardPolicy,
     },
     agents: AI_CRAWLER_REGISTRY.map((entry) => {
-      const group = selectGroup(groups, entry.token);
+      const entryGroups = selectGroups(groups, entry.token);
       return {
         ...entry,
-        matchedGroup: group?.agents || null,
-        ...evaluateGroup(group, targetPath),
+        matchedGroup: collectMatchedAgents(entryGroups),
+        ...evaluateSelectedGroups(entryGroups, targetPath),
         warnings: warningsFor(entry),
       };
     }),

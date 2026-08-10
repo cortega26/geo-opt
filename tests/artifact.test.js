@@ -278,4 +278,54 @@ describe("artifact invariants", () => {
       "REPORT_VERSION no se exporta desde dist/index.js"
     );
   });
+
+  it("index.d.ts declara exactamente los exports de valor del runtime (plan 081)", async () => {
+    build();
+    const distIndex = path.join(repoRoot, "dist", "index.js");
+    const mod = await import(`${distIndex}?t=${Date.now()}`);
+    const runtimeExports = Object.keys(mod).sort();
+
+    const dts = readFileSync(path.join(repoRoot, "index.d.ts"), "utf8");
+    const declared = new Set(
+      [
+        ...dts.matchAll(/^\s*export (?:async\s+)?(?:function|const|class)\s+([A-Za-z_$][\w$]*)/gm),
+      ].map((m) => m[1])
+    );
+
+    const missing = runtimeExports.filter((name) => !declared.has(name));
+    assert.deepStrictEqual(
+      missing,
+      [],
+      `runtime exports sin declaración en index.d.ts (plan 081): ${missing.join(", ")}`
+    );
+
+    const stale = [...declared].filter((name) => !runtimeExports.includes(name));
+    assert.deepStrictEqual(
+      stale,
+      [],
+      `declaraciones de valor sin export runtime: ${stale.join(", ")}`
+    );
+  });
+
+  it("consumer.test.ts importa todo el surface de valor del runtime (plan 081)", async () => {
+    build();
+    const distIndex = path.join(repoRoot, "dist", "index.js");
+    const mod = await import(`${distIndex}?t=${Date.now()}`);
+    const runtimeExports = Object.keys(mod).sort();
+
+    const consumer = readFileSync(path.join(repoRoot, "tests", "consumer.test.ts"), "utf8");
+    const imported = new Set();
+    for (const block of consumer.matchAll(/import\s*\{([\s\S]*?)\}\s*from\s*["']geo-opt["']/g)) {
+      for (const name of block[1].matchAll(/[A-Za-z_$][\w$]*/g)) {
+        imported.add(name[0]);
+      }
+    }
+
+    const notImported = runtimeExports.filter((name) => !imported.has(name));
+    assert.deepStrictEqual(
+      notImported,
+      [],
+      `exports de valor sin importar en tests/consumer.test.ts (plan 081): ${notImported.join(", ")}`
+    );
+  });
 });

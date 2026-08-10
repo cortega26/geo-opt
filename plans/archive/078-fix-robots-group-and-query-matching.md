@@ -3,7 +3,7 @@
 > **Executor instructions**: Apply the same robots semantics in `src/robots.js`
 > and fetcher integration. Preserve longest-match and Allow tie-breaking.
 >
-> **Drift check (run first)**: `git diff --stat 888d3e7..HEAD -- src/robots.js src/fetcher.js tests/optimizer.test.js tests/fetcher.test.js index.d.ts plans/README.md`
+> **Drift check (run first)**: `git diff --stat d144741..HEAD -- src/robots.js src/fetcher.js tests/optimizer.test.js tests/fetcher.test.js index.d.ts plans/README.md`
 
 ## Status
 
@@ -12,7 +12,7 @@
 - **Risk**: MED
 - **Depends on**: plans/073-make-fetcher-tests-hermetic.md
 - **Category**: bug
-- **Planned at**: commit `0006bb1`, 2026-08-03 (reconciled; 073 DONE)
+- **Planned at**: commit `d144741`, 2026-08-03 (reconciled at `0006bb1`; 073 DONE; 092/093 landed since, shifting fetcher line numbers only)
 
 ## Why this matters
 
@@ -23,16 +23,17 @@ target it. Local and remote audits can therefore disagree with published rules.
 
 ## Current state
 
-- `src/robots.js:182-195` returns a single selected group.
-- `src/fetcher.js:727-780` (`checkRobotsRule`) duplicates that single-group
-  algorithm — group selection at 743-751, rule matching at 758-774.
-- `src/fetcher.js:734` matches only `URL.pathname` (no `search`).
-- Longest rule and Allow tie behavior live at `src/robots.js:198-230` and
-  `src/fetcher.js:758-774`.
-- `fetchRobotsTxt` (`src/fetcher.js:686-714`) changed with 075 (ERR_HOP_POLICY
-  re-throw at 702-703); its matching semantics are unaffected.
+- `src/robots.js:182-196` (`selectGroup`) returns a single selected group.
+- `src/fetcher.js:774-825` (`checkRobotsRule`) duplicates that single-group
+  algorithm — group selection at 786-798, rule matching at 805-822.
+- `src/fetcher.js:781` matches only `URL.pathname` (no `search`).
+- Longest rule and Allow tie behavior live at `src/robots.js:198-232` and
+  `src/fetcher.js:805-822`.
+- `fetchRobotsTxt` (`src/fetcher.js:733-761`) changed with 075 (ERR_HOP_POLICY
+  re-throw at 749-751); its matching semantics are unaffected.
 - Existing patterns: `tests/optimizer.test.js:2031-2045` and
-  `tests/fetcher.test.js:955-985` (`describe("checkRobotsRule")` at 932).
+  `tests/fetcher.test.js:1070+` (`describe("checkRobotsRule")` at 1070, group
+  fixture at 1072-1092).
 
 ## Commands you will need
 

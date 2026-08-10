@@ -479,6 +479,12 @@ export function suggestSection(filepath, content, cwd = process.cwd()) {
   const relDir = path.relative(cwd, path.dirname(filepath));
   if (!relDir || relDir === ".") return "Pages";
 
+  // Paths outside cwd produce "../…" relative labels that are never useful as
+  // a section name. Fall back to the directory's own name so the dirname map
+  // and wording below still apply; only give up when there is no directory.
+  const labelBase = relDir.startsWith("..") ? path.basename(path.dirname(filepath)) : relDir;
+  if (!labelBase || labelBase === "." || labelBase === "..") return "Pages";
+
   // Common directory name → readable section
   const dirMap = {
     docs: "Documentation",
@@ -503,7 +509,7 @@ export function suggestSection(filepath, content, cwd = process.cwd()) {
     releases: "Releases",
   };
 
-  const dirName = path.basename(relDir).toLowerCase();
+  const dirName = path.basename(labelBase).toLowerCase();
   if (dirMap[dirName]) return dirMap[dirName];
 
   // Use content signals if available (lightweight, no profile dependency)
@@ -517,7 +523,7 @@ export function suggestSection(filepath, content, cwd = process.cwd()) {
   }
 
   // General path transformation
-  return relDir.charAt(0).toUpperCase() + relDir.slice(1).replace(/[_-]/g, " ");
+  return labelBase.charAt(0).toUpperCase() + labelBase.slice(1).replace(/[_-]/g, " ");
 }
 
 /**
