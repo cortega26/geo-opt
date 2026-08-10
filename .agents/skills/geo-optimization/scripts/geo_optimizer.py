@@ -1379,7 +1379,7 @@ def discover_files(input_paths, recursive=False, ignore_patterns=None,
     for input_path in input_paths:
         resolved = os.path.abspath(os.path.join(cwd, input_path))
         try:
-            st = os.stat(resolved)
+            os.stat(resolved)
         except OSError:
             continue
 
@@ -2560,7 +2560,7 @@ def main():
             if len(batch_results) > 1:
                 summary = compute_summary(batch_results)
                 print(f"\n{'='*50}")
-                print(f"                 SITE SUMMARY                    ")
+                print("                 SITE SUMMARY                    ")
                 print(f"{'='*50}")
                 print(f"Files:  {summary['succeeded']}/{summary['totalFiles']} succeeded")
                 if summary['failed'] > 0:
@@ -2707,7 +2707,7 @@ def main():
                     pass
             report = audit_llms_txt(content, discovered, os.getcwd())
             print(f"{'='*50}")
-            print(f"              LLMS.TXT AUDIT REPORT               ")
+            print("              LLMS.TXT AUDIT REPORT               ")
             print(f"{'='*50}")
             if report["valid"]:
                 print("✓ llms.txt is valid and complete.")
@@ -2717,7 +2717,7 @@ def main():
                     print(f"  - {issue}")
             if "coverage" in report:
                 cov = report["coverage"]
-                print(f"\nCoverage:")
+                print("\nCoverage:")
                 print(f"  Listed: {cov['listed']} | Missing: {cov['missing']} | Total: {cov['total']}")
                 if cov["missingFiles"]:
                     print("\nMissing from llms.txt:")

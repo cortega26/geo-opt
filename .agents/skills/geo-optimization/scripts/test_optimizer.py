@@ -844,7 +844,7 @@ class TestGeoOptimizer(unittest.TestCase):
             }
         ]
         result = generate_llms_full_txt(entries, "Test")
-        heading = next(l for l in result.splitlines() if l.startswith("## ["))
+        heading = next(line for line in result.splitlines() if line.startswith("## ["))
         self.assertEqual(
             len(re.findall(r"[^\\]\]\(", heading)),
             1,

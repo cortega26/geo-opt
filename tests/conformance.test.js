@@ -543,6 +543,32 @@ describe("Python artifact output parity (Plan 084)", () => {
     }
   });
 
+  it("llms.txt title and description are identical for an .htm fixture", () => {
+    const parsed = [];
+    for (const [label, cli] of [
+      ["node", NODE],
+      ["python", PY],
+    ]) {
+      const content = llmsDryRun(cli, "page-basic.htm");
+      const entry = content.split("\n").find((line) => line.startsWith("- ["));
+      assert.ok(entry, `${label} must emit a llms.txt entry for the .htm fixture`);
+      const parts = entry.match(/^- \[([^\]]*)\]\([^)]*\)(?:: (.*))?$/);
+      assert.ok(parts, `${label} entry must parse as label + optional description: ${entry}`);
+      parsed.push({ label: parts[1], description: parts[2] ?? "" });
+    }
+    assert.equal(
+      parsed[0].label,
+      "Page Title",
+      `Node must use the HTML h1 as title for .htm files, got ${parsed[0].label}`
+    );
+    assert.equal(parsed[1].label, parsed[0].label, "Python title must match Node for .htm files");
+    assert.equal(
+      parsed[1].description,
+      parsed[0].description,
+      "Python description must match Node for .htm files"
+    );
+  });
+
   it("no score-based Optional section by default in either runtime", () => {
     for (const [label, cli] of [
       ["node", NODE],
@@ -606,6 +632,23 @@ describe("Python artifact output parity (Plan 084)", () => {
       "h1-less",
       `Python headline should be the basename, got ${headlines[1]}`
     );
+  });
+
+  it("schema headline comes from the HTML h1 for an .htm fixture in both runtimes", () => {
+    const fixtureFile = path.join(FIXTURES, "page-basic.htm");
+    const headlines = [];
+    for (const cli of [NODE, PY]) {
+      const out = run(cli, ["schema", fixtureFile, "article"]);
+      const match = out.match(/"headline"\s*:\s*"([^"]*)"/);
+      assert.ok(match, "schema generate must embed the Article headline");
+      headlines.push(match[1]);
+    }
+    assert.equal(
+      headlines[0],
+      "Page Title",
+      `Node headline should come from the HTML h1, got ${headlines[0]}`
+    );
+    assert.equal(headlines[1], headlines[0], "Python headline must match Node for .htm files");
   });
 });
 
