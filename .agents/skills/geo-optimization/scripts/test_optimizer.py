@@ -722,6 +722,48 @@ class TestGeoOptimizer(unittest.TestCase):
         self.assertTrue(len(meta["description"]) > 10)
         self.assertEqual(len(meta["sections"]), 1)
 
+    def test_extract_page_metadata_htm_extension_is_html(self):
+        """A .htm file with an <h1> must be treated as HTML (Node parity)."""
+        html = (
+            "<html>\n"
+            "<head><title>Page</title>"
+            '<meta name="description" content="Meta description for the page."></head>\n'
+            "<body><h1>Page Title</h1><p>First paragraph text.</p></body>\n"
+            "</html>\n"
+        )
+        meta = extract_page_metadata(html, "/tmp/page.htm")
+        self.assertEqual(meta["title"], "Page Title")
+        self.assertEqual(meta["description"], "Meta description for the page.")
+        meta2 = extract_page_metadata(html, "/tmp/page.html")
+        self.assertEqual(meta2["title"], "Page Title")
+        self.assertEqual(meta2["description"], "Meta description for the page.")
+
+    def test_generate_llms_txt_empty_section_and_missing_fields(self):
+        """Empty section names default to Pages; missing title/url must not crash."""
+        entries = [
+            {"title": "Sparse", "url": "https://example.com/sparse", "section": ""},
+            {"description": "no label"},
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertIn("## Pages", result)
+        self.assertIn("- [Sparse](https://example.com/sparse)", result)
+        self.assertIn("- []()", result)
+        full = generate_llms_full_txt(entries, "Test")
+        self.assertIn("## []()", full)
+
+    def test_generate_llms_txt_threshold_ignores_non_numeric_scores(self):
+        """Non-numeric or null scores never demote entries to Optional."""
+        entries = [
+            {"title": "Stringy", "url": "https://example.com/stringy", "score": "30"},
+            {"title": "Nullish", "url": "https://example.com/nullish", "score": None},
+            {"title": "Real", "url": "https://example.com/real", "score": 80},
+        ]
+        result = generate_llms_txt(entries, "Test", optional_threshold=50)
+        self.assertNotIn("## Optional", result)
+        self.assertIn("[Stringy]", result)
+        self.assertIn("[Nullish]", result)
+        self.assertIn("## Pages", result)
+
     def test_generate_llms_txt_produces_valid_structure(self):
         """generate_llms_txt should produce valid llmstxt.org-spec output."""
         entries = [

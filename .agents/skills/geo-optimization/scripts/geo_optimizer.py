@@ -810,7 +810,9 @@ def extract_page_metadata(content, filepath):
     """Extract title, description, and sections from Markdown or HTML content."""
     clean_text = preprocess_content(content)
 
-    is_html = filepath.endswith(".html") or bool(re.search(r'<html', clean_text, re.IGNORECASE))
+    is_html = filepath.endswith((".html", ".htm")) or bool(
+        re.search(r"<html", clean_text, re.IGNORECASE)
+    )
     frontmatter = extract_plain_frontmatter(content) if not is_html else {"title": "", "description": ""}
 
     title = ""
@@ -896,15 +898,16 @@ def generate_llms_txt(entries, site_title="Site Documentation", site_description
     sections = {}
     optional_entries = []
     for entry in entries:
+        score = entry.get("score")
         is_optional = entry.get("optional") is True or (
             optional_threshold is not None
-            and entry.get("score") is not None
-            and entry["score"] < optional_threshold
+            and isinstance(score, (int, float))
+            and score < optional_threshold
         )
         if is_optional:
             optional_entries.append(entry)
         else:
-            section = entry.get("section", "Pages")
+            section = entry.get("section") or "Pages"
             sections.setdefault(section, []).append(entry)
 
     for section_name, section_entries in sections.items():
@@ -912,7 +915,7 @@ def generate_llms_txt(entries, site_title="Site Documentation", site_description
         lines.append("")
         for entry in section_entries:
             desc = f": {escape_link_text(clean_markdown_to_plain_text(entry['description']))}" if entry.get("description") else ""
-            lines.append(f"- [{escape_link_text(entry['title'])}]({entry['url']}){desc}")
+            lines.append(f"- [{escape_link_text(entry.get('title', ''))}]({entry.get('url', '')}){desc}")
         lines.append("")
 
     if optional_entries:
@@ -920,7 +923,7 @@ def generate_llms_txt(entries, site_title="Site Documentation", site_description
         lines.append("")
         for entry in optional_entries:
             desc = f": {escape_link_text(clean_markdown_to_plain_text(entry['description']))}" if entry.get("description") else ""
-            lines.append(f"- [{escape_link_text(entry['title'])}]({entry['url']}){desc}")
+            lines.append(f"- [{escape_link_text(entry.get('title', ''))}]({entry.get('url', '')}){desc}")
         lines.append("")
 
     return "\n".join(lines).strip() + "\n"
@@ -937,7 +940,7 @@ def generate_llms_full_txt(entries, site_title="Site Documentation"):
     for entry in entries:
         lines.append("---")
         lines.append("")
-        lines.append(f"## [{escape_link_text(entry['title'])}]({entry['url']})")
+        lines.append(f"## [{escape_link_text(entry.get('title', ''))}]({entry.get('url', '')})")
         lines.append("")
         content = entry.get("content", "")
         clean = preprocess_content(content)
