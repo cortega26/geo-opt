@@ -5,6 +5,7 @@ import {
   generateSchemaData,
   validateWritableTargetInsideCwd,
 } from "./schema.js";
+import { writeFileAtomic } from "./safe-write.js";
 
 /**
  * Audit multiple files, collecting results without process.exit.
@@ -203,7 +204,7 @@ export function batchInject(files, schemaType, config, options = {}) {
 
   for (const filepath of files) {
     try {
-      // Use generateSchemaData + fs.writeFileSync instead of injectSchema
+      // Use generateSchemaData + writeFileAtomic instead of injectSchema
       // to avoid process.exit inside the batch loop. injectSchema calls
       // assertWritableTargetInsideCwd which exits on failure.
       // We replicate the inject logic here with batch-safe error handling.
@@ -222,7 +223,7 @@ export function batchInject(files, schemaType, config, options = {}) {
         continue;
       }
 
-      // Use generateSchemaData + fs.writeFileSync with explicit path validation
+      // Use generateSchemaData + writeFileAtomic with explicit path validation
       // instead of injectSchema to keep error handling batch-safe (no process.exit).
       let content;
       try {
@@ -247,7 +248,7 @@ export function batchInject(files, schemaType, config, options = {}) {
         noBranding: options.noBranding,
       });
 
-      fs.writeFileSync(filepath, modifiedContent, { encoding: "utf8" });
+      writeFileAtomic(filepath, modifiedContent);
       successCount++;
     } catch (err) {
       errors.push({ file: filepath, error: err.message });

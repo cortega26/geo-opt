@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 import os
+import re
 import tempfile
 import sys
 import json
@@ -36,6 +37,8 @@ from geo_optimizer import (
     reminders_are_enabled,
     set_reminders_enabled,
     write_engagement_state,
+    write_file_safe,
+    copy_file_safe,
 )
 
 class TestGeoOptimizer(unittest.TestCase):
@@ -719,6 +722,48 @@ class TestGeoOptimizer(unittest.TestCase):
         self.assertTrue(len(meta["description"]) > 10)
         self.assertEqual(len(meta["sections"]), 1)
 
+    def test_extract_page_metadata_htm_extension_is_html(self):
+        """A .htm file with an <h1> must be treated as HTML (Node parity)."""
+        html = (
+            "<html>\n"
+            "<head><title>Page</title>"
+            '<meta name="description" content="Meta description for the page."></head>\n'
+            "<body><h1>Page Title</h1><p>First paragraph text.</p></body>\n"
+            "</html>\n"
+        )
+        meta = extract_page_metadata(html, "/tmp/page.htm")
+        self.assertEqual(meta["title"], "Page Title")
+        self.assertEqual(meta["description"], "Meta description for the page.")
+        meta2 = extract_page_metadata(html, "/tmp/page.html")
+        self.assertEqual(meta2["title"], "Page Title")
+        self.assertEqual(meta2["description"], "Meta description for the page.")
+
+    def test_generate_llms_txt_empty_section_and_missing_fields(self):
+        """Empty section names default to Pages; missing title/url must not crash."""
+        entries = [
+            {"title": "Sparse", "url": "https://example.com/sparse", "section": ""},
+            {"description": "no label"},
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertIn("## Pages", result)
+        self.assertIn("- [Sparse](https://example.com/sparse)", result)
+        self.assertIn("- []()", result)
+        full = generate_llms_full_txt(entries, "Test")
+        self.assertIn("## []()", full)
+
+    def test_generate_llms_txt_threshold_ignores_non_numeric_scores(self):
+        """Non-numeric or null scores never demote entries to Optional."""
+        entries = [
+            {"title": "Stringy", "url": "https://example.com/stringy", "score": "30"},
+            {"title": "Nullish", "url": "https://example.com/nullish", "score": None},
+            {"title": "Real", "url": "https://example.com/real", "score": 80},
+        ]
+        result = generate_llms_txt(entries, "Test", optional_threshold=50)
+        self.assertNotIn("## Optional", result)
+        self.assertIn("[Stringy]", result)
+        self.assertIn("[Nullish]", result)
+        self.assertIn("## Pages", result)
+
     def test_generate_llms_txt_produces_valid_structure(self):
         """generate_llms_txt should produce valid llmstxt.org-spec output."""
         entries = [
@@ -745,6 +790,104 @@ class TestGeoOptimizer(unittest.TestCase):
         result = generate_llms_txt(entries, "Test", optional_threshold=50)
         self.assertIn("## Optional", result)
         self.assertIn("[Weak]", result)
+
+    def test_generate_llms_txt_keeps_low_score_in_section_by_default(self):
+        """Score-based Optional placement must be opt-in (Plan 084, Node parity)."""
+        entries = [
+            {"title": "Good", "url": "https://example.com/good", "score": 80},
+            {"title": "Weak", "url": "https://example.com/weak", "score": 30},
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertNotIn("## Optional", result)
+        self.assertIn("## Pages", result)
+        self.assertIn("[Weak](https://example.com/weak)", result)
+
+    def test_generate_llms_txt_optional_flag_moves_entry_without_threshold(self):
+        entries = [
+            {"title": "Manual", "url": "https://example.com/manual", "optional": True},
+            {"title": "Normal", "url": "https://example.com/normal"},
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertIn("## Optional", result)
+        self.assertIn("[Manual](https://example.com/manual)", result)
+        self.assertIn("## Pages", result)
+
+    def test_generate_llms_txt_escapes_hostile_link_text(self):
+        entries = [
+            {
+                "title": "Release [v1.2] (stable) \\beta [x](https://evil.example)",
+                "description": "Intro with ](https://evil.example) bracket (parens) text.",
+                "url": "https://example.com/rel",
+                "section": "Changelog [2026] (notes) [more](https://evil.example)",
+            }
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertIn("## Changelog \\[2026\\] \\(notes)", result)
+        for line in result.splitlines():
+            if line.startswith("## "):
+                self.assertEqual(
+                    len(re.findall(r"[^\\]\]\(", line)), 0, f"heading must be fully escaped: {line}"
+                )
+            elif line.startswith("- ["):
+                self.assertEqual(
+                    len(re.findall(r"[^\\]\]\(", line)),
+                    1,
+                    f"line must have exactly one real ](: {line}",
+                )
+
+    def test_generate_llms_full_txt_escapes_hostile_title(self):
+        entries = [
+            {
+                "title": "Page [One] (beta) [x](https://evil.example)",
+                "url": "https://example.com/one",
+                "content": "# Page One\n\nBody.",
+            }
+        ]
+        result = generate_llms_full_txt(entries, "Test")
+        heading = next(line for line in result.splitlines() if line.startswith("## ["))
+        self.assertEqual(
+            len(re.findall(r"[^\\]\]\(", heading)),
+            1,
+            f"heading must have exactly one real ](: {heading}",
+        )
+        self.assertNotIn("](https://evil.example)", heading)
+
+    def test_schema_title_falls_back_to_basename_when_no_h1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "h1-less.md")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("Intro paragraph without a heading.\n\n## Section\nBody.\n")
+            schema = generate_schema_data(path, "article", self.config)
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
+            self.assertEqual(article["headline"], "h1-less")
+
+    def test_schema_title_uses_html_h1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "page.html")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("<html><body><h1>Hello <b>World</b></h1><p>Intro text here.</p></body></html>")
+            schema = generate_schema_data(path, "article", {})
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
+            self.assertEqual(article["headline"], "Hello World")
+
+    def test_metadata_frontmatter_title_and_description_fallback(self):
+        md = (
+            "---\n"
+            'title: "Frontmatter Title"\n'
+            "description: A frontmatter description.\n"
+            "---\n\n"
+            "## Section\nBody.\n"
+        )
+        meta = extract_page_metadata(md, "/tmp/front.md")
+        self.assertEqual(meta["title"], "Frontmatter Title")
+        self.assertEqual(meta["description"], "A frontmatter description.")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "front.md")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(md)
+            schema = generate_schema_data(path, "article", {})
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
+            self.assertEqual(article["headline"], "Frontmatter Title")
 
     def test_generate_llms_full_txt_compiles_full_content(self):
         """generate_llms_full_txt should compile complete page content."""
@@ -940,6 +1083,141 @@ class TestGeoOptimizer(unittest.TestCase):
         finally:
             import shutil
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+class SymlinkSafeWriteTests(unittest.TestCase):
+    """Plan 083: atomic symlink-safe artifact writes (Python boundary)."""
+
+    def setUp(self):
+        self.work_dir = tempfile.mkdtemp(prefix="geo-safe-py-", dir=os.getcwd())
+        self.outside_dir = tempfile.mkdtemp(prefix="geo-outside-py-")
+        self.prev_cwd = os.getcwd()
+        os.chdir(self.work_dir)
+
+    def tearDown(self):
+        os.chdir(self.prev_cwd)
+        import shutil
+
+        shutil.rmtree(self.work_dir, ignore_errors=True)
+        shutil.rmtree(self.outside_dir, ignore_errors=True)
+
+    def test_write_file_safe_normal(self):
+        write_file_safe("out.txt", "hola")
+        with open("out.txt", "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "hola")
+        self.assertEqual(
+            [n for n in os.listdir(".") if n.endswith(".tmp") or ".geo-opt-tmp" in n], []
+        )
+
+    def test_write_file_safe_preserves_mode(self):
+        write_file_safe("out.txt", "v1")
+        os.chmod("out.txt", 0o600)
+        write_file_safe("out.txt", "v2")
+        self.assertEqual(os.stat("out.txt").st_mode & 0o777, 0o600)
+
+    def test_write_file_safe_rejects_final_symlink(self):
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "out.txt")
+        with self.assertRaises(SystemExit):
+            write_file_safe("out.txt", "x")
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_write_file_safe_rejects_symlinked_parent(self):
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(self.outside_dir, "sub")
+        with self.assertRaises(SystemExit):
+            write_file_safe("sub/out.txt", "x")
+        self.assertFalse(os.path.exists(os.path.join(self.outside_dir, "out.txt")))
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_copy_file_safe_rejects_final_symlink(self):
+        with open("src.md", "w", encoding="utf-8") as f:
+            f.write("contenido")
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "src.md.bak")
+        with self.assertRaises(SystemExit):
+            copy_file_safe("src.md", "src.md.bak")
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_write_file_safe_rejects_missing_directory(self):
+        with self.assertRaises(SystemExit):
+            write_file_safe("no-such-dir/out.txt", "x")
+        self.assertFalse(os.path.exists("no-such-dir"))
+
+    def test_write_file_safe_new_file_default_mode_matches_node(self):
+        write_file_safe("out.txt", "hola")
+        current_umask = os.umask(0)
+        os.umask(current_umask)
+        self.assertEqual(os.stat("out.txt").st_mode & 0o777, 0o644 & ~current_umask)
+
+    def test_write_file_safe_writes_through_parent_symlink_inside_cwd(self):
+        os.makedirs("real-dir")
+        os.symlink("real-dir", "link-in")
+        write_file_safe("link-in/out.txt", "hola")
+        with open("real-dir/out.txt", "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "hola")
+
+    def test_copy_file_safe_preserves_bytes_byte_for_byte(self):
+        with open("src.bin", "wb") as f:
+            f.write(b"\x00\xff\xfe\x80contenido\xff")
+        copy_file_safe("src.bin", "src.bin.bak")
+        with open("src.bin.bak", "rb") as f:
+            self.assertEqual(f.read(), b"\x00\xff\xfe\x80contenido\xff")
+
+    def test_copy_file_safe_normal_backup(self):
+        with open("src.md", "w", encoding="utf-8") as f:
+            f.write("contenido")
+        os.chmod("src.md", 0o640)
+        copy_file_safe("src.md", "src.md.bak")
+        with open("src.md.bak", "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "contenido")
+        self.assertEqual(os.stat("src.md.bak").st_mode & 0o777, 0o640)
+
+    def test_cli_robots_generate_rejects_symlink_output(self):
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "robots.txt")
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "geo_optimizer.py"
+        )
+        result = subprocess.run(
+            [sys.executable, script_path, "robots", "generate", "--output", "robots.txt"],
+            cwd=self.work_dir, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr)
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
+
+    def test_cli_llmstxt_generate_rejects_symlink_output(self):
+        with open("index.md", "w", encoding="utf-8") as f:
+            f.write("# Home\n\nWelcome to our test site with enough words for a description.\n")
+        sentinel = os.path.join(self.outside_dir, "sentinel.txt")
+        with open(sentinel, "w", encoding="utf-8") as f:
+            f.write("original")
+        os.symlink(sentinel, "llms.txt")
+        script_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "geo_optimizer.py"
+        )
+        result = subprocess.run(
+            [sys.executable, script_path, "llmstxt", "generate", ".",
+             "--site-url", "https://example.com", "--title", "Test Site",
+             "--description", "A description.", "--recursive"],
+            cwd=self.work_dir, capture_output=True, text=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        with open(sentinel, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "original")
 
 
 if __name__ == "__main__":

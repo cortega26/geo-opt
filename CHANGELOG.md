@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2](https://github.com/cortega26/geo-opt/compare/v2.4.1...v2.4.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* **python:** close post-084 parity gaps in metadata and llms generation (audit) ([de76f36](https://github.com/cortega26/geo-opt/commit/de76f36bdd9f6689ded4760b05b28ac240d95b0b))
+
+## [2.4.1](https://github.com/cortega26/geo-opt/compare/v2.4.0...v2.4.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **python:** align compatible artifact outputs (Plan 084) ([d0414e5](https://github.com/cortega26/geo-opt/commit/d0414e52bf68303d14698a0b64b8308bec34b7a4))
+
 # [2.4.0](https://github.com/cortega26/geo-opt/compare/v2.3.11...v2.4.0) (2026-08-09)
 
 
@@ -21,10 +35,16 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **batch:** tolerate success results without a report in `aggregateReport` (the d.ts contract allows it) instead of crashing (Plan 080)
 - **sitemap:** resolve sub-sitemap `<loc>` entries in generated indexes to absolute URLs when `baseUrl` is set, as the sitemap protocol requires (relative names are kept in local file mode)
 - **llms.txt:** `suggestSection` no longer leaks `../` into section labels for paths outside the cwd; it derives the label from the directory's own name instead
+- **Security (Plan 083 audit 2026-08-09):** the write boundary is hardened against a parent-symlink swap between validation and rename — Node and Python now stage the temp file and rename onto the fully resolved real destination path, so re-pointing a symlinked parent component cannot redirect the write outside the CWD (deterministic regression test pins it); destination directories must exist (clean "Output directory does not exist" error instead of a raw ENOENT, matching the pre-083 CLI guards); Python copy/schema tasks copy bytes byte-for-byte (no more silent UTF-8 replacement on backups) and new files default to `0o644` masked by the umask (Node parity, previously `0600`); the containment predicate has a single implementation shared by the validators and the boundary
+- **Security (Plan 083):** every user-directed artifact write now goes through one shared atomic, symlink-safe boundary in Node and Python: `robots generate`, `sitemap generate`, `llmstxt generate` (incl. `--full`), `generate-all` outputs, `report` and `technical -o`, the `geo_config.json` template, schema injection (single and batch), and `--backup` copies. Destinations whose real parent directory resolves outside the CWD are rejected; an existing final symlink is refused instead of followed; writes stage through a unique temp file and atomic rename, so a symlink raced in between check and write is replaced, not followed; existing file modes are preserved; temp files are cleaned up on failure. Injection of files that are themselves symlinks is now refused at the final destination (previously only outside-CWD links were)
 - **validate:** `geo-opt validate` now exits nonzero when a file has no JSON-LD blocks, malformed JSON, or schema errors, so it can serve as a CI gate; `validateSchemaFile` returns a structured `{ valid, blockCount, errors, warnings, notes, blocks }` result and `validateSchema` is total over JSON values (null, primitives, arrays return errors instead of crashing) (Plan 082)
+- **python (Plan 084):** Python artifact output now matches the documented compatible tier: schema titles use the same metadata fallback chain as Node (markdown H1 → HTML `<h1>` → frontmatter title → file basename) instead of a bare "Untitled Document"; score-based `## Optional` placement in `generate_llms_txt` is opt-in via `optional_threshold` (deprecation warning on stderr, Node parity) while `entry["optional"] = True` is honored without a threshold; and link labels (titles, descriptions, section names, llms-full headings) are Markdown-escaped so hostile text cannot inject links — backslashes, brackets and opening parentheses escaped exactly like Node
 - **validate (audit 2026-08-09):** block extraction is brace-balanced, so array roots are rejected with a clear error and `@graph` documents with nested nodes parse whole instead of truncating to invalid JSON; ```` ```jsonld ````/```` ```json-ld ```` and case variants are recognized (longest alternative first), HTML `<script type='application/ld+json'>` single-quoted attributes are matched, multiple JSON-LD values inside one fence become individual blocks, and fence bodies without a leading `{`/`[` or without `@context` are still skipped
 - **batch (audit 2026-08-09):** `aggregateReport` computes statistics over finite scores only — score-less successes can no longer produce `NaN` in `averageScore`/`medianScore`/`stdDev` or drop out of `worstFiles`; with zero scored files the numeric stats are omitted and the summary explains why
 - **sitemap (audit 2026-08-09):** `resolveIndexLoc` tolerates non-string `baseUrl` values (misconfigured `geo_config.json`) by falling back to relative locs, and strips query strings/fragments from `baseUrl` so sitemap-index `<loc>` entries stay clean absolute URLs
+- **python (audit 2026-08-10):** Python metadata and llms parity closed post-Plan-084 gaps: `.htm` files count as HTML exactly like `.html` (Node parity), so `<h1>` titles and meta-description fallbacks match; `generate_llms_txt`/`generate_llms_full_txt` tolerate empty section names (defaulting to `## Pages`, like Node's falsy-section fallback) and entries missing `title`/`url` instead of raising `KeyError`; score-based `## Optional` placement demotes numeric scores only — `null`, non-numeric or absent scores never demote (Node coerces `null` to 0 and demotes; Python deliberately does not, noted in the capability matrix)
+- **python (audit 2026-08-10):** the Python port is clean under `ruff check` (unused `st` assignment, three placeholder-less f-strings, one ambiguous `l` variable — all behavior-preserving), and a shared `page-basic.htm` conformance fixture now pins cross-runtime parity for `.htm` files: llms.txt entry title/description and the schema `headline` are asserted identical between Node and Python
+- **docs (audit 2026-08-10):** README badge, highlights and dev-section test counts realigned to the live `node --test` count (935 tests · 165 suites) in both languages; the Plan 058 README-consistency gate had pinned a stale 162-suites literal and now matches the real suite count
 
 ### Tested
 

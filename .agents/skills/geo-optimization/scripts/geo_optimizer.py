@@ -6,6 +6,7 @@ import json
 import argparse
 import contextlib
 import io
+import stat
 import tempfile
 from datetime import datetime, timezone
 
@@ -667,6 +668,93 @@ def is_inside_directory(candidate_path, directory_path):
     )
 
 
+def write_file_safe(filepath, content, mode=None):
+    """Atomically write content to filepath inside the CWD (Plan 083).
+
+    Rejects a destination whose directory resolves outside the CWD, a missing
+    destination directory, and a final name that already is a symlink or a
+    directory. Writes through a unique temp file in the real destination
+    directory and os.replace()s it onto the fully resolved real destination
+    path, so a symlink — raced in at the final name or re-pointed on a parent
+    component — is replaced, not followed (audit 2026-08-09). Preserves the
+    mode of an existing regular file or applies the caller-provided mode, and
+    defaults to 0o644 masked by the umask for new files (Node parity). Bytes
+    pass through untouched; str content is encoded as UTF-8. Cleans the temp
+    file on failure. Exits with status 1 on refusal.
+    """
+    cwd_real = os.path.realpath(os.getcwd())
+    dest_dir = os.path.dirname(os.path.abspath(filepath))
+    if not os.path.isdir(dest_dir):
+        print(
+            f"Error: Output directory does not exist: {os.path.relpath(dest_dir, os.getcwd()) or dest_dir}. Create it first, then run the command again.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    dest_dir_real = os.path.realpath(dest_dir)
+    if not is_inside_directory(dest_dir_real, cwd_real):
+        print(
+            f"Error: Security restriction — output path {filepath} resolves outside the current working directory.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    final_path = os.path.join(dest_dir_real, os.path.basename(filepath))
+    try:
+        lstat_result = os.lstat(final_path)
+    except OSError:
+        lstat_result = None
+    if lstat_result is not None:
+        if stat.S_ISLNK(lstat_result.st_mode):
+            print(
+                f"Error: Security restriction — refusing to write through symlink: {filepath}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if stat.S_ISDIR(lstat_result.st_mode):
+            print(f"Error: Output path {filepath} is a directory.", file=sys.stderr)
+            sys.exit(1)
+        if mode is None:
+            mode = stat.S_IMODE(lstat_result.st_mode)
+
+    if mode is None:
+        current_umask = os.umask(0)
+        os.umask(current_umask)
+        mode = 0o644 & ~current_umask
+
+    if isinstance(content, str):
+        content = content.encode("utf-8")
+
+    descriptor, temp_path = tempfile.mkstemp(dir=dest_dir_real, prefix=".geo-opt-tmp-")
+    try:
+        with os.fdopen(descriptor, "wb") as temp_file:
+            temp_file.write(content)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.chmod(temp_path, mode)
+        os.replace(temp_path, final_path)
+    except Exception as exc:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise exc
+
+
+def copy_file_safe(src, dest):
+    """Copy an existing validated source file to a new destination (Plan 083).
+
+    The source must resolve inside the CWD; it is read through its real path
+    (never through symlinked components), its mode is preserved, and the
+    destination goes through write_file_safe. Bytes are copied untouched, so
+    non-UTF-8 sources back up byte-for-byte (audit 2026-08-09).
+    """
+    src_real_path, _ = assert_writable_target_inside_cwd(src)
+    mode = stat.S_IMODE(os.stat(src_real_path).st_mode)
+    with open(src_real_path, "rb") as src_file:
+        data = src_file.read()
+    write_file_safe(dest, data, mode=mode)
+
+
 def assert_writable_target_inside_cwd(filepath):
     try:
         target_real_path = os.path.realpath(filepath)
@@ -685,24 +773,6 @@ def assert_writable_target_inside_cwd(filepath):
     return target_real_path, cwd_real_path
 
 
-def assert_new_file_parent_inside_cwd(filepath):
-    try:
-        parent_real_path = os.path.realpath(os.path.dirname(filepath) or ".")
-        cwd_real_path = os.path.realpath(os.getcwd())
-    except OSError as exc:
-        print(f"Error: Failed to resolve real path for {filepath}: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    if not is_inside_directory(parent_real_path, cwd_real_path):
-        print(
-            f"Error: Security restriction — output path {filepath} resolves outside the current working directory.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    return parent_real_path, cwd_real_path
-
-
 def clean_html_text(value):
     soup = BeautifulSoup(value, "html.parser")
     return re.sub(r"\s+", " ", soup.get_text()).strip()
@@ -714,9 +784,36 @@ def truncate_description(description):
 
 # ---- Page metadata extraction (llms.txt) ----
 
+def extract_plain_frontmatter(content):
+    """Parse flat YAML frontmatter (title/description only).
+
+    Mirrors the Node extractPageMetadata fallback chain (Plan 084): only
+    plain ``key: value`` entries are read; quoted values are unquoted.
+    Returns a dict with the recognized string fields ("" when absent).
+    """
+    result = {"title": "", "description": ""}
+    match = re.match(r"^---\s*\n([\s\S]*?)\n---\s*\n?", content)
+    if not match:
+        return result
+    for line in match.group(1).splitlines():
+        kv = re.match(r'^\s*([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*$', line)
+        if not kv or kv.group(1) not in result:
+            continue
+        value = kv.group(2)
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            value = value[1:-1]
+        result[kv.group(1)] = value
+    return result
+
+
 def extract_page_metadata(content, filepath):
     """Extract title, description, and sections from Markdown or HTML content."""
     clean_text = preprocess_content(content)
+
+    is_html = filepath.endswith((".html", ".htm")) or bool(
+        re.search(r"<html", clean_text, re.IGNORECASE)
+    )
+    frontmatter = extract_plain_frontmatter(content) if not is_html else {"title": "", "description": ""}
 
     title = ""
     title_match = re.search(r'^#\s+(.+)$', clean_text, re.MULTILINE)
@@ -726,6 +823,8 @@ def extract_page_metadata(content, filepath):
         h1_match = re.search(r'<h1\b[^>]*>([\s\S]*?)</h1>', clean_text, re.DOTALL | re.IGNORECASE)
         if h1_match:
             title = clean_html_text(h1_match.group(1))
+    if not title and frontmatter["title"]:
+        title = frontmatter["title"].strip()
     if not title:
         title = os.path.splitext(os.path.basename(filepath))[0] or "Untitled"
 
@@ -733,7 +832,7 @@ def extract_page_metadata(content, filepath):
     intro_match = re.search(r'^#\s+.+?\n\n([^#\n]+)', clean_text, re.DOTALL)
     if intro_match:
         description = clean_markdown_to_plain_text(intro_match.group(1).strip())
-    if not description and (filepath.endswith(".html") or re.search(r'<html', clean_text, re.IGNORECASE)):
+    if not description and is_html:
         soup = BeautifulSoup(content, "html.parser")
         meta_desc = soup.find("meta", attrs={"name": "description"})
         if meta_desc and meta_desc.get("content"):
@@ -742,6 +841,8 @@ def extract_page_metadata(content, filepath):
             first_p = soup.find("p")
             if first_p:
                 description = clean_html_text(first_p.get_text())
+    if not description and frontmatter["description"]:
+        description = frontmatter["description"].strip()
     description = truncate_description(description)
 
     sections = extract_sections(content)
@@ -750,9 +851,42 @@ def extract_page_metadata(content, filepath):
 
 # ---- llms.txt generation ----
 
+def escape_link_text(text):
+    """Escape Markdown link-label text (Plan 084, Node parity).
+
+    Mirrors src/llms-txt.js escapeLinkText: backslashes, brackets, and the
+    opening parenthesis are escaped so hostile titles/descriptions/sections
+    cannot close the label early or inject links into generated output.
+    """
+    if text is None:
+        return ""
+    return (
+        str(text)
+        .replace("\\", "\\\\")
+        .replace("[", "\\[")
+        .replace("]", "\\]")
+        .replace("(", "\\(")
+    )
+
+
 def generate_llms_txt(entries, site_title="Site Documentation", site_description="",
-                      optional_threshold=50):
-    """Generate llms.txt content following the llmstxt.org specification."""
+                      optional_threshold=None):
+    """Generate llms.txt content following the llmstxt.org specification.
+
+    Entries are grouped by their ``section`` field (or "Pages" by default);
+    entries with ``optional=True`` are placed in the ``## Optional`` section
+    at the end. Score-based curation (``optional_threshold``) is deprecated,
+    mirroring Node: pass it only to opt in; omitting it disables score-based
+    placement entirely. Link labels (titles, descriptions, section names) are
+    Markdown-escaped so hostile text cannot inject links.
+    """
+    if optional_threshold is not None:
+        print(
+            "[geo-opt] Warning: generate_llms_txt optional_threshold is deprecated. "
+            "Set entry[\"optional\"] = True on entries you want in ## Optional instead.",
+            file=sys.stderr,
+        )
+
     lines = []
 
     lines.append(f"# {site_title}")
@@ -765,26 +899,31 @@ def generate_llms_txt(entries, site_title="Site Documentation", site_description
     optional_entries = []
     for entry in entries:
         score = entry.get("score")
-        if score is not None and score < optional_threshold:
+        is_optional = entry.get("optional") is True or (
+            optional_threshold is not None
+            and isinstance(score, (int, float))
+            and score < optional_threshold
+        )
+        if is_optional:
             optional_entries.append(entry)
         else:
-            section = entry.get("section", "Pages")
+            section = entry.get("section") or "Pages"
             sections.setdefault(section, []).append(entry)
 
     for section_name, section_entries in sections.items():
-        lines.append(f"## {section_name}")
+        lines.append(f"## {escape_link_text(section_name)}")
         lines.append("")
         for entry in section_entries:
-            desc = f": {clean_markdown_to_plain_text(entry['description'])}" if entry.get("description") else ""
-            lines.append(f"- [{entry['title']}]({entry['url']}){desc}")
+            desc = f": {escape_link_text(clean_markdown_to_plain_text(entry['description']))}" if entry.get("description") else ""
+            lines.append(f"- [{escape_link_text(entry.get('title', ''))}]({entry.get('url', '')}){desc}")
         lines.append("")
 
     if optional_entries:
         lines.append("## Optional")
         lines.append("")
         for entry in optional_entries:
-            desc = f": {clean_markdown_to_plain_text(entry['description'])}" if entry.get("description") else ""
-            lines.append(f"- [{entry['title']}]({entry['url']}){desc}")
+            desc = f": {escape_link_text(clean_markdown_to_plain_text(entry['description']))}" if entry.get("description") else ""
+            lines.append(f"- [{escape_link_text(entry.get('title', ''))}]({entry.get('url', '')}){desc}")
         lines.append("")
 
     return "\n".join(lines).strip() + "\n"
@@ -801,7 +940,7 @@ def generate_llms_full_txt(entries, site_title="Site Documentation"):
     for entry in entries:
         lines.append("---")
         lines.append("")
-        lines.append(f"## [{entry['title']}]({entry['url']})")
+        lines.append(f"## [{escape_link_text(entry.get('title', ''))}]({entry.get('url', '')})")
         lines.append("")
         content = entry.get("content", "")
         clean = preprocess_content(content)
@@ -1240,7 +1379,7 @@ def discover_files(input_paths, recursive=False, ignore_patterns=None,
     for input_path in input_paths:
         resolved = os.path.abspath(os.path.join(cwd, input_path))
         try:
-            st = os.stat(resolved)
+            os.stat(resolved)
         except OSError:
             continue
 
@@ -2056,29 +2195,13 @@ def generate_schema_data(filepath, schema_type, config, _content=None):
             print(f"Error: Failed to read file {filepath}: {e}", file=sys.stderr)
             sys.exit(1)
         
-    # Strip code blocks to prevent title/description contamination
-    clean_text = preprocess_content(content)
-
-    # Try markdown H1 first, then HTML <h1>
-    title_match = re.search(r'^#\s+(.+)$', clean_text, re.MULTILINE)
-    if not title_match:
-        title_match = re.search(r'<h1\b[^>]*>(.*?)</h1>', clean_text, re.DOTALL | re.IGNORECASE)
-    title = clean_html_text(title_match.group(1)) if title_match else "Untitled Document"
-    
-    intro_match = re.search(r'^#\s+.+?\n\n([^#\n]+)', clean_text, re.DOTALL)
-    description = clean_markdown_to_plain_text(intro_match.group(1).strip()) if intro_match else ""
-    if not description and (filepath.endswith(".html") or "<html" in clean_text.lower()):
-        # Use BeautifulSoup for reliable <meta name="description"> extraction
-        # regardless of attribute order.
-        soup_desc = BeautifulSoup(content, "html.parser")
-        meta_desc = soup_desc.find("meta", attrs={"name": "description"})
-        if meta_desc and meta_desc.get("content"):
-            description = clean_html_text(meta_desc["content"])
-        if not description:
-            first_p = soup_desc.find("p")
-            if first_p:
-                description = clean_html_text(first_p.get_text())
-    description = truncate_description(description)
+    # Title and description come from extract_page_metadata so the fallback
+    # chain matches Node's generateSchemaData (Plan 084): markdown H1, HTML
+    # <h1>, frontmatter title, then the file basename — never a bare
+    # "Untitled Document" for H1-less pages.
+    meta = extract_page_metadata(content, filepath)
+    title = clean_html_text(meta["title"]) or meta["title"] or "Untitled Document"
+    description = meta["description"]
         
     author_info = config.get("author", {})
     pub_info = config.get("publisher", {})
@@ -2289,8 +2412,7 @@ def inject_schema(filepath, schema_type, config, dry_run=False, no_branding=Fals
         return
 
     try:
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(content)
+        write_file_safe(filepath, content)
     except Exception as e:
         print(f"Error: Failed to write to file {filepath}: {e}", file=sys.stderr)
         sys.exit(1)
@@ -2438,7 +2560,7 @@ def main():
             if len(batch_results) > 1:
                 summary = compute_summary(batch_results)
                 print(f"\n{'='*50}")
-                print(f"                 SITE SUMMARY                    ")
+                print("                 SITE SUMMARY                    ")
                 print(f"{'='*50}")
                 print(f"Files:  {summary['succeeded']}/{summary['totalFiles']} succeeded")
                 if summary['failed'] > 0:
@@ -2474,8 +2596,7 @@ def main():
                 print(content)
                 print(f"[dry-run] Would write to: {args.output}")
             else:
-                with open(args.output, "w", encoding="utf-8") as f:
-                    f.write(content)
+                write_file_safe(args.output, content)
                 print(f"robots.txt written to {args.output}")
         else:
             check_robots(args.filepath, output_format=args.format)
@@ -2557,14 +2678,12 @@ def main():
             else:
                 out_dir = os.path.abspath(args.output)
                 os.makedirs(out_dir, exist_ok=True)
-                with open(os.path.join(out_dir, "llms.txt"), "w", encoding="utf-8") as f:
-                    f.write(llms_content)
+                write_file_safe(os.path.join(out_dir, "llms.txt"), llms_content)
                 sections_n = len(set(e["section"] for e in entries))
                 print(f"✓ llms.txt written ({len(entries)} pages, {sections_n} sections) → {os.path.join(out_dir, 'llms.txt')}")
                 if args.full:
                     full_content = generate_llms_full_txt([e for e in entries if e.get("content")], site_title)
-                    with open(os.path.join(out_dir, "llms-full.txt"), "w", encoding="utf-8") as f:
-                        f.write(full_content)
+                    write_file_safe(os.path.join(out_dir, "llms-full.txt"), full_content)
                     print(f"✓ llms-full.txt written → {os.path.join(out_dir, 'llms-full.txt')}")
 
             if errors_list:
@@ -2588,7 +2707,7 @@ def main():
                     pass
             report = audit_llms_txt(content, discovered, os.getcwd())
             print(f"{'='*50}")
-            print(f"              LLMS.TXT AUDIT REPORT               ")
+            print("              LLMS.TXT AUDIT REPORT               ")
             print(f"{'='*50}")
             if report["valid"]:
                 print("✓ llms.txt is valid and complete.")
@@ -2598,7 +2717,7 @@ def main():
                     print(f"  - {issue}")
             if "coverage" in report:
                 cov = report["coverage"]
-                print(f"\nCoverage:")
+                print("\nCoverage:")
                 print(f"  Listed: {cov['listed']} | Missing: {cov['missing']} | Total: {cov['total']}")
                 if cov["missingFiles"]:
                     print("\nMissing from llms.txt:")
@@ -2643,10 +2762,8 @@ def main():
             if backup and not dry_run:
                 backup_path = args.filepath + ".bak"
                 assert_writable_target_inside_cwd(args.filepath)
-                assert_new_file_parent_inside_cwd(backup_path)
                 try:
-                    import shutil
-                    shutil.copy2(args.filepath, backup_path)
+                    copy_file_safe(args.filepath, backup_path)
                     print(f"Backup created: {backup_path}")
                 except Exception as e:
                     print(f"Error: Failed to create backup {backup_path}: {e}", file=sys.stderr)
