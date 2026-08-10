@@ -385,21 +385,29 @@ export function renderV2Summary(summary) {
 
 /**
  * Generate a plain-English summary of a v2 report for non-technical users.
+ * Wording describes observed style markers; it never promises ranking,
+ * discovery, readiness, or citation outcomes (plan 085, audit F-06).
  * @param {object} report - V2Report
  * @returns {string[]} lines for display
  */
-function plainEnglishSummary(report) {
+export function plainEnglishSummary(report) {
   const lines = [];
   const score = report.effectiveScore;
   const profile = report.profile?.label || "content";
   const band = report.readinessBand;
 
   if (score >= 80) {
-    lines.push(`  Your ${profile} page is well-optimized for AI discovery.`);
+    lines.push(
+      `  Your ${profile} page shows strong style markers for structure, attribution, and citations.`
+    );
   } else if (score >= 50) {
-    lines.push(`  Your ${profile} page has decent AI discoverability but could improve.`);
+    lines.push(
+      `  Your ${profile} page shows moderate style markers; targeted improvements can strengthen them.`
+    );
   } else {
-    lines.push(`  Your ${profile} page needs work to be reliably discovered by AI engines.`);
+    lines.push(
+      `  Your ${profile} page shows weak style markers — the flagged issues below are the gaps to address.`
+    );
   }
 
   const dims = report.dimensions || {};
@@ -426,9 +434,9 @@ function plainEnglishSummary(report) {
   const bandAdvice = {
     "production-ready":
       "Strong style markers. Note: the score reflects formatting signals, not factual accuracy or ranking (audit F-06).",
-    solid: "Close to ready — a few tweaks will make a difference.",
+    solid: "Meets most quality thresholds — a few targeted improvements remain.",
     "at-risk": "Address the flagged issues before publishing widely.",
-    "needs-work": "This page needs substantial improvement to be AI-discoverable.",
+    "needs-work": "Partial style markers — address the flagged structural or attribution gaps.",
   };
   if (bandAdvice[band]) {
     lines.push(`  ${bandAdvice[band]}`);

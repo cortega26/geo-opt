@@ -18,7 +18,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { execSync, spawnSync } from "child_process";
 
-import { scoreContentV2 } from "../src/scoring-v2.js";
+import { scoreContentV2, readinessBand } from "../src/scoring-v2.js";
 import { scoreContent } from "../src/scoring.js";
 import { aggregateReport } from "../src/batch.js";
 import {
@@ -597,5 +597,42 @@ describe("readiness band label — audit F-06", () => {
     assert.equal(report.readinessBand, "production-ready");
     // La descripción declara que el score no valida veracidad.
     assert.match(report.readinessDescription, /not factual accuracy|style markers/i);
+  });
+});
+
+describe("Plan 085 — v2 band copy does not predict outcomes", () => {
+  // Phrasing that promises an engine outcome (ranking, discovery, readiness,
+  // citation) is banned from band labels/descriptions: the heuristic measures
+  // observed style markers only (AGENTS.md truthfulness warning, F-06).
+  const PREDICTIVE = new RegExp(
+    [
+      "production[- ]?ready",
+      "unlikely to cite",
+      "likelihood of being cited",
+      "reliably discovered",
+      "well-optimized for ai",
+      "ai-discoverable",
+      "decent ai discoverability",
+    ].join("|"),
+    "i"
+  );
+  const CASES = [
+    [90, "production-ready"],
+    [70, "solid"],
+    [55, "needs-work"],
+    [30, "at-risk"],
+  ];
+
+  it("all four band descriptions describe observed markers, not outcomes", () => {
+    for (const [pct, expectedId] of CASES) {
+      const band = readinessBand(pct);
+      assert.equal(band.band, expectedId, `stable band id for ${pct}`);
+      assert.doesNotMatch(band.label, PREDICTIVE, `${expectedId} label: ${band.label}`);
+      assert.doesNotMatch(
+        band.description,
+        PREDICTIVE,
+        `${expectedId} description: ${band.description}`
+      );
+    }
   });
 });

@@ -393,12 +393,15 @@ Available profiles: `auto` (default), `documentation`, `open-source`,
 - `commercial` and `ecommerce`: customer testimonials and product
   specifications are treated as valid evidence.
 
-**Readiness bands** replace the 0–100 score in v2 output:
+**Style-marker bands** (stable JSON band ids: `production-ready`, `solid`,
+`needs-work`, `at-risk`) replace the 0–100 score in v2 output. Bands describe
+observed formatting and attribution markers, never ranking or citation
+outcomes:
 
-- **Production-Ready** (≥85 %) — well-structured, well-attributed, clear.
+- **Strong Style Markers** (`production-ready`, ≥85 %) — well-structured, well-attributed, clear.
 - **Solid** (65–84 %) — meets most quality thresholds.
-- **Needs Work** (45–64 %) — structural or attribution gaps.
-- **At Risk** (<45 %) — multiple quality issues.
+- **Needs Work** (45–64 %) — partial markers; structural or attribution gaps.
+- **At Risk** (<45 %) — weak markers across multiple quality dimensions.
 
 Set `profile` in `geo_config.json` to lock a profile for Node v2 audits:
 

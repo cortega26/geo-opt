@@ -656,10 +656,12 @@ function scoreClarity(obs, textContent, config, profile) {
 
 /**
  * Map a total percentage to a readiness band.
+ * Band ids are stable JSON contract; labels/descriptions describe observed
+ * style markers, never ranking, discovery, or citation outcomes (plan 085).
  * @param {number} pct — 0–100
  * @returns {{ band: string, label: string, description: string }}
  */
-function readinessBand(pct) {
+export function readinessBand(pct) {
   if (pct >= 85) {
     return {
       // El band id es contract estable del JSON; el label ya no afirma
@@ -676,7 +678,7 @@ function readinessBand(pct) {
       band: "solid",
       label: "Solid",
       description:
-        "Content meets most quality thresholds. A few targeted improvements will raise it to production-ready.",
+        "Content meets most quality thresholds for structure, attribution, and citation markers. A few targeted improvements remain.",
     };
   }
   if (pct >= 45) {
@@ -684,14 +686,14 @@ function readinessBand(pct) {
       band: "needs-work",
       label: "Needs Work",
       description:
-        "Content has structural or attribution gaps that reduce its likelihood of being cited by AI engines.",
+        "Content shows partial style markers — structural or attribution gaps remain, such as weak citation hygiene.",
     };
   }
   return {
     band: "at-risk",
     label: "At Risk",
     description:
-      "Content shows multiple quality issues. AI engines are unlikely to cite this page.",
+      "Content shows weak style markers with multiple quality issues across structure, attribution, and citations.",
   };
 }
 
