@@ -472,6 +472,144 @@ describe("Compatible capability shape checks", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Tier: compatible — Python artifact output parity (Plan 084)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Python artifact output parity (Plan 084)", () => {
+  function run(cli, args, opts = {}) {
+    return execFileSync(cli[0], [...cli.slice(1), ...args], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: "pipe",
+      ...opts,
+    });
+  }
+
+  const NODE = ["node", NODE_CLI];
+  const PY = [PYTHON, PY_SCRIPT];
+
+  /** Extract the llms.txt content from a `llmstxt generate --dry-run` run. */
+  function llmsDryRun(cli, fixtureName) {
+    const out = run(cli, [
+      "llmstxt",
+      "generate",
+      path.join(FIXTURES, fixtureName),
+      "--site-url",
+      "https://example.com",
+      "--title",
+      "Test Site",
+      "--description",
+      "Test description.",
+      "--dry-run",
+    ]);
+    const match = out.match(/=== llms\.txt preview ===\n([\s\S]*?)\n\n\[dry-run\]/);
+    assert.ok(match, `no llms.txt preview section found in: ${out.slice(0, 300)}`);
+    return match[1].trimEnd() + "\n";
+  }
+
+  /** Normalize llms.txt content into a comparable structure (semantic, order-preserving). */
+  function normalizeLlms(content) {
+    const result = { sections: [], optional: [], lines: content.split("\n") };
+    let current = null;
+    for (const line of result.lines) {
+      if (line.startsWith("## ")) {
+        current = line.slice(3);
+        if (current === "Optional") result.optional = [];
+        else result.sections.push({ name: current, entries: [] });
+      } else if (line.startsWith("- [") && current) {
+        const label = line.slice(3).split("](")[0];
+        const target = current === "Optional" ? result.optional : result.sections.at(-1).entries;
+        target.push(label);
+      }
+    }
+    return result;
+  }
+
+  it("llms.txt content is semantically identical for an H1-less fixture", () => {
+    const node = normalizeLlms(llmsDryRun(NODE, "h1-less.md"));
+    const python = normalizeLlms(llmsDryRun(PY, "h1-less.md"));
+    assert.deepEqual(
+      node.sections.map((s) => s.name),
+      python.sections.map((s) => s.name),
+      "sections must match"
+    );
+    assert.deepEqual(node.optional, python.optional, "optional placement must match");
+    for (let i = 0; i < node.sections.length; i++) {
+      assert.deepEqual(
+        node.sections[i].entries,
+        python.sections[i].entries,
+        `titles in section ${node.sections[i].name} must match`
+      );
+    }
+  });
+
+  it("no score-based Optional section by default in either runtime", () => {
+    for (const [label, cli] of [
+      ["node", NODE],
+      ["python", PY],
+    ]) {
+      const normalized = normalizeLlms(llmsDryRun(cli, "hostile.md"));
+      assert.deepEqual(
+        normalized.optional,
+        [],
+        `${label} must not demote pages to ## Optional without an explicit threshold`
+      );
+    }
+  });
+
+  it("hostile titles cannot inject links into either runtime's output", () => {
+    for (const [label, cli] of [
+      ["node", NODE],
+      ["python", PY],
+    ]) {
+      const normalized = normalizeLlms(llmsDryRun(cli, "hostile.md"));
+      for (const line of normalized.lines) {
+        if (!line.startsWith("- [") && !line.startsWith("## ")) continue;
+        if (line.startsWith("## ")) {
+          assert.equal(
+            (line.match(/\]\(/g) || []).length,
+            0,
+            `${label} section heading must not contain an unescaped link closer: ${line}`
+          );
+          continue;
+        }
+        const closers = line.match(/[^\\]\]\(/g) || [];
+        assert.equal(
+          closers.length,
+          1,
+          `${label} link line must contain exactly one real ]( closer: ${line}`
+        );
+        assert.ok(
+          /[^\\]\[/.test(line.slice(3, line.lastIndexOf("]("))) === false,
+          `${label} label must not contain a raw [ : ${line}`
+        );
+      }
+    }
+  });
+
+  it("schema title falls back to the basename for H1-less files in both runtimes", () => {
+    const fixtureFile = path.join(FIXTURES, "h1-less.md");
+    const headlines = [];
+    for (const cli of [NODE, PY]) {
+      const out = run(cli, ["schema", fixtureFile, "article"]);
+      const match = out.match(/"headline"\s*:\s*"([^"]*)"/);
+      assert.ok(match, "schema generate must embed the Article headline");
+      headlines.push(match[1]);
+    }
+    assert.equal(
+      headlines[0],
+      "h1-less",
+      `Node headline should be the basename, got ${headlines[0]}`
+    );
+    assert.equal(
+      headlines[1],
+      "h1-less",
+      `Python headline should be the basename, got ${headlines[1]}`
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Tier: equivalent — V1 audit, headings no-Latin (F-10)
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -140,6 +140,7 @@ These are verified differences that do not break the compatible-tier contract
 | Path resolution in error messages | Absolute path from CWD | Path relative to script location | Error text differs; exit codes match |
 | Dry-run output format | Structured preview | Compressed preview | Both communicate the intended change |
 | Engagement state directory default | `$XDG_STATE_HOME` or `~/.local/state` | `$GEO_OPT_STATE_DIR` or script directory | Different default, same env-var override |
+| Frontmatter title/description fallback (metadata) | Full YAML parse (quoted, typed values) | Flat `key: value` lines; single-line quoted strings | Same precedence chain (H1 → HTML h1 → frontmatter → basename); only H1-less frontmatter pages can differ, on exotic YAML only |
 
 None of these divergences affect audit scores, findings, schema output, robots
 policy, or `llms.txt` content — the committed contracts for `equivalent` and

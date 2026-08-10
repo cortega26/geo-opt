@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 import os
+import re
 import tempfile
 import sys
 import json
@@ -747,6 +748,104 @@ class TestGeoOptimizer(unittest.TestCase):
         result = generate_llms_txt(entries, "Test", optional_threshold=50)
         self.assertIn("## Optional", result)
         self.assertIn("[Weak]", result)
+
+    def test_generate_llms_txt_keeps_low_score_in_section_by_default(self):
+        """Score-based Optional placement must be opt-in (Plan 084, Node parity)."""
+        entries = [
+            {"title": "Good", "url": "https://example.com/good", "score": 80},
+            {"title": "Weak", "url": "https://example.com/weak", "score": 30},
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertNotIn("## Optional", result)
+        self.assertIn("## Pages", result)
+        self.assertIn("[Weak](https://example.com/weak)", result)
+
+    def test_generate_llms_txt_optional_flag_moves_entry_without_threshold(self):
+        entries = [
+            {"title": "Manual", "url": "https://example.com/manual", "optional": True},
+            {"title": "Normal", "url": "https://example.com/normal"},
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertIn("## Optional", result)
+        self.assertIn("[Manual](https://example.com/manual)", result)
+        self.assertIn("## Pages", result)
+
+    def test_generate_llms_txt_escapes_hostile_link_text(self):
+        entries = [
+            {
+                "title": "Release [v1.2] (stable) \\beta [x](https://evil.example)",
+                "description": "Intro with ](https://evil.example) bracket (parens) text.",
+                "url": "https://example.com/rel",
+                "section": "Changelog [2026] (notes) [more](https://evil.example)",
+            }
+        ]
+        result = generate_llms_txt(entries, "Test")
+        self.assertIn("## Changelog \\[2026\\] \\(notes)", result)
+        for line in result.splitlines():
+            if line.startswith("## "):
+                self.assertEqual(
+                    len(re.findall(r"[^\\]\]\(", line)), 0, f"heading must be fully escaped: {line}"
+                )
+            elif line.startswith("- ["):
+                self.assertEqual(
+                    len(re.findall(r"[^\\]\]\(", line)),
+                    1,
+                    f"line must have exactly one real ](: {line}",
+                )
+
+    def test_generate_llms_full_txt_escapes_hostile_title(self):
+        entries = [
+            {
+                "title": "Page [One] (beta) [x](https://evil.example)",
+                "url": "https://example.com/one",
+                "content": "# Page One\n\nBody.",
+            }
+        ]
+        result = generate_llms_full_txt(entries, "Test")
+        heading = next(l for l in result.splitlines() if l.startswith("## ["))
+        self.assertEqual(
+            len(re.findall(r"[^\\]\]\(", heading)),
+            1,
+            f"heading must have exactly one real ](: {heading}",
+        )
+        self.assertNotIn("](https://evil.example)", heading)
+
+    def test_schema_title_falls_back_to_basename_when_no_h1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "h1-less.md")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("Intro paragraph without a heading.\n\n## Section\nBody.\n")
+            schema = generate_schema_data(path, "article", self.config)
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
+            self.assertEqual(article["headline"], "h1-less")
+
+    def test_schema_title_uses_html_h1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "page.html")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("<html><body><h1>Hello <b>World</b></h1><p>Intro text here.</p></body></html>")
+            schema = generate_schema_data(path, "article", {})
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
+            self.assertEqual(article["headline"], "Hello World")
+
+    def test_metadata_frontmatter_title_and_description_fallback(self):
+        md = (
+            "---\n"
+            'title: "Frontmatter Title"\n'
+            "description: A frontmatter description.\n"
+            "---\n\n"
+            "## Section\nBody.\n"
+        )
+        meta = extract_page_metadata(md, "/tmp/front.md")
+        self.assertEqual(meta["title"], "Frontmatter Title")
+        self.assertEqual(meta["description"], "A frontmatter description.")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "front.md")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(md)
+            schema = generate_schema_data(path, "article", {})
+            article = next(x for x in schema["@graph"] if x["@type"] == "Article")
+            self.assertEqual(article["headline"], "Frontmatter Title")
 
     def test_generate_llms_full_txt_compiles_full_content(self):
         """generate_llms_full_txt should compile complete page content."""
