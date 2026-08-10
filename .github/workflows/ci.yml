@@ -50,10 +50,11 @@ jobs:
         run: npm run format:check
 
       - name: JS tests
-        run: npm test
+        run: |
+          bash -o pipefail -c "npm test 2>&1 | tee /tmp/geo-opt-test-count.log"
 
       - name: Test-count badge
-        run: node scripts/check-test-count.js
+        run: node scripts/check-test-count.js --from-log /tmp/geo-opt-test-count.log
 
       - name: Plan archive gate
         run: node scripts/check-plan-archive.js
