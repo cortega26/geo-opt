@@ -57,6 +57,7 @@ requires an explicit matrix decision, not automatic duplication in Python.
 | Purpose          | Command                                                             |
 | ---------------- | ------------------------------------------------------------------- |
 | Test JavaScript  | `npm test`                                                          |
+| Test + badges (one run) | `npm run test:verify`                                        |
 | Test Python port | `python3 .agents/skills/geo-optimization/scripts/test_optimizer.py` |
 | Lint             | `npm run lint`                                                      |
 | Format check     | `npm run format:check`                                              |

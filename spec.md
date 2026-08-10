@@ -73,8 +73,9 @@ negocio), re-diseños de producto, cambios de contract JSON.
 1. `node --test tests/audit-2026-07-31.e2e.test.js` — los 14 describes, cada uno
    con su probe del informe reproducido black-box.
 2. `npm run check` completo — el gate no debe regresar (la suite nueva se
-   añade al conteo vía `scripts/check-test-count.js`; si el conteo fijo lo
-   exige, se actualiza el número en README/AGENTS).
+   añade al conteo vía `npm run test:verify`, que verifica los badges de tests
+   y cobertura desde una sola ejecución vía `scripts/verify-badges.js`; si el
+   conteo fijo lo exige, se actualiza el número en README/AGENTS).
 3. `python3 .agents/skills/geo-optimization/scripts/test_optimizer.py` (cubierto
    por el gate).
 4. `git diff --check`.

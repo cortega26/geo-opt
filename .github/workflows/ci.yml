@@ -49,18 +49,13 @@ jobs:
       - name: Format check
         run: npm run format:check
 
-      - name: JS tests
-        run: |
-          bash -o pipefail -c "npm test 2>&1 | tee /tmp/geo-opt-test-count.log"
-
-      - name: Test-count badge
-        run: node scripts/check-test-count.js --from-log /tmp/geo-opt-test-count.log
+      - name: JS tests and badge verification
+        # One full suite run per leg: count + branch-coverage badges are
+        # verified from the same c8 run (Plan 087).
+        run: npm run test:verify
 
       - name: Plan archive gate
         run: node scripts/check-plan-archive.js
-
-      - name: Coverage badge
-        run: npm run test:coverage && node scripts/check-coverage.js
 
       - name: Typecheck
         run: npm run typecheck

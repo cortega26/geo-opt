@@ -388,7 +388,7 @@ describe("Plan 072 — aggregate score semantics", () => {
     }
   });
 
-  it("package.json lint script covers tests/ (Plan 080)", () => {
+  it("package.json lint script covers tests/ (Plan 086)", () => {
     // Tests were linted ad hoc but excluded from `npm run lint`; appending
     // tests/ here pins the scope so stray coverage cannot silently regress.
     const lint = pkg.scripts.lint;
@@ -400,6 +400,33 @@ describe("Plan 072 — aggregate score semantics", () => {
     assert.ok(
       !/--ignore-pattern/u.test(lint) || !/tests\//u.test(lint),
       "lint script should not add tests/ then ignore it"
+    );
+  });
+
+  it("package.json wires check through the canonical single-suite test:verify (Plan 087)", () => {
+    // The count/coverage badges must be verified from ONE run, not from a
+    // re-spawned suite. Pinning the wiring prevents silent drift back to
+    // duplicate runs or to a reserialized check-test-count pipeline.
+    assert.match(
+      pkg.scripts["test:verify"],
+      /^node scripts\/verify-badges\.js$/u,
+      `test:verify must be the canonical verify-badges command: ${pkg.scripts["test:verify"]}`
+    );
+    assert.ok(
+      pkg.scripts.check.includes("npm run test:verify"),
+      `check must chain test:verify: ${pkg.scripts.check}`
+    );
+    assert.ok(
+      !pkg.scripts.check.includes("check-test-count"),
+      "check must not resurrect the duplicate-run count check"
+    );
+    assert.ok(
+      !pkg.scripts.check.includes("check-coverage"),
+      "check must not resurrect the duplicate-run coverage check"
+    );
+    assert.ok(
+      !pkg.scripts.check.includes("--from-log"),
+      "check must not re-parse an old npm-test log instead of the canonical run"
     );
   });
 });

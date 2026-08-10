@@ -180,10 +180,11 @@ describe("Plan 058 §6.2 — README test-count badge is internally consistent", 
   //   - This test asserts the badge URL number, the highlights-line number,
   //     and the dev-section number all agree (internal consistency).
   //   - The authoritative badge-vs-actual-count check lives in
-  //     `scripts/check-test-count.js`, run standalone as
-  //     `node scripts/check-test-count.js` (NOT inside `npm test`, so no
-  //     recursion). It is wired into `npm run check` (immediately after
-  //     `npm test`) so the badge cannot drift silently.
+  //     `scripts/verify-badges.js`, run standalone as
+  //     `npm run test:verify` (NOT inside `npm test`, so no recursion). It is
+  //     wired into `npm run check` and CI: one c8 run verifies BOTH the
+  //     test-count and branch-coverage badges from the same suite run
+  //     (Plan 087).
   // If the badge drifts, the standalone check fails; if the README numbers
   // disagree with each other, this test fails.
   function badgeNumber(text) {
