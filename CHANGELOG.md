@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1](https://github.com/cortega26/geo-opt/compare/v2.4.0...v2.4.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **python:** align compatible artifact outputs (Plan 084) ([d0414e5](https://github.com/cortega26/geo-opt/commit/d0414e52bf68303d14698a0b64b8308bec34b7a4))
+
 # [2.4.0](https://github.com/cortega26/geo-opt/compare/v2.3.11...v2.4.0) (2026-08-09)
 
 
