@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2](https://github.com/cortega26/geo-opt/compare/v2.4.1...v2.4.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* **python:** close post-084 parity gaps in metadata and llms generation (audit) ([de76f36](https://github.com/cortega26/geo-opt/commit/de76f36bdd9f6689ded4760b05b28ac240d95b0b))
+
 ## [2.4.1](https://github.com/cortega26/geo-opt/compare/v2.4.0...v2.4.1) (2026-08-10)
 
 
