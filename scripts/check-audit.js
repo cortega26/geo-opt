@@ -64,10 +64,52 @@ const ALLOWLIST = [
       "Dev-only and unfixable upstream. The vulnerable copy is bundled inside " +
       "the npm CLI tarball (semantic-release > @semantic-release/npm > npm), " +
       "so `overrides` cannot reach it — bundled dependencies ship as-is. " +
-      "Verified 2026-07-31: npm 11.19.0 and 12.0.2 both still bundle 5.0.7, " +
-      "so no version bump resolves it. Not reachable from published geo-opt " +
-      "code; semantic-release executes only in the Release workflow. The " +
-      "direct dependency path (eslint > minimatch) is already on 5.0.8.",
+      "Verified 2026-07-31 and 2026-08-10: npm 11.19.0 (max in-range for the " +
+      "@semantic-release/npm ^11.6.2 requirement) and 12.0.2 (latest) both " +
+      "still bundle 5.0.7, so no version bump resolves it. Not reachable from " +
+      "published geo-opt code; semantic-release executes only in the Release " +
+      "workflow. The direct dependency path (eslint > minimatch) is on 5.0.9 " +
+      "as of 2026-08-10, which satisfies this advisory and its bypass " +
+      "GHSA-rgw5-rvv9-x895.",
+  },
+  {
+    package: "brace-expansion",
+    url: "https://github.com/advisories/GHSA-rgw5-rvv9-x895",
+    nodes: ["node_modules/npm/node_modules/brace-expansion"],
+    version: "5.0.7",
+    source: 0, // diagnostic only
+    range: ">=4.0.0 <5.0.9", // diagnostic only
+    added: "2026-08-10",
+    recheck: "2026-10-31",
+    reason:
+      "High (DoS via unbounded intermediate arrays, bypassing the " +
+      "CVE-2026-14257 mitigation). Same class as GHSA-mh99-v99m-4gvg above: " +
+      "the vulnerable copy is the one bundled inside the npm CLI tarball — " +
+      "`overrides` cannot reach bundled dependencies. Verified 2026-08-10 that " +
+      "npm 11.19.0 and 12.0.2 both still bundle 5.0.7. The direct dependency " +
+      "path (eslint > minimatch) was bumped to 5.0.9 on the same date, which " +
+      "fixes this advisory in the developer toolchain; only the Release " +
+      "workflow's bundled npm copy remains.",
+  },
+  {
+    package: "ip-address",
+    url: "https://github.com/advisories/GHSA-mwp4-54f8-5fhr",
+    nodes: ["node_modules/npm/node_modules/ip-address"],
+    version: "10.2.0",
+    source: 0, // diagnostic only
+    range: "<=10.3.0", // diagnostic only
+    added: "2026-08-10",
+    recheck: "2026-11-30",
+    reason:
+      "High (leading-zero octets decoded as decimal while resolvers decode " +
+      "them as octal, enabling SSRF and trust-boundary bypass). Dev-only and " +
+      "unfixable upstream: the vulnerable copy is bundled inside the npm CLI " +
+      "tarball (semantic-release > @semantic-release/npm > npm > " +
+      "make-fetch-happen > @npmcli/agent > socks-proxy-agent > socks > " +
+      "ip-address), so `overrides` cannot reach it. Verified 2026-08-10: npm " +
+      "11.19.0 (max in-range) and 12.0.2 (latest) both still bundle 10.2.0, " +
+      "so no version bump resolves it. Reachable only from the Release " +
+      "workflow's npm publish path, never from published geo-opt code.",
   },
 ];
 

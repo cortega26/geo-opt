@@ -11,6 +11,24 @@ import { evaluateAuditReport } from "../scripts/check-audit.js";
 const GHSA_URL = "https://github.com/advisories/GHSA-mh99-v99m-4gvg";
 const REVIEWED_PATH = "node_modules/npm/node_modules/brace-expansion";
 
+// Stale-detection semantics depend on the *entire* allowlist (every entry
+// whose GHSA does not appear in the report is stale), so those tests run
+// against a dedicated one-entry fixture list instead of the real ALLOWLIST,
+// which grows as new unfixable bundled advisories get documented.
+const FIXTURE_ALLOWLIST = [
+  {
+    package: "brace-expansion",
+    url: GHSA_URL,
+    nodes: [REVIEWED_PATH],
+    version: "5.0.7",
+    source: 1130591,
+    range: ">=4.0.0 <5.0.8",
+    added: "2026-07-31",
+    recheck: "2026-10-31",
+    reason: "fixture allowlist entry for Plan 069 hermetic tests",
+  },
+];
+
 function advisory(overrides = {}) {
   return {
     source: 1130591,
@@ -138,7 +156,11 @@ describe("Plan 069 — audit allowlist matches by GHSA identity", () => {
   });
 
   it("reports the allowlist entry as stale when its GHSA no longer appears", () => {
-    const { suppressed, blocking, stale } = evaluateAuditReport(report({}), lockfile());
+    const { suppressed, blocking, stale } = evaluateAuditReport(
+      report({}),
+      lockfile(),
+      FIXTURE_ALLOWLIST
+    );
     assert.strictEqual(suppressed.length, 0);
     assert.strictEqual(blocking.length, 0);
     assert.strictEqual(stale.length, 1);
@@ -148,7 +170,8 @@ describe("Plan 069 — audit allowlist matches by GHSA identity", () => {
   it("does not warn stale when the advisory is present at sub-blocking severity", () => {
     const { suppressed, blocking, stale } = evaluateAuditReport(
       report({ "brace-expansion": entry({ via: advisory({ severity: "moderate" }) }) }),
-      lockfile()
+      lockfile(),
+      FIXTURE_ALLOWLIST
     );
     assert.strictEqual(suppressed.length, 0);
     assert.strictEqual(blocking.length, 0);
@@ -163,7 +186,8 @@ describe("Plan 069 — audit allowlist matches by GHSA identity", () => {
           via: advisory({ name: "minimatch", dependency: "minimatch" }),
         }),
       }),
-      lockfile()
+      lockfile(),
+      FIXTURE_ALLOWLIST
     );
     assert.strictEqual(suppressed.length, 0);
     assert.strictEqual(blocking.length, 1);
@@ -176,7 +200,8 @@ describe("Plan 069 — audit allowlist matches by GHSA identity", () => {
         "brace-expansion": entry(),
         "npm-bundled/brace-expansion": entry({ nodes: ["node_modules/other/brace-expansion"] }),
       }),
-      lockfile()
+      lockfile(),
+      FIXTURE_ALLOWLIST
     );
     assert.strictEqual(suppressed.length, 1);
     assert.strictEqual(blocking.length, 1);
@@ -190,7 +215,8 @@ describe("Plan 069 — audit allowlist matches by GHSA identity", () => {
         npm: entry({ via: ["brace-expansion"], severity: "high" }),
         "brace-expansion": entry({ via: advisory({ severity: "moderate" }) }),
       }),
-      lockfile()
+      lockfile(),
+      FIXTURE_ALLOWLIST
     );
     assert.strictEqual(suppressed.length, 0);
     assert.strictEqual(blocking.length, 0);
