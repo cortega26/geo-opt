@@ -1,13 +1,18 @@
 # Documentation governance
 
-**Status:** normative  
-**Owner:** repository maintainer  
-**Last verified:** 2026-06-27
+This document defines how geo-opt keeps its code, public documentation, plans,
+product claims, and historical records aligned with one another. It exists so
+the repository can stay coherent for a single maintainer: every fact has one
+authoritative source, each public claim is backed by executable behavior, a
+test, or a named external source, and old records are preserved rather than
+silently rewritten.
 
-This document defines how `geo-opt` keeps code, public documentation, plans,
-product claims, and historical records aligned. Its purpose is to reduce
-documentation drift without creating a documentation bureaucracy that a single
-maintainer cannot sustain.
+**Status:** normative · **Owner:** repository maintainer · **Last verified:** 2026-08-10
+
+The tables below name files by their canonical names: `README.md` (the public
+readme), `AGENTS.md` (the agent instruction file), `SKILL.md` (the bundled
+optimization skill), `CHANGELOG.md` (the release history) and
+`LICENSE`/`LICENSE-HISTORY.md` (the licensing terms).
 
 ## Principles
 
@@ -24,6 +29,9 @@ maintainer cannot sustain.
    describe.
 
 ## Document classes
+
+Documentation is grouped into six classes. Each class has a purpose and an
+update policy; the table below is the reference for how a document may change.
 
 | Class                     | Documents                                                            | Purpose                                            | Update policy                                        |
 | ------------------------- | -------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------- |
@@ -60,7 +68,9 @@ itself establish parity.
 
 These statements must remain true unless an explicit decision changes them:
 
-- Node.js is the canonical implementation and npm/library runtime.
+- Node.js is the canonical implementation and npm/library runtime. The
+  supported runtimes are Node.js 22 LTS and Node.js 24 LTS, per the official
+  [Node.js release schedule](https://nodejs.org/en/about/previous-releases).
 - Python is a capability-scoped compatibility port, not a second source of
   truth.
 - v1 remains the default scoring model until the migration gate in the roadmap
@@ -68,8 +78,8 @@ These statements must remain true unless an explicit decision changes them:
 - A report contract version, scoring model version and package version are
   distinct concepts, even where the current implementation still needs
   hardening.
-- Core functions should return data or errors. CLI adapters own terminal
-  rendering and process exit behavior.
+- Core functions should return data or errors. CLI (command-line interface)
+  adapters own terminal rendering and process exit behavior.
 - Processing is local by default. Network access, sharing and telemetry require
   explicit opt-in and documentation.
 - Machine-readable stdout must not be contaminated by diagnostics, reminders
@@ -77,8 +87,8 @@ These statements must remain true unless an explicit decision changes them:
 - Generated structured data must not infer author, publisher, publication date,
   price, currency or availability.
 - `robots.txt` communicates crawler preferences; it is not access control.
-- `llms.txt` is an optional community proposal and has no positive or negative
-  effect on Google Search visibility.
+- `llms.txt` is an optional [community proposal](https://llmstxt.org/) and has
+  no positive or negative effect on Google Search visibility.
 - Scores and findings do not guarantee ranking, retrieval, inclusion, mention
   or citation.
 - Community reminders remain local, non-blocking, automation-safe,
@@ -90,7 +100,8 @@ These statements must remain true unless an explicit decision changes them:
 
 Treat the following as compatibility-sensitive:
 
-- CLI command names, flags, exit codes and JSON shapes;
+- CLI command names, flags, exit codes and JSON (JavaScript Object Notation)
+  shapes;
 - exported JavaScript names and TypeScript declarations;
 - finding `ruleId`, status vocabulary and evidence metadata;
 - report/model version semantics;
@@ -103,11 +114,17 @@ An incompatible change requires:
 
 1. an explicit migration decision;
 2. tests for old and new behavior where a compatibility window exists;
-3. an `Unreleased` changelog entry;
+3. an `Unreleased` [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+   entry;
 4. updates to every required mirror in the source-of-truth matrix;
-5. a versioning decision appropriate to the affected contract.
+5. a versioning decision appropriate to the affected contract, following
+   [Semantic Versioning](https://semver.org/).
 
 ## Change-trigger matrix
+
+When a change lands, the documentation listed next to it must be reviewed in
+the same change. The matrix names the minimum set of mirrors for each change
+type.
 
 | Change                             | Documentation that must be reviewed                                   |
 | ---------------------------------- | --------------------------------------------------------------------- |
@@ -173,6 +190,9 @@ final implementation selects among materially different long-term contracts.
 
 ## Verification cadence
 
+The repository verifies documentation at three cadences: on every behavior
+change, on every material merge, and monthly or before a release.
+
 ### Every behavior change
 
 - Run checks required by `AGENTS.md`.
@@ -209,3 +229,14 @@ git diff --check
 
 Command examples should also be executed when they describe a newly added or
 changed CLI surface.
+
+## References
+
+- [Node.js release schedule](https://nodejs.org/en/about/previous-releases) —
+  supported runtime versions (Node.js 22 LTS and Node.js 24 LTS).
+- [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — the changelog
+  format this repository follows.
+- [Semantic Versioning](https://semver.org/) — the versioning scheme used for
+  the package and its contracts.
+- [llmstxt.org](https://llmstxt.org/) — the optional `llms.txt` community
+  proposal.
