@@ -73,8 +73,10 @@ These statements must remain true unless an explicit decision changes them:
   [Node.js release schedule](https://nodejs.org/en/about/previous-releases).
 - Python is a capability-scoped compatibility port, not a second source of
   truth.
-- v1 remains the default scoring model until the migration gate in the roadmap
-  is complete.
+- v2 is the default scoring model. V1 is legacy/deprecated but still selectable
+  via `--model v1`; any future default or scoring-model change requires an
+  explicit release decision with a documented migration guide and deprecation
+  notice period.
 - A report contract version, scoring model version and package version are
   distinct concepts, even where the current implementation still needs
   hardening.

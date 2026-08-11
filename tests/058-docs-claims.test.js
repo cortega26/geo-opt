@@ -118,6 +118,95 @@ describe("Plan 058 §6.2 — architecture.md current-maturity is truthful", () =
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Plan 091 — v2 is the documented default scoring model
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("Plan 091 — v2 is the documented default scoring model", () => {
+  const currentDocs = [
+    "docs/architecture.md",
+    "docs/documentation-governance.md",
+    "README.md",
+    "README.es.md",
+    ".agents/skills/geo-optimization/SKILL.md",
+  ];
+
+  it("architecture, governance and READMEs name v2 as the default", () => {
+    assert.match(
+      read("docs/architecture.md"),
+      /V2 is the default scoring model/u,
+      "architecture.md must state v2 is the default"
+    );
+    assert.match(
+      read("docs/documentation-governance.md"),
+      /v2 is the default scoring model/u,
+      "documentation-governance.md must state v2 is the default"
+    );
+    assert.match(
+      read("README.md"),
+      /`v2` \(default, profile-aware\)/u,
+      "README.md must document the v2 default"
+    );
+    assert.match(
+      read("README.es.md"),
+      /`v2` \(predeterminado, con conciencia de/u,
+      "README.es.md must document the v2 default"
+    );
+  });
+
+  it("no current document claims v1 is the default or a switch is pending", () => {
+    const v1DefaultPatterns = [
+      /v1\s+remains?\s+the\s+default/u,
+      /v1\s+is\s+the\s+default/u,
+      /default\s+switch\s+from\s+v1/u,
+      /v1\/default/u,
+      /v1[^\n]{0,40}default\s+scoring\s+model/u,
+    ];
+    for (const rel of currentDocs) {
+      const text = read(rel);
+      for (const pattern of v1DefaultPatterns) {
+        assert.doesNotMatch(
+          text,
+          pattern,
+          `${rel} still claims v1 as default or a pending switch (${pattern})`
+        );
+      }
+    }
+  });
+
+  it("Python is not documented as v2-capable", () => {
+    const architecture = read("docs/architecture.md");
+    // The capability matrix scopes Python to the legacy v1 surface and
+    // marks the v2 row Node-only.
+    const v2Row = architecture.match(/V2 profiles and readiness[^\n]*/u);
+    assert.ok(v2Row, "capability matrix must list the v2 row");
+    assert.match(
+      v2Row[0],
+      /Node-only/u,
+      "capability matrix must mark v2 profiles/readiness as Node-only"
+    );
+    assert.doesNotMatch(
+      architecture,
+      /Python[^\n]{0,60}\bV2\b[^\n]{0,40}(default|full|equivalent)/u,
+      "no current doc may imply Python runs v2"
+    );
+  });
+
+  it("v2 stays characterized as experimental and profile-aware, not a ranking oracle", () => {
+    const architecture = read("docs/architecture.md");
+    assert.match(
+      architecture,
+      /experimental and profile-aware/u,
+      "v2 experimental characterization must remain"
+    );
+    assert.doesNotMatch(
+      architecture,
+      /predicts?\s+(citation|ranking|search)/u,
+      "v2 must not be documented as a ranking/citation predictor"
+    );
+  });
+});
+
 describe("Plan 058 §6.2 — README tables match runtime", () => {
   for (const readme of ["README.md", "README.es.md"]) {
     it(`${readme}: command reference does not mark Community commands as Tier=Pro`, () => {

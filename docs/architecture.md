@@ -40,7 +40,7 @@ the current execution roadmap and architecture gate in the local
 | Configuration and validation            | `src/config.js`                           |
 | Content discovery and ignore rules      | `src/discovery.js`                        |
 | Text extraction and normalization       | `src/text.js`                             |
-| Legacy heuristic scoring (v1/default)   | `src/scoring.js`                          |
+| Legacy heuristic scoring (v1/legacy)   | `src/scoring.js`                          |
 | Profile-aware scoring (v2/experimental) | `src/scoring-v2.js`                       |
 | Content profiles and auto-detection     | `src/profiles.js`                         |
 | Section-level observation engine        | `src/observations.js`                     |
@@ -280,8 +280,9 @@ citation outcomes.
 
 - Add fixtures to the corpus; never tune thresholds against a single customer's
   desired score.
-- A default switch from v1 to v2 requires a separate release decision,
-  documented migration guide, and deprecation notice period.
+- The v1-to-v2 default switch has already happened (roadmap gate T0, closed
+  2026-06-27). Any future default or scoring-model change requires a separate
+  release decision, documented migration guide, and deprecation notice period.
 - Threshold values in `src/observations.js` and `src/scoring-v2.js` are
   configurable heuristics. Changes that affect ranking order constitute a
   MAJOR model version bump.
