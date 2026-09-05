@@ -163,6 +163,13 @@ const NON_USER_FACING_PROPERTIES = new Set([
   "inDefinedTermSet",
 ]);
 
+// Nodos de identidad del sitio. Su `description` es copy de
+// posicionamiento (tagline) que legítimamente parafrasea el branding
+// visible en lugar de citarlo literalmente; exigir coincidencia exacta
+// ahí dispara en todos los sitios bien formados (falso positivo). Los
+// claims de artículos conservan la verificación literal.
+const SITE_IDENTITY_TYPES = new Set(["WebSite", "Organization"]);
+
 function observeStructuredDataConsistency(blocks, title, visibleText, brandingText = "") {
   const nodes = blocks
     .filter((block) => block.valid)
@@ -174,8 +181,13 @@ function observeStructuredDataConsistency(blocks, title, visibleText, brandingTe
   const normalizedBranding = brandingText.toLocaleLowerCase();
 
   for (const node of nodes) {
+    const nodeTypes = (Array.isArray(node["@type"]) ? node["@type"] : [node["@type"]]).filter(
+      (type) => typeof type === "string"
+    );
+    const isSiteIdentity = nodeTypes.some((type) => SITE_IDENTITY_TYPES.has(type));
     for (const property of ["headline", "name", "description"]) {
       if (NON_USER_FACING_PROPERTIES.has(property)) continue;
+      if (isSiteIdentity && property === "description") continue;
       if (typeof node[property] !== "string") continue;
       const value = normalizeSpace(node[property]);
       if (!value) continue;

@@ -196,6 +196,26 @@ describe("technical HTML audit", () => {
     );
   });
 
+  it("ignores site-identity descriptions that paraphrase branding", () => {
+    const site = auditTechnicalHtml(`
+      <html><head><title>Noticiencias</title>
+      <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"WebSite","name":"Noticiencias","description":"Traduce ciencia a un español claro para millones."}
+      </script></head>
+      <body><header><span class="brand-mark">Noticiencias</span></header><main><h1>Noticiencias</h1><p>Visible body copy about science news.</p></main></body></html>
+    `);
+    assert.equal(finding(site, "technical.structured_data_text_consistency").status, "pass");
+
+    const article = auditTechnicalHtml(`
+      <html><head><title>Visible title</title>
+      <script type="application/ld+json">
+        {"@context":"https://schema.org","@type":"NewsArticle","headline":"Visible title","description":"Unrelated marketing copy nowhere on the page."}
+      </script></head>
+      <body><main><h1>Visible title</h1><p>Visible body copy.</p></main></body></html>
+    `);
+    assert.equal(finding(article, "technical.structured_data_text_consistency").status, "warn");
+  });
+
   it("emits nine versioned, evidence-labeled findings", () => {
     const observations = observeTechnicalHtml(fixture("valid-static.html"), {
       sourceUrl: "https://example.com/guide",
